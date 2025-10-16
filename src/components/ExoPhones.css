@@ -1,0 +1,355 @@
+/* Root container */
+.exo-container {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  min-height: 100vh;
+  padding: 24px;
+  color: #f1f5f9;
+  font-family: "Inter", Arial, sans-serif;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Welcome card */
+.welcome-card {
+  background: #1e293b;
+  border-radius: 16px;
+  padding: 28px 20px;
+  text-align: center;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  position: relative;
+  overflow: hidden;
+}
+.welcome-card::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    circle,
+    rgba(14, 165, 233, 0.1) 0%,
+    transparent 70%
+  );
+  animation: pulse 8s infinite;
+  z-index: 0;
+}
+.welcome-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(14, 165, 233, 0.2);
+}
+.welcome-icon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+  color: #0ea5e9;
+  transition: transform 0.3s ease;
+}
+.welcome-card:hover .welcome-icon {
+  transform: rotate(15deg);
+}
+.welcome-text {
+  font-size: 1.7rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #f8fafc;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.welcome-subtext {
+  font-size: 1rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 28px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 6px;
+  position: relative;
+}
+.tabs::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #0ea5e9;
+  transition: width 0.3s ease;
+}
+.tabs:hover::after {
+  width: 100%;
+}
+.tabs span {
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #94a3b8;
+  padding: 4px 8px;
+  transition: color 0.2s ease, transform 0.2s ease;
+  position: relative;
+}
+.tabs span:hover {
+  color: #e2e8f0;
+  transform: translateY(-2px);
+}
+.active-tab {
+  border-bottom: 2px solid #0ea5e9;
+  color: #0ea5e9 !important;
+  font-weight: 600;
+}
+
+/* Section title */
+.title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 10px 0 24px;
+  color: #f8fafc;
+  position: relative;
+}
+.title::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 40px;
+  height: 2px;
+  background: #0ea5e9;
+  transition: width 0.3s ease;
+}
+.title:hover::after {
+  width: 60px;
+}
+
+/* Global settings */
+.global-settings {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 24px;
+  align-items: flex-end;
+  background: rgba(30, 41, 59, 0.9);
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+.global-settings:hover {
+  transform: translateY(-2px);
+}
+.global-settings .input-box,
+.global-settings .select-box {
+  flex: 1;
+}
+
+/* Call list grid */
+.call-list {
+  display: grid;
+  gap: 18px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+/* Call card */
+.lead-call-card {
+  background: #1e293b;
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  border: 1px solid transparent;
+  transition: border 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.lead-call-card:hover {
+  border: 1px solid #0ea5e9;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
+}
+
+/* Lead info */
+.lead-info small {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 5px;
+  letter-spacing: 0.05em;
+  transition: color 0.2s ease;
+}
+.lead-call-card:hover .lead-info small {
+  color: #cbd5e1;
+}
+.lead-info a {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #38bdf8;
+  text-decoration: none;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+.lead-info a:hover {
+  color: #0ea5e9;
+  text-shadow: 0 0 8px rgba(14, 165, 233, 0.3);
+}
+
+/* Call settings */
+.call-settings {
+  font-size: 0.9rem;
+  color: #e2e8f0;
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+.lead-call-card:hover .call-settings {
+  background: rgba(15, 23, 42, 0.95);
+}
+
+/* Input & select fields */
+.input-box,
+.select-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.input-box label,
+.select-box label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.input-box input,
+.select-box select {
+  padding: 10px 12px;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #f8fafc;
+  transition: border 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.input-box input:focus,
+.select-box select:focus {
+  border-color: #0ea5e9;
+  outline: none;
+  background: #1e293b;
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.2);
+}
+
+/* Call button */
+.call-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  color: #fff;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  align-self: flex-end;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.call-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.6);
+  background: linear-gradient(135deg, #0d8fc9, #2bb0f0);
+}
+.call-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  background: #475569;
+}
+
+/* Call history section */
+.call-history {
+  margin-top: 36px;
+  padding: 20px;
+  background: #1e293b;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  border-left: 4px solid #0ea5e9;
+  transition: transform 0.2s ease;
+}
+.call-history:hover {
+  transform: translateX(5px);
+}
+.call-history h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #f8fafc;
+  text-transform: uppercase;
+}
+.call-history ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.call-history li {
+  padding: 8px 0;
+  font-size: 0.9rem;
+  color: #e2e8f0;
+  border-bottom: 1px solid #334155;
+  transition: color 0.2s ease;
+}
+.call-history li:hover {
+  color: #f8fafc;
+}
+.call-history li:last-child {
+  border-bottom: none;
+}
+
+/* Responsive layout */
+@media (min-width: 768px) {
+  .lead-call-card {
+    flex-direction: row;
+    align-items: center;
+    gap: 18px;
+  }
+  .call-btn {
+    align-self: center;
+  }
+  .global-settings {
+    flex-direction: row;
+  }
+}
+
+/* Animations */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

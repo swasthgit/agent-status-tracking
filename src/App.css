@@ -1,0 +1,53 @@
+/* We don't need much here anymore as MUI and component-specific files will handle styling */
+/* src/App.css */
+
+.App {
+  text-align: center;
+  min-height: 100vh;
+  /* Added beautiful grid pattern background */
+  background: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    #282c34;
+  background-size: 20px 20px;
+  background-attachment: fixed;
+}
+
+.App-header {
+  background: transparent; /* Made transparent to show grid pattern */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  /* Added subtle backdrop for better text readability */
+  backdrop-filter: blur(0.5px);
+}
+
+.App-link {
+  color: #61dafb;
+  /* Added hover effect for better interactivity */
+  transition: color 0.3s ease;
+}
+
+.App-link:hover {
+  color: #21a9c7;
+}
+
+/* Added responsive grid pattern for mobile */
+@media (max-width: 768px) {
+  .App {
+    background-size: 15px 15px;
+  }
+}
+
+/* Added alternative dot pattern option */
+.App.dots-pattern {
+  background: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.1) 1px,
+      transparent 1px
+    ),
+    #282c34;
+  background-size: 20px 20px;
+}
