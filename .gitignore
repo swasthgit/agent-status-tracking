@@ -182,7 +182,21 @@ src/components/UploadPartners.js
 upload-partners.js
 
 # ===========================================
-# FIRESTORE RULES (Use firebase deploy instead)
+# FIRESTORE/STORAGE RULES (Sensitive - deploy separately)
 # ===========================================
+firestore.rules
+storage.rules
+firestore.indexes.json
 FIRESTORE_RULES.txt
 UPDATED_FIRESTORE_RULES.txt
+
+# ===========================================
+# ENVIRONMENT FILES
+# ===========================================
+.env.example
+.env*
+
+# ===========================================
+# FIREBASE CONFIG
+# ===========================================
+.firebaserc
