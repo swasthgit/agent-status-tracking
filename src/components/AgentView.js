@@ -1,64 +1,86 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import CallLogForm from "./CallLogForm";
 import ExoPhones from "./ExoPhones";
 import ManualLeads from "./ManualLeads";
 import InboundCalls from "./InboundCalls";
+import CallHistory from "./CallHistory";
+import DailyTaskForm from "./DailyTaskForm";
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
-  Button,
-  FormControl,
-  Select,
-  MenuItem,
-  Grid,
-  List,
-  ListItem,
-  Divider,
-  Paper,
-  Chip,
   Avatar,
-  Fade,
-  Zoom,
   Tabs,
   Tab,
+  Paper,
+  Chip,
 } from "@mui/material";
 import {
-  Phone,
-  PhoneDisabled,
   Person,
-  AccessTime,
-  TrendingUp,
+  Circle,
 } from "@mui/icons-material";
 import {
   doc,
   getDoc,
   collection,
-  addDoc,
-  serverTimestamp,
   onSnapshot,
   updateDoc,
   setDoc,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
-import styles from "./AgentView.module.css";
+import { THEME } from "../theme/theme";
+import { useAgentStatus, AGENT_STATUS } from "../hooks/useAgentStatus";
+
+// Status color mapping
+const getStatusColor = (status) => {
+  switch (status) {
+    case AGENT_STATUS.AVAILABLE:
+      return "#22c55e"; // Green
+    case AGENT_STATUS.ON_CALL:
+      return "#f59e0b"; // Orange/Amber
+    case AGENT_STATUS.UNAVAILABLE:
+    default:
+      return "#ef4444"; // Red
+  }
+};
 
 const AgentView = ({ currentUser, onStatusChange }) => {
   const [agent, setAgent] = useState(null);
-  const [isCallActive, setIsCallActive] = useState(false);
-  const [showCallForm, setShowCallForm] = useState(false);
   const [callLog, setCallLog] = useState([]);
-  const [filteredCallLog, setFilteredCallLog] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [callStartTime, setCallStartTime] = useState(null);
-  const [callEndTime, setCallEndTime] = useState(null);
   const [tabValue, setTabValue] = useState(0);
-  const [currentLeadNumber, setCurrentLeadNumber] = useState("");
   const unsubscribeRef = useRef(() => {});
   const isMountedRef = useRef(false);
   const timeoutRef = useRef(null);
   const isRevertingToIdle = useRef(false);
+
+  // Helper function to get the correct collection name
+  const getCollectionName = useCallback(() => {
+    if (currentUser?.collection) {
+      return currentUser.collection;
+    }
+    if (currentUser?.role === "teamlead") {
+      return "mswasth";
+    }
+    if (currentUser?.role === "health_tl") {
+      return "healthTeamLeads";
+    }
+    if (currentUser?.role === "healthAgent") {
+      return "healthAgents";
+    }
+    return currentUser?.email?.split("@")[0] || "";
+  }, [currentUser]);
+
+  // Use the new status management hook
+  const {
+    status: agentStatus,
+    setOnCall,
+    setAvailableAfterCall,
+    setUnavailable,
+    recordActivity,
+  } = useAgentStatus(
+    currentUser?.uid,
+    getCollectionName(),
+    true // isLoggedIn - hook auto-sets to Available on mount
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -72,13 +94,7 @@ const AgentView = ({ currentUser, onStatusChange }) => {
         return;
       }
 
-      // Check if user is a Team Leader (role is teamlead)
-      let collectionName = currentUser.email.split("@")[0];
-
-      // If user role is teamlead, use mswasth collection
-      if (currentUser.role === "teamlead") {
-        collectionName = "mswasth";
-      }
+      const collectionName = getCollectionName();
 
       try {
         const userDocRef = doc(db, collectionName, currentUser.uid);
@@ -87,8 +103,9 @@ const AgentView = ({ currentUser, onStatusChange }) => {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setAgent({
-              id: currentUser.uid,
               ...userData,
+              id: currentUser.uid,  // Keep Firebase UID as id (overwrites userData.id)
+              customId: userData.id,  // Store custom ID separately
               status: "Idle",
             });
 
@@ -126,11 +143,7 @@ const AgentView = ({ currentUser, onStatusChange }) => {
       currentUser.email &&
       currentUser.uid
     ) {
-      // Check if user is a Team Leader
-      let collectionName = currentUser.email.split("@")[0];
-      if (currentUser.role === "teamlead") {
-        collectionName = "mswasth";
-      }
+      const collectionName = getCollectionName();
 
       const callLogsRef = collection(
         db,
@@ -146,14 +159,19 @@ const AgentView = ({ currentUser, onStatusChange }) => {
         callLogsRef,
         (snapshot) => {
           if (isMountedRef.current) {
+            console.log(`[AgentView] Call logs snapshot received for ${collectionName}/${currentUser.uid}`);
+            console.log(`[AgentView] Number of call logs:`, snapshot.docs.length);
             const logs = snapshot.docs.map((doc) => ({
               id: doc.id,
               ...doc.data(),
             }));
+            console.log(`[AgentView] Mapped call logs:`, logs);
             setCallLog(logs);
           }
         },
-        (error) => {}
+        (error) => {
+          console.error(`[AgentView] Error fetching call logs:`, error);
+        }
       );
 
       const unsubscribeAgentStatus = onSnapshot(
@@ -190,194 +208,43 @@ const AgentView = ({ currentUser, onStatusChange }) => {
         timeoutRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, onStatusChange]);
 
-  useEffect(() => {
-    const filterLogs = () => {
-      const now = new Date();
-      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const filtered = callLog.filter((log) => {
-        if (!log.timestamp) return false;
-        const logTime = log.timestamp.toDate();
-        return logTime >= twentyFourHoursAgo && logTime <= now;
-      });
-      setFilteredCallLog(filtered);
-    };
-    filterLogs();
-  }, [callLog]);
-
-  const handleStatusChange = useCallback(
-    async (e) => {
-      const newStatus = e.target.value;
-      if (agent && agent.status !== newStatus) {
-        onStatusChange(agent.id, newStatus);
-        setAgent((prev) => ({ ...prev, status: newStatus }));
-        try {
-          let collectionName = currentUser.email.split("@")[0];
-          if (currentUser.role === "teamlead") {
-            collectionName = "mswasth";
-          }
-          await updateDoc(doc(db, collectionName, agent.id), {
-            status: newStatus,
-          });
-
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
-
-          if (newStatus === "On Call" && !isCallActive) {
-            timeoutRef.current = setTimeout(async () => {
-              if (isMountedRef.current && !isCallActive) {
-                setAgent((prev) => {
-                  if (prev.status === "On Call") {
-                    isRevertingToIdle.current = true;
-                    onStatusChange(prev.id, "Idle");
-                    return { ...prev, status: "Idle" };
-                  }
-                  return prev;
-                });
-                try {
-                  await updateDoc(doc(db, collectionName, agent.id), {
-                    status: "Idle",
-                  });
-                } catch (error) {
-                } finally {
-                  isRevertingToIdle.current = false;
-                }
-              }
-            }, 300 * 1000);
-          }
-        } catch (error) {}
-      }
-    },
-    [agent, currentUser, onStatusChange, isCallActive]
-  );
 
   const startCall = useCallback(
-    (leadNumber) => {
+    () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
 
-      const start = new Date();
-      setCallStartTime(start);
-      setCurrentLeadNumber(leadNumber);
-      onStatusChange(agent.id, "Busy");
-      setIsCallActive(true);
-      let collectionName = currentUser.email.split("@")[0];
-      if (currentUser.role === "teamlead") {
-        collectionName = "mswasth";
-      }
-      updateDoc(doc(db, collectionName, agent.id), { status: "Busy" }).catch(
-        (error) => {}
-      );
+      // Use new status hook to set "On Call"
+      setOnCall();
+      onStatusChange(agent.id, AGENT_STATUS.ON_CALL);
     },
-    [agent, currentUser, onStatusChange]
+    [agent, onStatusChange, setOnCall]
   );
 
   const endCall = useCallback(() => {
-    const end = new Date();
-    setCallEndTime(end);
-    setIsCallActive(false);
-    setShowCallForm(true);
-    let collectionName = currentUser.email.split("@")[0];
-    if (currentUser.role === "teamlead") {
-      collectionName = "mswasth";
-    }
-    updateDoc(doc(db, collectionName, agent.id), { status: "Idle" }).catch(
-      (error) => {}
-    );
-  }, [agent, currentUser, onStatusChange]);
-
-  const handleFormSubmit = useCallback(
-    async (logEntry) => {
-      if (!currentUser || !currentUser.email || !agent) return;
-
-      try {
-        let collectionName = currentUser.email.split("@")[0];
-        if (currentUser.role === "teamlead") {
-          collectionName = "mswasth";
-        }
-        await addDoc(collection(db, collectionName, agent.id, "callLogs"), {
-          agentId: agent.id,
-          clientNumber: logEntry.clientNumber,
-          time: logEntry.time,
-          date: logEntry.date,
-          callConnected: logEntry.callConnected,
-          callStatus: logEntry.callConnected ? logEntry.callStatus : null,
-          notConnectedReason: logEntry.callConnected
-            ? null
-            : logEntry.notConnectedReason,
-          remarks: logEntry.remarks || null,
-          duration: logEntry.duration || { hours: 0, minutes: 0, seconds: 0 },
-          startTime: callStartTime ? callStartTime.toISOString() : null,
-          endTime: callEndTime ? callEndTime.toISOString() : null,
-          timestamp: serverTimestamp(),
-        });
-        onStatusChange(agent.id, "Idle");
-        updateDoc(doc(db, collectionName, agent.id), { status: "Idle" }).catch(
-          (error) => {}
-        );
-        setCallStartTime(null);
-        setCallEndTime(null);
-        setCurrentLeadNumber("");
-      } catch (error) {}
-      setShowCallForm(false);
-    },
-    [agent, currentUser, callStartTime, callEndTime, onStatusChange]
-  );
-
-  const statuses = ["Idle", "Break", "On Call", "Logout"];
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Idle":
-        return "success";
-      case "Break":
-        return "warning";
-      case "On Call":
-        return "info";
-      case "Busy":
-        return "error";
-      case "Logout":
-        return "default";
-      default:
-        return "default";
-    }
-  };
-
-  const formatDuration = (duration) => {
-    if (
-      !duration ||
-      typeof duration !== "object" ||
-      (!duration.hours && !duration.minutes && !duration.seconds)
-    )
-      return null;
-    return `${duration.hours || 0}h ${duration.minutes || 0}m ${
-      duration.seconds || 0
-    }s`;
-  };
+    // Use new status hook to set back to "Available"
+    setAvailableAfterCall();
+    onStatusChange(agent?.id, AGENT_STATUS.AVAILABLE);
+  }, [agent, onStatusChange, setAvailableAfterCall]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
-    // Reset call-related UI states and refresh "Call History" when switching to it
-    if (newValue === 0) {
-      // Call History tab
-      setIsCallActive(false);
-      setShowCallForm(false);
-      // Force re-filter of logs to ensure latest data is displayed
-      const now = new Date();
-      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const filtered = callLog.filter((log) => {
-        if (!log.timestamp) return false;
-        const logTime = log.timestamp.toDate();
-        return logTime >= twentyFourHoursAgo && logTime <= now;
-      });
-      setFilteredCallLog(filtered); // Recompute filtered logs
-    }
+    // Record activity when agent interacts with tabs
+    recordActivity();
   };
+
+  // Set status to unavailable when component unmounts (logout)
+  useEffect(() => {
+    return () => {
+      // This will run when the agent logs out / component unmounts
+      setUnavailable();
+    };
+  }, [setUnavailable]);
 
   if (loading) {
     return <Typography>Loading agent data...</Typography>;
@@ -388,296 +255,194 @@ const AgentView = ({ currentUser, onStatusChange }) => {
   }
 
   return (
-    <Box className={styles.container}>
-      <Box className={styles.headerSection}>
-        <Avatar className={styles.agentAvatar}>
-          <Person />
-        </Avatar>
-        <Box>
-          <Typography variant="h4" className={styles.welcomeTitle}>
-            Welcome back, {agent.name}
-          </Typography>
-          <Typography variant="subtitle1" className={styles.welcomeSubtitle}>
-            Ready to make some calls today?
-          </Typography>
+    <Box
+      sx={{
+        background: THEME.background,
+        minHeight: "100vh",
+        padding: "24px",
+      }}
+    >
+      {/* Modern Header Section */}
+      <Paper
+        elevation={0}
+        sx={{
+          background: `linear-gradient(135deg, ${THEME.primary} 0%, #1e8a7f 100%)`,
+          color: "#fff",
+          padding: "32px",
+          borderRadius: "16px",
+          marginBottom: "24px",
+          border: "none",
+          boxShadow: `0 4px 20px ${THEME.primary}33`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "20px",
+          flexWrap: "wrap",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <Avatar
+            sx={{
+              width: 64,
+              height: 64,
+              background: "rgba(255, 255, 255, 0.2)",
+              backdropFilter: "blur(10px)",
+              border: "2px solid rgba(255, 255, 255, 0.3)",
+            }}
+          >
+            <Person sx={{ fontSize: "32px", color: "#fff" }} />
+          </Avatar>
+          <Box>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                color: "#fff",
+                margin: 0,
+                fontSize: { xs: "1.5rem", md: "2rem" },
+              }}
+            >
+              Welcome back, {agent.name}
+            </Typography>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                color: "rgba(255, 255, 255, 0.9)",
+                margin: "4px 0 0 0",
+                fontWeight: 500,
+              }}
+            >
+              Ready to make some calls today?
+            </Typography>
+          </Box>
         </Box>
+
+        {/* Real-time Status Indicator */}
+        <Chip
+          icon={<Circle sx={{ fontSize: "12px !important", color: getStatusColor(agentStatus) }} />}
+          label={agentStatus}
+          sx={{
+            bgcolor: "rgba(255, 255, 255, 0.15)",
+            backdropFilter: "blur(10px)",
+            color: "#fff",
+            fontWeight: 600,
+            fontSize: "14px",
+            padding: "8px 4px",
+            height: "auto",
+            border: `2px solid ${getStatusColor(agentStatus)}`,
+            "& .MuiChip-icon": {
+              color: getStatusColor(agentStatus),
+              animation: agentStatus === AGENT_STATUS.ON_CALL ? "pulse 1.5s infinite" : "none",
+            },
+            "@keyframes pulse": {
+              "0%": { opacity: 1 },
+              "50%": { opacity: 0.4 },
+              "100%": { opacity: 1 },
+            },
+          }}
+        />
+      </Paper>
+
+      {/* Modern Tabs */}
+      <Paper
+        elevation={0}
+        sx={{
+          backgroundColor: THEME.cardBg,
+          borderRadius: "16px",
+          marginBottom: "24px",
+          border: `1px solid ${THEME.primary}20`,
+          overflow: "hidden",
+        }}
+      >
+        <Tabs
+          value={tabValue}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            "& .MuiTab-root": {
+              color: THEME.textSecondary,
+              fontWeight: 600,
+              fontSize: "14px",
+              textTransform: "none",
+              minHeight: "64px",
+              transition: "all 0.3s ease",
+              "&:hover": {
+                color: THEME.primary,
+                backgroundColor: `${THEME.primary}10`,
+              },
+              "&.Mui-selected": {
+                color: THEME.primary,
+                fontWeight: 700,
+              },
+            },
+            "& .MuiTabs-indicator": {
+              backgroundColor: THEME.primary,
+              height: "3px",
+              borderRadius: "3px 3px 0 0",
+            },
+          }}
+        >
+          <Tab label="Call History" />
+          <Tab label="ExoPhones" />
+          <Tab label="Manual Leads" />
+          <Tab label="Inbound Calls" />
+          {/* Daily Task tab - Only for Health Agents */}
+          {(currentUser?.role === "Health Agent" ||
+            currentUser?.role === "healthAgent" ||
+            currentUser?.collection === "healthAgents") && (
+            <Tab label="Daily Task" />
+          )}
+        </Tabs>
+      </Paper>
+
+      {/* Tab Content */}
+      <Box sx={{ marginTop: "24px" }}>
+        {tabValue === 0 && (
+          <CallHistory callLogs={callLog} agentName={agent.name} />
+        )}
+
+        {tabValue === 1 && agent && currentUser && (
+          <ExoPhones
+            agentId={agent.id}
+            agentCollection={getCollectionName()}
+            onStartCall={startCall}
+            onEndCall={endCall}
+          />
+        )}
+
+        {tabValue === 2 && agent && currentUser && (
+          <ManualLeads
+            agentId={agent.id}
+            agentCollection={getCollectionName()}
+            onStartCall={startCall}
+            onEndCall={endCall}
+          />
+        )}
+
+        {tabValue === 3 && agent && currentUser && (
+          <InboundCalls
+            agentId={agent.id}
+            agentCollection={getCollectionName()}
+            agentName={agent.name}
+          />
+        )}
+
+        {/* Daily Task tab content - Only for Health Agents */}
+        {tabValue === 4 &&
+          agent &&
+          currentUser &&
+          (currentUser?.role === "Health Agent" ||
+            currentUser?.role === "healthAgent" ||
+            currentUser?.collection === "healthAgents") && (
+            <DailyTaskForm
+              agentId={agent.id}
+              agentName={agent.name}
+              agentCollection={getCollectionName()}
+              currentUser={currentUser}
+            />
+          )}
       </Box>
-
-      <Tabs value={tabValue} onChange={handleTabChange} centered>
-        <Tab label="Call History" />
-        <Tab label="ExoPhones" />
-        <Tab label="Manual Leads" />
-        <Tab label="Inbound Calls" />
-      </Tabs>
-
-      {tabValue === 0 && (
-        <Grid container spacing={3} className={styles.mainGrid}>
-          <Grid item xs={12} lg={4}>
-            <Card className={styles.controlCard} elevation={0}>
-              <CardContent className={styles.controlContent}>
-                <Box className={styles.cardHeader}>
-                  <Typography variant="h6" className={styles.sectionHeader}>
-                    Control Center
-                  </Typography>
-                  <Chip
-                    label={agent.status}
-                    color={getStatusColor(agent.status)}
-                    size="small"
-                    className={styles.statusChip}
-                  />
-                </Box>
-
-                <Box className={styles.statusBox}>
-                  {!isCallActive && !showCallForm && (
-                    <Fade in={true}>
-                      <Box className={styles.actionControls}>
-                        <FormControl
-                          variant="outlined"
-                          size="small"
-                          className={styles.statusSelect}
-                        >
-                          <Select
-                            value={agent.status || "Idle"}
-                            onChange={handleStatusChange}
-                            displayEmpty
-                          >
-                            {statuses.map((status) => (
-                              <MenuItem key={status} value={status}>
-                                {status}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                        {/* <Button
-                          variant="contained"
-                          startIcon={<Phone />}
-                          onClick={startCall}
-                          className={styles.startButton}
-                          size="large"
-                          disabled={agent.status === "Logout"}
-                        >
-                          Start Call
-                        </Button> */}
-                      </Box>
-                    </Fade>
-                  )}
-                </Box>
-
-                {isCallActive && (
-                  <Zoom in={true}>
-                    <Box className={styles.activeCallBox}>
-                      <Box className={styles.pulseIcon}>
-                        <Phone className={styles.phoneIcon} />
-                      </Box>
-                      <Typography
-                        variant="h6"
-                        className={styles.activeCallText}
-                      >
-                        Call in Progress
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        className={styles.callSubtext}
-                      >
-                        Stay focused and professional
-                      </Typography>
-                      <Button
-                        variant="contained"
-                        color="error"
-                        startIcon={<PhoneDisabled />}
-                        onClick={endCall}
-                        className={styles.endButton}
-                        size="large"
-                      >
-                        End Call
-                      </Button>
-                    </Box>
-                  </Zoom>
-                )}
-
-                {showCallForm && (
-                  <Fade in={true}>
-                    <Box className={styles.formContainer}>
-                      <CallLogForm
-                        onSubmit={handleFormSubmit}
-                        initialClientNumber={currentLeadNumber}
-                      />
-                    </Box>
-                  </Fade>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className={styles.statsCard} elevation={0}>
-              <CardContent>
-                <Box className={styles.statsHeader}>
-                  <TrendingUp className={styles.statsIcon} />
-                  <Typography variant="h6">Today's Stats</Typography>
-                </Box>
-                <Box className={styles.statsGrid}>
-                  <Box className={styles.statItem}>
-                    <Typography variant="h4" className={styles.statNumber}>
-                      {filteredCallLog.length}
-                    </Typography>
-                    <Typography variant="body2" className={styles.statLabel}>
-                      Total Calls
-                    </Typography>
-                  </Box>
-                  <Box className={styles.statItem}>
-                    <Typography variant="h4" className={styles.statNumber}>
-                      {
-                        filteredCallLog.filter((log) => log.callConnected)
-                          .length
-                      }
-                    </Typography>
-                    <Typography variant="body2" className={styles.statLabel}>
-                      Connected
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} lg={8}>
-            <Box className={styles.logSection}>
-              <Box className={styles.logHeader}>
-                <Box>
-                  <Typography variant="h5" className={styles.logTitle}>
-                    Call History (Last 24 Hours)
-                  </Typography>
-                  <Typography variant="body2" className={styles.logSubtitle}>
-                    Track your daily progress
-                  </Typography>
-                </Box>
-                <AccessTime className={styles.timeIcon} />
-              </Box>
-
-              <Paper className={styles.logPaper} elevation={0}>
-                <List disablePadding className={styles.logList}>
-                  {filteredCallLog.length === 0 ? (
-                    <ListItem className={styles.emptyLogItem}>
-                      <Box className={styles.emptyState}>
-                        <Phone className={styles.emptyIcon} />
-                        <Typography className={styles.emptyText}>
-                          No calls logged in the last 24 hours
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className={styles.emptySubtext}
-                        >
-                          Start your first call to see it here
-                        </Typography>
-                      </Box>
-                    </ListItem>
-                  ) : (
-                    filteredCallLog.map((log, index) => (
-                      <React.Fragment key={log.id || index}>
-                        <ListItem className={styles.logItem}>
-                          <Box className={styles.logItemContent}>
-                            <Box className={styles.logItemHeader}>
-                              <Box className={styles.logItemLeft}>
-                                <Box className={styles.phoneIconWrapper}>
-                                  <Phone className={styles.logPhoneIcon} />
-                                </Box>
-                                <Box>
-                                  <Typography className={styles.logPrimary}>
-                                    {log.clientNumber}
-                                  </Typography>
-                                  <Typography className={styles.logTime}>
-                                    {log.time}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                              <Chip
-                                label={
-                                  log.callConnected
-                                    ? "Connected"
-                                    : "Not Connected"
-                                }
-                                color={log.callConnected ? "success" : "error"}
-                                size="small"
-                                className={styles.modernStatusChip}
-                              />
-                            </Box>
-
-                            <Box className={styles.logDetails}>
-                              <Box className={styles.logDetailItem}>
-                                <Typography className={styles.logDetailLabel}>
-                                  Status:
-                                </Typography>
-                                <Typography className={styles.logDetailValue}>
-                                  {log.callConnected
-                                    ? log.callStatus
-                                    : log.notConnectedReason}
-                                </Typography>
-                              </Box>
-
-                              {log.remarks && (
-                                <Box className={styles.logDetailItem}>
-                                  <Typography className={styles.logDetailLabel}>
-                                    Remarks:
-                                  </Typography>
-                                  <Typography className={styles.logDetailValue}>
-                                    {log.remarks}
-                                  </Typography>
-                                </Box>
-                              )}
-
-                              {log.callConnected &&
-                                formatDuration(log.duration) && (
-                                  <Box className={styles.logDetailItem}>
-                                    <AccessTime
-                                      className={styles.durationIcon}
-                                    />
-                                    <Typography
-                                      className={styles.logDurationValue}
-                                    >
-                                      {formatDuration(log.duration)}
-                                    </Typography>
-                                  </Box>
-                                )}
-                            </Box>
-                          </Box>
-                        </ListItem>
-                        {index < filteredCallLog.length - 1 && (
-                          <Divider className={styles.logDivider} />
-                        )}
-                      </React.Fragment>
-                    ))
-                  )}
-                </List>
-              </Paper>
-            </Box>
-          </Grid>
-        </Grid>
-      )}
-
-      {tabValue === 1 && agent && currentUser && (
-        <ExoPhones
-          agentId={agent.id}
-          agentCollection={currentUser.role === "teamlead" ? "mswasth" : currentUser.email.split("@")[0]}
-          onStartCall={startCall}
-          onEndCall={endCall}
-        />
-      )}
-
-      {tabValue === 2 && agent && currentUser && (
-        <ManualLeads
-          agentId={agent.id}
-          agentCollection={currentUser.role === "teamlead" ? "mswasth" : currentUser.email.split("@")[0]}
-          onStartCall={startCall}
-          onEndCall={endCall}
-        />
-      )}
-
-      {tabValue === 3 && agent && currentUser && (
-        <InboundCalls
-          agentId={agent.id}
-          agentCollection={currentUser.role === "teamlead" ? "mswasth" : currentUser.email.split("@")[0]}
-          agentName={agent.name}
-        />
-      )}
     </Box>
   );
 };

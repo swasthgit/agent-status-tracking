@@ -1,12 +1,7 @@
 .container {
   min-height: 100vh !important;
-  padding: 16px !important; /* Reduced padding for smaller screens */
-  background: linear-gradient(
-    135deg,
-    #0f172a 0%,
-    #1e293b 50%,
-    #334155 100%
-  ) !important;
+  padding: 16px !important;
+  background: #f5f7fa !important;
   position: relative !important;
   overflow: hidden !important;
   display: flex !important;
@@ -15,20 +10,7 @@
 }
 
 .container::before {
-  content: "" !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  background-image: radial-gradient(
-    circle at 2px 2px,
-    rgba(148, 163, 184, 0.1) 1px,
-    transparent 0
-  ) !important;
-  background-size: 24px 24px !important;
-  pointer-events: none !important;
-  z-index: -1 !important;
+  content: none !important;
 }
 
 .container > * {
@@ -37,29 +19,26 @@
 }
 
 .header {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
-  color: #f1f5f9 !important;
-  padding: 24px !important; /* Slightly reduced padding */
-  border-radius: 8px !important;
+  background: linear-gradient(135deg, #26a69a 0%, #1e8a7f 100%) !important;
+  color: #fff !important;
+  padding: 24px !important;
+  border-radius: 16px !important;
   margin-bottom: 16px !important;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  border: none !important;
+  box-shadow: 0 4px 20px rgba(38, 166, 154, 0.2) !important;
+  transition: all 0.3s ease !important;
 }
 
 .headerTitle {
-  font-size: clamp(24px, 5vw, 28px) !important; /* Responsive font size */
-  font-weight: 800 !important;
+  font-size: clamp(24px, 5vw, 28px) !important;
+  font-weight: 700 !important;
   margin: 0 !important;
-  background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  color: #fff !important;
 }
 
 .headerSubtitle {
-  font-size: clamp(14px, 3vw, 16px) !important; /* Responsive font size */
-  color: #cbd5e1 !important;
+  font-size: clamp(14px, 3vw, 16px) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
   margin: 8px 0 0 0 !important;
   font-weight: 500 !important;
 }
@@ -70,18 +49,19 @@
     auto-fit,
     minmax(160px, 1fr)
   ) !important; /* Smaller min-width for mobile */
-  gap: 12px !important; /* Reduced gap for smaller screens */
-  padding: 0 0 24px 0 !important;
+  gap: 16px !important;
+  padding: 0 !important;
+  margin-bottom: 32px !important;
 }
 
 .statCard {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  border-radius: 8px !important;
-  padding: 16px !important; /* Reduced padding */
+  background: #ffffff !important;
+  border: 1px solid rgba(38, 166, 154, 0.2) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
   text-align: center !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
   position: relative !important;
   overflow: hidden !important;
 }
@@ -93,30 +73,24 @@
   left: 0 !important;
   right: 0 !important;
   height: 3px !important;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(59, 130, 246, 0.5) 50%,
-    transparent 100%
-  ) !important;
+  background: linear-gradient(90deg, #26a69a 0%, #66bb6a 50%, #ff7043 100%) !important;
 }
 
 .statCard:hover {
   transform: translateY(-4px) !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
-  border-color: rgba(59, 130, 246, 0.4) !important;
+  box-shadow: 0 8px 32px rgba(38, 166, 154, 0.15) !important;
+  border-color: #26a69a !important;
 }
 
 .statNumber {
-  font-size: clamp(24px, 6vw, 32px) !important; /* Responsive font size */
-  font-weight: 800 !important;
+  font-size: clamp(24px, 6vw, 32px) !important;
+  font-weight: 700 !important;
   margin: 0 0 8px 0 !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 
 .statLabel {
-  font-size: clamp(12px, 2.5vw, 13px) !important; /* Responsive font size */
-  color: #cbd5e1 !important;
+  font-size: clamp(12px, 2.5vw, 13px) !important;
+  color: #546e7a !important;
   margin: 0 !important;
   text-transform: uppercase !important;
   letter-spacing: 1px !important;
@@ -124,16 +98,16 @@
 }
 
 .statAvailable .statNumber {
-  color: #22c55e !important;
+  color: #26a69a !important;
 }
 .statBusy .statNumber {
-  color: #f59e0b !important;
+  color: #66bb6a !important;
 }
 .statBreak .statNumber {
-  color: #ef4444 !important;
+  color: #546e7a !important;
 }
 .statTotal .statNumber {
-  color: #8b5cf6 !important;
+  color: #ff7043 !important;
 }
 
 .agentsContainer {
@@ -141,11 +115,10 @@
 }
 
 .sectionTitle {
-  font-size: clamp(20px, 4vw, 24px) !important; /* Responsive font size */
+  font-size: clamp(20px, 4vw, 24px) !important;
   font-weight: 700 !important;
-  color: #f1f5f9 !important;
+  color: #26a69a !important;
   margin: 0 0 16px 0 !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 
 .agentsGrid {
@@ -158,12 +131,12 @@
 }
 
 .agentCard {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  border-radius: 8px !important;
-  padding: 16px !important; /* Reduced padding */
+  background: #ffffff !important;
+  border: 1px solid rgba(38, 166, 154, 0.2) !important;
+  border-radius: 16px !important;
+  padding: 20px !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
   text-align: left !important;
   position: relative !important;
   overflow: hidden !important;
@@ -175,14 +148,14 @@
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 2px !important;
-  background: linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%) !important;
+  height: 3px !important;
+  background: linear-gradient(90deg, #26a69a 0%, #66bb6a 50%, #ff7043 100%) !important;
 }
 
 .agentCard:hover {
   transform: translateY(-4px) !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
-  border-color: rgba(139, 92, 246, 0.4) !important;
+  box-shadow: 0 8px 32px rgba(38, 166, 154, 0.15) !important;
+  border-color: #26a69a !important;
 }
 
 .agentHeader {
@@ -199,30 +172,30 @@
 }
 
 .agentAvatar {
-  width: clamp(40px, 10vw, 48px) !important; /* Responsive avatar size */
+  width: clamp(40px, 10vw, 48px) !important;
   height: clamp(40px, 10vw, 48px) !important;
-  border-radius: 8px !important;
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   color: white !important;
   font-weight: 700 !important;
-  font-size: clamp(16px, 4vw, 18px) !important; /* Responsive font size */
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3) !important;
-  margin-right: 12px !important; /* Reduced margin */
+  font-size: clamp(16px, 4vw, 18px) !important;
+  box-shadow: 0 4px 12px rgba(102, 187, 106, 0.3) !important;
+  margin-right: 12px !important;
 }
 
 .agentInfo h3 {
-  font-size: clamp(16px, 4vw, 18px) !important; /* Responsive font size */
+  font-size: clamp(16px, 4vw, 18px) !important;
   font-weight: 700 !important;
-  color: #f1f5f9 !important;
+  color: #26a69a !important;
   margin: 0 0 4px 0 !important;
 }
 
 .agentInfo p {
-  font-size: clamp(12px, 3vw, 13px) !important; /* Responsive font size */
-  color: #cbd5e1 !important;
+  font-size: clamp(12px, 3vw, 13px) !important;
+  color: #546e7a !important;
   margin: 0 !important;
   font-weight: 500 !important;
 }
@@ -245,30 +218,30 @@
 }
 
 .statusAvailable {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+  background: linear-gradient(135deg, #26a69a 0%, #1e8a7f 100%) !important;
   color: white !important;
 }
 
 .statusBusy {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  background: linear-gradient(135deg, #ff7043 0%, #ff5722 100%) !important;
   color: white !important;
 }
 
 .statusBreak {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  background: linear-gradient(135deg, #ef5350 0%, #e53935 100%) !important;
   color: white !important;
 }
 
 .departmentIcon {
-  width: clamp(24px, 6vw, 26px) !important; /* Responsive icon size */
+  width: clamp(24px, 6vw, 26px) !important;
   height: clamp(24px, 6vw, 26px) !important;
   border-radius: 6px !important;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+  background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   color: white !important;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(102, 187, 106, 0.3) !important;
 }
 
 .performanceSection {
@@ -279,8 +252,8 @@
 }
 
 .performanceLabel {
-  font-size: clamp(10px, 2.5vw, 11px) !important; /* Responsive font size */
-  color: #cbd5e1 !important;
+  font-size: clamp(10px, 2.5vw, 11px) !important;
+  color: #546e7a !important;
   margin: 0 0 8px 0 !important;
   text-transform: uppercase !important;
   letter-spacing: 1px !important;
@@ -289,26 +262,26 @@
 
 .performanceBar {
   width: 100% !important;
-  height: 6px !important; /* Slightly thinner bar */
-  background: rgba(51, 65, 85, 0.8) !important;
-  border-radius: 6px !important;
+  height: 8px !important;
+  background: rgba(38, 166, 154, 0.1) !important;
+  border-radius: 8px !important;
   overflow: hidden !important;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: none !important;
   position: relative !important;
 }
 
 .performanceFill {
   height: 100% !important;
-  background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%) !important;
-  border-radius: 6px !important;
+  background: linear-gradient(90deg, #4caf50 0%, #66bb6a 100%) !important;
+  border-radius: 8px !important;
   transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4) !important;
+  box-shadow: none !important;
 }
 
 .performanceText {
-  font-size: clamp(12px, 3vw, 13px) !important; /* Responsive font size */
+  font-size: clamp(12px, 3vw, 13px) !important;
   font-weight: 700 !important;
-  color: #f1f5f9 !important;
+  color: #26a69a !important;
   margin: 6px 0 0 0 !important;
   text-align: right !important;
 }
@@ -322,8 +295,8 @@
 }
 
 .callLabel {
-  font-size: clamp(10px, 2.5vw, 11px) !important; /* Responsive font size */
-  color: #94a3b8 !important;
+  font-size: clamp(10px, 2.5vw, 11px) !important;
+  color: #546e7a !important;
   margin: 0 !important;
   font-weight: 500 !important;
   letter-spacing: 0.5px !important;

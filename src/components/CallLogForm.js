@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -16,12 +16,19 @@ import {
   Divider,
 } from "@mui/material";
 import { Save, Cancel } from "@mui/icons-material";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../firebaseConfig";
 
 const CallLogForm = ({ onSubmit }) => {
   const [formData, setFormData] = useState({
     clientNumber: "",
     callConnected: true,
     callStatus: "",
+    callType: "",
+    callCategory: "",
+    partner: "",
+    escalation: "",
+    department: "",
     notConnectedReason: "",
     remarks: "",
     duration: {
@@ -30,7 +37,27 @@ const CallLogForm = ({ onSubmit }) => {
       seconds: 0,
     },
   });
-  const [clientNumberError, setClientNumberError] = useState(""); // State for validation error
+  const [clientNumberError, setClientNumberError] = useState("");
+  const [partners, setPartners] = useState([]);
+
+  // Fetch partners from Firestore
+  useEffect(() => {
+    const fetchPartners = async () => {
+      try {
+        const partnersRef = collection(db, "partners");
+        const querySnapshot = await getDocs(partnersRef);
+        const partnersList = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setPartners(partnersList);
+      } catch (error) {
+        console.error("Error fetching partners:", error);
+      }
+    };
+
+    fetchPartners();
+  }, []);
 
   const handleInputChange = (field, value) => {
     if (field === "clientNumber") {
@@ -73,6 +100,41 @@ const CallLogForm = ({ onSubmit }) => {
       return;
     }
 
+    if (!formData.callType) {
+      alert("Please select a Call Type (Client/Branch Manager/Nurse)");
+      return;
+    }
+
+    if (!formData.escalation) {
+      alert("Please select Escalation (Yes/No)");
+      return;
+    }
+
+    if (!formData.department) {
+      alert("Please select Department Name");
+      return;
+    }
+
+    if (formData.callConnected) {
+      if (!formData.callCategory) {
+        alert("Please select a Call Category");
+        return;
+      }
+      if (!formData.callStatus) {
+        alert("Please select a Call Status");
+        return;
+      }
+      if (!formData.partner) {
+        alert("Please select a Partner");
+        return;
+      }
+    } else {
+      if (!formData.notConnectedReason) {
+        alert("Please select a Not Connected Reason");
+        return;
+      }
+    }
+
     const logEntry = {
       ...formData,
       time: new Date().toLocaleTimeString(),
@@ -86,12 +148,27 @@ const CallLogForm = ({ onSubmit }) => {
       clientNumber: "",
       callConnected: true,
       callStatus: "",
+      callType: "",
+      callCategory: "",
+      partner: "",
+      escalation: "",
+      department: "",
       notConnectedReason: "",
       remarks: "",
       duration: { hours: 0, minutes: 0, seconds: 0 },
     });
     setClientNumberError("");
   };
+
+  const callTypes = ["Client", "Branch Manager", "Nurse"];
+
+  const callCategories = [
+    "Query Update",
+    "Claim Status",
+    "Negotiation Call",
+    "Intimation Call",
+    "Product Information",
+  ];
 
   const callStatuses = [
     "Completed Successfully",
@@ -172,6 +249,296 @@ const CallLogForm = ({ onSubmit }) => {
           />
         </Grid>
 
+        {/* Call Type Dropdown */}
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth variant="outlined" required>
+            <InputLabel
+              id="call-type-label"
+              shrink={true}
+              sx={{
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: formData.callType ? "#d1d5db" : "#ff9800",
+                "&.Mui-focused": {
+                  color: formData.callType ? "#3b82f6" : "#ff9800",
+                },
+              }}
+            >
+              Call Type *
+            </InputLabel>
+            <Select
+              labelId="call-type-label"
+              value={formData.callType}
+              onChange={(e) => handleInputChange("callType", e.target.value)}
+              label="Call Type *"
+              required
+              sx={{
+                borderRadius: "6px",
+                backgroundColor: "rgba(17, 24, 39, 0.5)",
+                color: "#f8fafc",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.callType
+                    ? "rgba(75, 85, 99, 0.6)"
+                    : "#ff9800",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.callType
+                    ? "rgba(156, 163, 175, 0.8)"
+                    : "#ff9800",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#3b82f6",
+                },
+                "& .MuiSelect-icon": {
+                  color: "#d1d5db",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#374151",
+                    "& .MuiMenuItem-root": {
+                      color: "#f8fafc",
+                      "&:hover": {
+                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      },
+                      "&.Mui-disabled": {
+                        color: "#9ca3af",
+                      },
+                    },
+                  },
+                },
+              }}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Call Type
+              </MenuItem>
+              {callTypes.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* Partner Dropdown */}
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth variant="outlined" required>
+            <InputLabel
+              id="partner-label"
+              shrink={true}
+              sx={{
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: formData.partner ? "#d1d5db" : "#ff9800",
+                "&.Mui-focused": {
+                  color: formData.partner ? "#3b82f6" : "#ff9800",
+                },
+              }}
+            >
+              Partner *
+            </InputLabel>
+            <Select
+              labelId="partner-label"
+              value={formData.partner}
+              onChange={(e) => handleInputChange("partner", e.target.value)}
+              label="Partner *"
+              required
+              sx={{
+                borderRadius: "6px",
+                backgroundColor: "rgba(17, 24, 39, 0.5)",
+                color: "#f8fafc",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.partner
+                    ? "rgba(75, 85, 99, 0.6)"
+                    : "#ff9800",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.partner
+                    ? "rgba(156, 163, 175, 0.8)"
+                    : "#ff9800",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#3b82f6",
+                },
+                "& .MuiSelect-icon": {
+                  color: "#d1d5db",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#374151",
+                    "& .MuiMenuItem-root": {
+                      color: "#f8fafc",
+                      "&:hover": {
+                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      },
+                      "&.Mui-disabled": {
+                        color: "#9ca3af",
+                      },
+                    },
+                  },
+                },
+              }}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Partner
+              </MenuItem>
+              {partners.map((partner) => (
+                <MenuItem key={partner.id} value={partner.name}>
+                  {partner.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* Escalation Dropdown */}
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth variant="outlined" required>
+            <InputLabel
+              id="escalation-label"
+              shrink={true}
+              sx={{
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: formData.escalation ? "#d1d5db" : "#ff9800",
+                "&.Mui-focused": {
+                  color: formData.escalation ? "#3b82f6" : "#ff9800",
+                },
+              }}
+            >
+              Escalation *
+            </InputLabel>
+            <Select
+              labelId="escalation-label"
+              value={formData.escalation}
+              onChange={(e) => handleInputChange("escalation", e.target.value)}
+              label="Escalation *"
+              required
+              sx={{
+                borderRadius: "6px",
+                backgroundColor: "rgba(17, 24, 39, 0.5)",
+                color: "#f8fafc",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.escalation
+                    ? "rgba(75, 85, 99, 0.6)"
+                    : "#ff9800",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.escalation
+                    ? "rgba(156, 163, 175, 0.8)"
+                    : "#ff9800",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#3b82f6",
+                },
+                "& .MuiSelect-icon": {
+                  color: "#d1d5db",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#374151",
+                    "& .MuiMenuItem-root": {
+                      color: "#f8fafc",
+                      "&:hover": {
+                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      },
+                      "&.Mui-disabled": {
+                        color: "#9ca3af",
+                      },
+                    },
+                  },
+                },
+              }}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Escalation
+              </MenuItem>
+              <MenuItem value="Yes">Yes</MenuItem>
+              <MenuItem value="No">No</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* Department Name Dropdown */}
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth variant="outlined" required>
+            <InputLabel
+              id="department-label"
+              shrink={true}
+              sx={{
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: formData.department ? "#d1d5db" : "#ff9800",
+                "&.Mui-focused": {
+                  color: formData.department ? "#3b82f6" : "#ff9800",
+                },
+              }}
+            >
+              Department Name *
+            </InputLabel>
+            <Select
+              labelId="department-label"
+              value={formData.department}
+              onChange={(e) => handleInputChange("department", e.target.value)}
+              label="Department Name *"
+              required
+              sx={{
+                borderRadius: "6px",
+                backgroundColor: "rgba(17, 24, 39, 0.5)",
+                color: "#f8fafc",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.department
+                    ? "rgba(75, 85, 99, 0.6)"
+                    : "#ff9800",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.department
+                    ? "rgba(156, 163, 175, 0.8)"
+                    : "#ff9800",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#3b82f6",
+                },
+                "& .MuiSelect-icon": {
+                  color: "#d1d5db",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#374151",
+                    "& .MuiMenuItem-root": {
+                      color: "#f8fafc",
+                      "&:hover": {
+                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      },
+                      "&.Mui-disabled": {
+                        color: "#9ca3af",
+                      },
+                    },
+                  },
+                },
+              }}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Department
+              </MenuItem>
+              <MenuItem value="Insurance Claim">Insurance Claim</MenuItem>
+              <MenuItem value="Insurance Policy">Insurance Policy</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+
         <Grid item xs={12}>
           <FormControl component="fieldset">
             <FormLabel
@@ -208,6 +575,82 @@ const CallLogForm = ({ onSubmit }) => {
 
         {formData.callConnected ? (
           <>
+            {/* Call Category Dropdown */}
+            <Grid item xs={12}>
+              <FormControl fullWidth variant="outlined" required>
+                <InputLabel
+                  id="call-category-label"
+                  shrink={true}
+                  sx={{
+                    fontSize: "1rem",
+                    fontWeight: 600,
+                    color: formData.callCategory ? "#d1d5db" : "#ff9800",
+                    "&.Mui-focused": {
+                      color: formData.callCategory ? "#3b82f6" : "#ff9800",
+                    },
+                  }}
+                >
+                  Call Category *
+                </InputLabel>
+                <Select
+                  labelId="call-category-label"
+                  value={formData.callCategory}
+                  onChange={(e) =>
+                    handleInputChange("callCategory", e.target.value)
+                  }
+                  label="Call Category *"
+                  required
+                  sx={{
+                    borderRadius: "6px",
+                    backgroundColor: "rgba(17, 24, 39, 0.5)",
+                    color: "#f8fafc",
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: formData.callCategory
+                        ? "rgba(75, 85, 99, 0.6)"
+                        : "#ff9800",
+                    },
+                    "&:hover .MuiOutlinedInput-notchedOutline": {
+                      borderColor: formData.callCategory
+                        ? "rgba(156, 163, 175, 0.8)"
+                        : "#ff9800",
+                    },
+                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "#3b82f6",
+                    },
+                    "& .MuiSelect-icon": {
+                      color: "#d1d5db",
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        backgroundColor: "#374151",
+                        "& .MuiMenuItem-root": {
+                          color: "#f8fafc",
+                          "&:hover": {
+                            backgroundColor: "rgba(59, 130, 246, 0.1)",
+                          },
+                          "&.Mui-disabled": {
+                            color: "#9ca3af",
+                          },
+                        },
+                      },
+                    },
+                  }}
+                  displayEmpty
+                >
+                  <MenuItem value="" disabled>
+                    Select Category
+                  </MenuItem>
+                  {callCategories.map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {category}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
             <Grid item xs={12}>
               <FormControl fullWidth variant="outlined" required>
                 <InputLabel
@@ -465,6 +908,11 @@ const CallLogForm = ({ onSubmit }) => {
                   clientNumber: "",
                   callConnected: true,
                   callStatus: "",
+                  callType: "",
+                  callCategory: "",
+                  partner: "",
+                  escalation: "",
+                  department: "",
                   notConnectedReason: "",
                   remarks: "",
                   duration: { hours: 0, minutes: 0, seconds: 0 },

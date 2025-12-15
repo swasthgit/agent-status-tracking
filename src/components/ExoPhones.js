@@ -6,6 +6,8 @@ import {
   getDocs,
   addDoc,
   onSnapshot,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import API_BASE_URL from "../config/api";
@@ -25,6 +27,20 @@ function ExoPhones({ agentId, agentCollection }) {
     useState("");
   const [callHistory, setCallHistory] = useState([]);
   const [agentName, setAgentName] = useState("Agent");
+  const [agentTypes, setAgentTypes] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isDropdownOpen && !event.target.closest('.select-box')) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDropdownOpen]);
 
   useEffect(() => {
     console.log("agentId:", agentId, "agentCollection:", agentCollection);
@@ -37,10 +53,9 @@ function ExoPhones({ agentId, agentCollection }) {
     // Fetch agent name
     const fetchAgentName = async () => {
       try {
-        const agentDocRef = collection(db, agentCollection);
-        const agentSnapshot = await getDocs(agentDocRef);
-        const agentDoc = agentSnapshot.docs.find(doc => doc.id === agentId);
-        if (agentDoc) {
+        const agentDocRef = doc(db, agentCollection, agentId);
+        const agentDoc = await getDoc(agentDocRef);
+        if (agentDoc.exists()) {
           const agentData = agentDoc.data();
           setAgentName(agentData.name || "Agent");
         }
@@ -113,47 +128,54 @@ function ExoPhones({ agentId, agentCollection }) {
   useEffect(() => {
     const fetchExotelPhones = async () => {
       try {
-        const response = await axios.get(
-          `${API_BASE_URL}/v1/Accounts/${ACCOUNT_SID}/IncomingPhoneNumbers`
-        );
+        // Fetch all exophones from Firestore
+        const exophonesRef = collection(db, "exophones");
+        const exophonesSnap = await getDocs(exophonesRef);
 
-        // Parse XML response
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(response.data, "application/xml");
-        const phoneElements = xmlDoc.getElementsByTagName("IncomingPhoneNumber");
+        // Fetch partner linkages
+        const linkagesRef = collection(db, "partnerNumbers");
+        const linkagesSnap = await getDocs(linkagesRef);
 
+        // Create a map of exophoneId -> partner info
+        const linkagesMap = {};
+        linkagesSnap.forEach((doc) => {
+          const linkData = doc.data();
+          linkagesMap[linkData.exophoneId] = {
+            partnerName: linkData.partnerName,
+            partnerId: linkData.partnerId,
+          };
+        });
+
+        // Build phone list with partner names
         const phones = [];
-        for (let i = 0; i < phoneElements.length; i++) {
-          const phoneElement = phoneElements[i];
+        exophonesSnap.forEach((doc) => {
+          const phoneData = doc.data();
+          const linkage = linkagesMap[doc.id];
+
           phones.push({
-            phone_number: phoneElement.getElementsByTagName("PhoneNumber")[0]?.textContent,
-            friendly_name: phoneElement.getElementsByTagName("FriendlyName")[0]?.textContent,
-            sid: phoneElement.getElementsByTagName("Sid")[0]?.textContent,
+            phone_number: phoneData.formattedNumber || `0${phoneData.number}`,
+            friendly_name: linkage ? linkage.partnerName : "Available Number",
+            sid: doc.id,
+            status: phoneData.status,
+            isAssigned: phoneData.status === "assigned",
+            partnerName: linkage ? linkage.partnerName : null,
           });
-        }
+        });
+
+        // Sort: assigned first (alphabetically by partner name), then unassigned
+        phones.sort((a, b) => {
+          if (a.isAssigned && !b.isAssigned) return -1;
+          if (!a.isAssigned && b.isAssigned) return 1;
+          if (a.isAssigned && b.isAssigned) {
+            return a.partnerName.localeCompare(b.partnerName);
+          }
+          return 0;
+        });
 
         setExotelPhones(phones);
       } catch (err) {
         console.error("Error fetching Exotel phones:", err);
-
-        // Try to parse error message from XML response
-        let errorMessage = err.message;
-        if (err.response && err.response.data) {
-          try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(err.response.data, "application/xml");
-            const errorMsg = xmlDoc.getElementsByTagName("Message")[0]?.textContent;
-            const errorCode = xmlDoc.getElementsByTagName("Code")[0]?.textContent;
-            if (errorMsg) {
-              errorMessage = `${errorMsg} (Code: ${errorCode})`;
-              console.error("Exotel API Error:", errorMessage);
-            }
-          } catch (parseErr) {
-            console.error("Could not parse error XML:", parseErr);
-          }
-        }
-
-        setError("Error fetching Exotel phones: " + errorMessage);
+        setError("Error fetching phone numbers: " + err.message);
       }
     };
     fetchExotelPhones();
@@ -177,9 +199,14 @@ function ExoPhones({ agentId, agentCollection }) {
     const toNumber = item.clientNumber;
     const fromNumber = globalManualNumber;
     const callerId = globalSelectedExotelPhone;
+    const agentType = agentTypes[callId];
 
     if (!toNumber || !fromNumber || !callerId) {
       setError("Settings not configured. Please add your number and ExoPhone.");
+      return;
+    }
+    if (!agentType) {
+      setError("Please select an Agent Type before making the call.");
       return;
     }
 
@@ -210,6 +237,7 @@ function ExoPhones({ agentId, agentCollection }) {
         agentName,
         leadToCallNumber: toNumber,
         callerId,
+        agentType,
         timestamp: new Date().toISOString(),
       };
       setCallHistory((prevHistory) => [...prevHistory, newCallRecord]);
@@ -226,6 +254,7 @@ function ExoPhones({ agentId, agentCollection }) {
         agent: agentName,
         lead: toNumber,
         exophone: callerId,
+        agentType,
         callType: "Assigned Call",
         time: new Date().toISOString(),
         assignedCallId: callId,
@@ -244,6 +273,10 @@ function ExoPhones({ agentId, agentCollection }) {
 
   const handleManualNumberChange = (value) => {
     setManualNumberInput(value);
+  };
+
+  const handleAgentTypeChange = (callId, value) => {
+    setAgentTypes((prev) => ({ ...prev, [callId]: value }));
   };
 
   const handleExotelPhoneChange = (value) => {
@@ -265,11 +298,6 @@ function ExoPhones({ agentId, agentCollection }) {
 
   return (
     <div className="exo-container">
-      <div className="welcome-card">
-        <div className="welcome-icon">👤</div>
-        <h1 className="welcome-text">Welcome back, {agentName}</h1>
-        <p className="welcome-subtext">Ready to make some calls today?</p>
-      </div>
       <h2 className="title">Assigned Calls for {agentCollection}</h2>
       <div className="global-settings">
         <div className="input-box">
@@ -285,26 +313,137 @@ function ExoPhones({ agentId, agentCollection }) {
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <div className="select-box">
+        <div className="select-box" style={{ position: "relative" }}>
           <label
             htmlFor="global-exotelSelect"
             className="text-sm text-gray-600"
           >
             Caller ID (ExoPhone)
           </label>
-          <select
-            id="global-exotelSelect"
-            value={selectedExotelPhoneInput}
-            onChange={(e) => handleExotelPhoneChange(e.target.value)}
+          <input
+            type="text"
+            placeholder="Search by partner name or number..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => setIsDropdownOpen(true)}
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">-- Select --</option>
-            {exotelPhones.map((phone, index) => (
-              <option key={index} value={phone.phone_number}>
-                {phone.phone_number} ({phone.friendly_name})
-              </option>
-            ))}
-          </select>
+          />
+          {selectedExotelPhoneInput && (
+            <div style={{
+              padding: "0.5rem",
+              backgroundColor: "#e0f2fe",
+              borderRadius: "6px",
+              marginBottom: "0.5rem",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}>
+              <span style={{ fontWeight: "600", color: "#0f172a" }}>
+                Selected: {selectedExotelPhoneInput}
+              </span>
+              <button
+                onClick={() => {
+                  setSelectedExotelPhoneInput("");
+                  setSearchTerm("");
+                }}
+                style={{
+                  background: "#ef4444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "0.25rem 0.75rem",
+                  cursor: "pointer"
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          )}
+          {isDropdownOpen && (
+            <div style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              maxHeight: "300px",
+              overflowY: "auto",
+              backgroundColor: "white",
+              border: "1px solid #d1d5db",
+              borderRadius: "6px",
+              boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+              zIndex: 1000
+            }}>
+              {/* Assigned Numbers */}
+              <div style={{ padding: "0.5rem", backgroundColor: "#f3f4f6", fontWeight: "600", fontSize: "0.875rem" }}>
+                📋 Assigned Partner Numbers
+              </div>
+              {exotelPhones
+                .filter((phone) => phone.isAssigned)
+                .filter((phone) =>
+                  phone.phone_number.includes(searchTerm) ||
+                  phone.partnerName.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((phone, index) => (
+                  <div
+                    key={index}
+                    onClick={() => {
+                      handleExotelPhoneChange(phone.phone_number);
+                      setIsDropdownOpen(false);
+                      setSearchTerm("");
+                    }}
+                    style={{
+                      padding: "0.75rem",
+                      cursor: "pointer",
+                      borderBottom: "1px solid #e5e7eb",
+                      backgroundColor: selectedExotelPhoneInput === phone.phone_number ? "#dbeafe" : "white"
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = "#f3f4f6"}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = selectedExotelPhoneInput === phone.phone_number ? "#dbeafe" : "white"}
+                  >
+                    <div style={{ fontWeight: "600", color: "#0f172a" }}>{phone.phone_number}</div>
+                    <div style={{ fontSize: "0.875rem", color: "#64748b" }}>{phone.partnerName}</div>
+                  </div>
+                ))}
+
+              {/* Available Numbers */}
+              <div style={{ padding: "0.5rem", backgroundColor: "#f3f4f6", fontWeight: "600", fontSize: "0.875rem", marginTop: "0.5rem" }}>
+                📞 Available Numbers (Others/Extras)
+              </div>
+              {exotelPhones
+                .filter((phone) => !phone.isAssigned)
+                .filter((phone) => phone.phone_number.includes(searchTerm))
+                .map((phone, index) => (
+                  <div
+                    key={index}
+                    onClick={() => {
+                      handleExotelPhoneChange(phone.phone_number);
+                      setIsDropdownOpen(false);
+                      setSearchTerm("");
+                    }}
+                    style={{
+                      padding: "0.75rem",
+                      cursor: "pointer",
+                      borderBottom: "1px solid #e5e7eb",
+                      backgroundColor: selectedExotelPhoneInput === phone.phone_number ? "#dbeafe" : "white"
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = "#f3f4f6"}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = selectedExotelPhoneInput === phone.phone_number ? "#dbeafe" : "white"}
+                  >
+                    <div style={{ fontWeight: "600", color: "#0f172a" }}>{phone.phone_number}</div>
+                  </div>
+                ))}
+
+              {/* No results */}
+              {exotelPhones.filter((phone) =>
+                phone.phone_number.includes(searchTerm) ||
+                (phone.partnerName && phone.partnerName.toLowerCase().includes(searchTerm.toLowerCase()))
+              ).length === 0 && (
+                <div style={{ padding: "1rem", textAlign: "center", color: "#64748b" }}>
+                  No numbers found
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <button
           onClick={handleAddSettings}
@@ -328,6 +467,31 @@ function ExoPhones({ agentId, agentCollection }) {
               >
                 {item.clientNumber}
               </a>
+            </div>
+            <div className="select-box" style={{ marginBottom: "1rem" }}>
+              <label
+                htmlFor={`agentType-${item.id}`}
+                className="text-sm text-gray-600"
+              >
+                Agent Type (Optional)
+              </label>
+              <select
+                id={`agentType-${item.id}`}
+                value={agentTypes[item.id] || ""}
+                onChange={(e) =>
+                  handleAgentTypeChange(item.id, e.target.value)
+                }
+                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{
+                  color: "#0f172a",
+                  fontWeight: "500",
+                  fontSize: "0.95rem"
+                }}
+              >
+                <option value="">-- Select Type --</option>
+                <option value="Insurance">Insurance</option>
+                <option value="Health">Health</option>
+              </select>
             </div>
             <div className="call-settings">
               <p>

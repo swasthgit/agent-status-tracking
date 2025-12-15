@@ -9,6 +9,7 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
   const [callStartTime, setCallStartTime] = useState(null);
   const [currentClientNumber, setCurrentClientNumber] = useState("");
   const [error, setError] = useState(null);
+  const [agentType, setAgentType] = useState("");
 
   const handleStartLogging = () => {
     if (!currentClientNumber.trim()) {
@@ -33,6 +34,7 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
         ...logEntry,
         agentId,
         agentName: agentName || "Agent",
+        agentType: agentType || "N/A",
         callType: "Inbound",
         callDirection: "Inbound",
         timestamp: serverTimestamp(),
@@ -43,6 +45,7 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
       setShowCallForm(false);
       setCurrentClientNumber("");
       setCallStartTime(null);
+      setAgentType("");
       setError(null);
 
       alert("✅ Inbound call log saved successfully!");
@@ -71,51 +74,121 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
 
   return (
     <div className="exo-container">
-      <div className="welcome-card">
-        <div className="welcome-icon">📞</div>
-        <h1 className="welcome-text">Log Inbound Calls</h1>
-        <p className="welcome-subtext">
-          Record details of calls received from clients
-        </p>
-      </div>
-
       {!showCallForm ? (
         <div className="manual-leads-section">
           <h2 className="title">Inbound Call Logging</h2>
-          <p style={{ color: '#94a3b8', marginBottom: '20px' }}>
+          <p style={{ color: '#546e7a', marginBottom: '20px', fontSize: '0.95rem' }}>
             When a client calls you directly on your number, use this section to log the call details.
           </p>
 
-          <div className="add-lead-form">
-            <input
-              type="tel"
-              pattern="\d{10}"
-              maxLength="10"
-              placeholder="Enter client's 10-digit number"
-              value={currentClientNumber}
-              onChange={(e) => setCurrentClientNumber(e.target.value.replace(/\D/g, ''))}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style={{
-                backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                border: '1px solid rgba(148, 163, 184, 0.3)',
-                color: '#f1f5f9',
-                padding: '12px',
-                borderRadius: '8px',
-                fontSize: '16px'
-              }}
-            />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="input-box">
+              <label style={{
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                color: '#546e7a',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '6px',
+                display: 'block'
+              }}>
+                Client Number
+              </label>
+              <input
+                type="tel"
+                pattern="\d{10}"
+                maxLength="10"
+                placeholder="Enter client's 10-digit number"
+                value={currentClientNumber}
+                onChange={(e) => setCurrentClientNumber(e.target.value.replace(/\D/g, ''))}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  border: '1px solid rgba(38, 166, 154, 0.3)',
+                  borderRadius: '12px',
+                  background: '#ffffff',
+                  color: '#1e293b',
+                  fontWeight: '500',
+                  fontSize: '1rem',
+                  transition: 'border 0.2s ease, box-shadow 0.2s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#26a69a';
+                  e.target.style.boxShadow = '0 0 8px rgba(38, 166, 154, 0.2)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(38, 166, 154, 0.3)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+
+            <div className="select-box">
+              <label
+                htmlFor="agentType"
+                style={{
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  color: '#546e7a',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '6px',
+                  display: 'block'
+                }}
+              >
+                Agent Type (Optional)
+              </label>
+              <select
+                id="agentType"
+                value={agentType}
+                onChange={(e) => setAgentType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '1px solid rgba(38, 166, 154, 0.3)',
+                  borderRadius: '12px',
+                  background: '#ffffff',
+                  color: '#1e293b',
+                  fontWeight: '500',
+                  fontSize: '1rem',
+                  transition: 'border 0.2s ease, box-shadow 0.2s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#26a69a';
+                  e.target.style.boxShadow = '0 0 8px rgba(38, 166, 154, 0.2)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(38, 166, 154, 0.3)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                <option value="">-- Select Type --</option>
+                <option value="Insurance">Insurance</option>
+                <option value="Health">Health</option>
+              </select>
+            </div>
+
             <button
               onClick={handleStartLogging}
-              className="ml-2 p-2 rounded-md"
               style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
+                background: 'linear-gradient(135deg, #26a69a 0%, #1e8a7f 100%)',
+                color: '#fff',
                 padding: '12px 24px',
                 border: 'none',
-                borderRadius: '8px',
+                borderRadius: '12px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.3)',
+                boxShadow: '0 4px 12px rgba(38, 166, 154, 0.3)',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                fontSize: '1rem'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 6px 16px rgba(38, 166, 154, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 4px 12px rgba(38, 166, 154, 0.3)';
               }}
             >
               Start Logging
@@ -123,13 +196,15 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
           </div>
 
           {error && (
-            <div className="alert alert-danger mt-3" style={{
+            <div style={{
               backgroundColor: 'rgba(239, 68, 68, 0.1)',
               border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#fca5a5',
-              padding: '12px',
-              borderRadius: '8px',
-              marginTop: '16px'
+              color: '#dc2626',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              marginTop: '16px',
+              fontSize: '0.9rem',
+              fontWeight: '500'
             }}>
               {error}
             </div>
@@ -138,14 +213,14 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
           <div style={{
             marginTop: '32px',
             padding: '20px',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.2)',
+            backgroundColor: 'rgba(38, 166, 154, 0.08)',
+            border: '1px solid rgba(38, 166, 154, 0.2)',
             borderRadius: '12px'
           }}>
-            <h3 style={{ color: '#3b82f6', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>
+            <h3 style={{ color: '#26a69a', marginBottom: '12px', fontSize: '1.1rem', fontWeight: 600 }}>
               ℹ️ How to use this section:
             </h3>
-            <ol style={{ color: '#94a3b8', paddingLeft: '20px', lineHeight: '1.8' }}>
+            <ol style={{ color: '#546e7a', paddingLeft: '20px', lineHeight: '1.8', fontSize: '0.95rem', margin: 0 }}>
               <li>Enter the 10-digit number of the client who called you</li>
               <li>Click "Start Logging" to open the call log form</li>
               <li>Fill in all the call details (status, category, remarks, etc.)</li>
@@ -160,29 +235,39 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
             justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '20px',
-            padding: '16px',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderRadius: '8px',
-            border: '1px solid rgba(59, 130, 246, 0.2)'
+            padding: '20px',
+            backgroundColor: 'rgba(38, 166, 154, 0.1)',
+            borderRadius: '12px',
+            border: '1px solid rgba(38, 166, 154, 0.3)'
           }}>
             <div>
-              <h3 style={{ color: '#3b82f6', marginBottom: '4px' }}>
+              <h3 style={{ color: '#26a69a', marginBottom: '6px', fontSize: '1.2rem', fontWeight: 700 }}>
                 Logging Inbound Call
               </h3>
-              <p style={{ color: '#94a3b8', fontSize: '14px' }}>
-                Client Number: <strong style={{ color: '#f1f5f9' }}>{currentClientNumber}</strong>
+              <p style={{ color: '#546e7a', fontSize: '0.95rem', margin: 0 }}>
+                Client Number: <strong style={{ color: '#1e293b' }}>{currentClientNumber}</strong>
               </p>
             </div>
             <button
               onClick={handleCancel}
               style={{
-                padding: '8px 16px',
-                backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                color: '#fca5a5',
+                padding: '10px 20px',
+                backgroundColor: '#fff',
+                color: '#dc2626',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '6px',
+                borderRadius: '8px',
                 cursor: 'pointer',
-                fontWeight: 600
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                e.target.style.borderColor = '#dc2626';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#fff';
+                e.target.style.borderColor = 'rgba(239, 68, 68, 0.3)';
               }}
             >
               Cancel

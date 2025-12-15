@@ -1,1296 +1,864 @@
+import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
+  Box,
+  Tabs,
+  Tab,
+  AppBar,
+  Typography,
   Grid,
   Card,
   CardContent,
-  Typography,
-  Box,
+  IconButton,
+  Tooltip,
+  Avatar,
   Chip,
-  Paper,
-  Button,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  FormLabel,
+  LinearProgress,
+  CircularProgress,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  Badge,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import {
-  Person,
-  Circle,
-  TrendingUp,
-  AccessTime,
   Business,
-  Logout as LogoutIcon,
-  FileDownload,
-  PersonAdd,
+  LocalHospital,
+  Analytics,
+  DirectionsWalk,
+  Dashboard as DashboardIcon,
+  Refresh,
+  Menu as MenuIcon,
+  Close,
+  TrendingUp,
+  People,
+  Fullscreen,
+  FullscreenExit,
+  Notifications,
 } from "@mui/icons-material";
-import { useEffect, useState } from "react";
-import {
-  collection,
-  onSnapshot,
-  getDoc,
-  doc,
-  Timestamp,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db, auth } from "../firebaseConfig";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import styles from "./ManagerDashboard.module.css";
-import { useNavigate } from "react-router-dom";
+import { collection, onSnapshot, doc, getDoc, query, orderBy, getDocs } from "firebase/firestore";
+import { db } from "../firebaseConfig";
+import InsuranceManagerDashboard from "./InsuranceManagerDashboard";
+import HealthManagerDashboard from "./HealthManagerDashboard";
+import CallAnalytics from "./CallAnalytics";
+import OfflineVisitsManager from "./OfflineVisitsManager";
 
-function ManagerDashboard({ currentUser }) {
-  const [agents, setAgents] = useState([]);
-  const [callLogs, setCallLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [csvFilter, setCsvFilter] = useState("all");
-  const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
-  const [newUserData, setNewUserData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    id: "",
-    mobile: "",
-    role: "agent",
-    designation: "RE",
-  });
-  const [creating, setCreating] = useState(false);
-  const navigate = useNavigate();
-
-  // Current time as a Firestore Timestamp for ongoing calls (09:59 PM IST, October 08, 2025)
-  const currentTime = Timestamp.fromDate(new Date("2025-10-08T21:59:00+05:30"));
+// Animated Counter Hook
+const useAnimatedCounter = (end, duration = 1500) => {
+  const [count, setCount] = useState(0);
+  const countRef = useRef(null);
 
   useEffect(() => {
-    let mounted = true;
-    if (!currentUser || !currentUser.uid) {
-      if (mounted) setLoading(false);
+    if (end === 0) {
+      setCount(0);
       return;
     }
 
-    // Verify manager role
-    const fetchManagerRole = async () => {
+    const startTime = Date.now();
+    const startValue = 0;
+
+    const animate = () => {
+      const now = Date.now();
+      const progress = Math.min((now - startTime) / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const currentValue = Math.floor(startValue + (end - startValue) * easeOut);
+
+      setCount(currentValue);
+
+      if (progress < 1) {
+        countRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    countRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (countRef.current) {
+        cancelAnimationFrame(countRef.current);
+      }
+    };
+  }, [end, duration]);
+
+  return count;
+};
+
+// Quick Stats Card Component
+const QuickStatCard = ({ title, value, icon, gradient, subtitle, trend }) => {
+  const animatedValue = useAnimatedCounter(value);
+
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        background: gradient,
+        color: "white",
+        borderRadius: 3,
+        overflow: "hidden",
+        position: "relative",
+        transition: "all 0.3s ease",
+        cursor: "pointer",
+        "&:hover": {
+          transform: "translateY(-6px)",
+          boxShadow: "0 16px 32px rgba(0,0,0,0.15)",
+        },
+      }}
+    >
+      <CardContent sx={{ p: 2.5, position: "relative", zIndex: 1 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Box>
+            <Typography variant="caption" sx={{ opacity: 0.9, fontWeight: 500, letterSpacing: 0.5 }}>
+              {title}
+            </Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, my: 0.5 }}>
+              {animatedValue}
+            </Typography>
+            {subtitle && (
+              <Chip
+                label={subtitle}
+                size="small"
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.2)",
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: "0.65rem",
+                  height: 22,
+                }}
+              />
+            )}
+          </Box>
+          <Avatar
+            sx={{
+              bgcolor: "rgba(255,255,255,0.2)",
+              width: 48,
+              height: 48,
+            }}
+          >
+            {icon}
+          </Avatar>
+        </Box>
+        {trend && (
+          <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+            <TrendingUp sx={{ fontSize: 14, mr: 0.5 }} />
+            <Typography variant="caption" sx={{ fontWeight: 600 }}>
+              {trend}
+            </Typography>
+          </Box>
+        )}
+      </CardContent>
+      {/* Decorative elements */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: -20,
+          right: -20,
+          width: 100,
+          height: 100,
+          borderRadius: "50%",
+          bgcolor: "rgba(255,255,255,0.1)",
+        }}
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: -30,
+          right: 30,
+          width: 60,
+          height: 60,
+          borderRadius: "50%",
+          bgcolor: "rgba(255,255,255,0.08)",
+        }}
+      />
+    </Card>
+  );
+};
+
+// Department Tab Panel
+const TabPanel = ({ children, value, index, ...other }) => (
+  <div
+    role="tabpanel"
+    hidden={value !== index}
+    id={`department-tabpanel-${index}`}
+    aria-labelledby={`department-tab-${index}`}
+    {...other}
+  >
+    {value === index && <Box>{children}</Box>}
+  </div>
+);
+
+// Department Gradients
+const DEPARTMENT_GRADIENTS = {
+  insurance: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+  health: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
+  analytics: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+  offline: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+};
+
+const DEPARTMENT_COLORS = {
+  insurance: "#667eea",
+  health: "#11998e",
+  analytics: "#f093fb",
+  offline: "#4facfe",
+};
+
+/**
+ * Super Manager Dashboard - Revamped
+ * Modern UI with animations, charts, and enhanced visualizations
+ */
+function ManagerDashboard({ currentUser }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const initialTab = tabParam ? parseInt(tabParam, 10) : 0;
+
+  const [selectedTab, setSelectedTab] = useState(initialTab);
+  const [allCallLogs, setAllCallLogs] = useState([]);
+  const [allAgents, setAllAgents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [quickStats, setQuickStats] = useState({
+    totalAgents: 0,
+    totalCalls: 0,
+    connectedCalls: 0,
+    activeUsers: 0,
+    healthAgents: 0,
+    insuranceAgents: 0,
+    dcAgents: 0,
+    totalManagers: 0,
+  });
+  const [offlineVisitsData, setOfflineVisitsData] = useState({
+    users: [],
+    visitLogs: [],
+    manualCallLogs: [],
+    trips: [],
+  });
+
+  const handleTabChange = (event, newValue) => {
+    setSelectedTab(newValue);
+    setSearchParams({ tab: newValue.toString() });
+    setMobileMenuOpen(false);
+  };
+
+  // Toggle fullscreen
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  // Fetch quick stats
+  const fetchQuickStats = async () => {
+    try {
+      const [
+        healthAgentsSnap,
+        healthTLsSnap,
+        insuranceAgentsSnap,
+        insuranceTLsSnap,
+        dcAgentsSnap,
+        managersSnap,
+      ] = await Promise.all([
+        getDocs(collection(db, "healthAgents")),
+        getDocs(collection(db, "healthTeamLeads")),
+        getDocs(collection(db, "insuranceAgents")),
+        getDocs(collection(db, "insuranceTeamLeads")),
+        getDocs(collection(db, "offlineVisits")),
+        getDocs(collection(db, "managers")),
+      ]);
+
+      const healthCount = healthAgentsSnap.size + healthTLsSnap.size;
+      const insuranceCount = insuranceAgentsSnap.size + insuranceTLsSnap.size;
+      const dcCount = dcAgentsSnap.size;
+      const managersCount = managersSnap.size;
+
+      // Count active users (Available, On Call, or legacy statuses)
+      let activeCount = 0;
+      [healthAgentsSnap, healthTLsSnap, insuranceAgentsSnap, insuranceTLsSnap, dcAgentsSnap].forEach(snap => {
+        snap.docs.forEach(doc => {
+          const data = doc.data();
+          // New status values: Available, On Call
+          // Legacy: Login, active, Idle, Busy
+          if (data.status === "Available" || data.status === "On Call" ||
+              data.status === "Login" || data.status === "active" ||
+              data.status === "Idle" || data.status === "Busy") {
+            activeCount++;
+          }
+        });
+      });
+
+      setQuickStats({
+        totalAgents: healthCount + insuranceCount + dcCount,
+        healthAgents: healthCount,
+        insuranceAgents: insuranceCount,
+        dcAgents: dcCount,
+        totalManagers: managersCount,
+        activeUsers: activeCount,
+        totalCalls: allCallLogs.length,
+        connectedCalls: allCallLogs.filter(log => log.callConnected || log.status === "completed").length,
+      });
+    } catch (error) {
+      console.error("Error fetching quick stats:", error);
+    }
+  };
+
+  // Sync tab state with URL parameter
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam !== null) {
+      const tabIndex = parseInt(tabParam, 10);
+      if (!isNaN(tabIndex) && tabIndex !== selectedTab) {
+        setSelectedTab(tabIndex);
+      }
+    }
+  }, [searchParams, selectedTab]);
+
+  // Fetch all call logs and agents for analytics
+  useEffect(() => {
+    let mounted = true;
+    if (!currentUser || !currentUser.uid) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchAllData = async () => {
       try {
+        setLoading(true);
         const userDoc = await getDoc(doc(db, "admin", currentUser.uid));
         if (userDoc.exists() && userDoc.data().role === "manager") {
-          const agentCollections = [];
-          for (let i = 1; i <= 31; i++) {
-            agentCollections.push(`agent${i}`);
-          }
+          const agentCollections = ["insuranceAgents", "healthAgents"];
+          const tlCollections = ["insuranceTeamLeads", "healthTeamLeads"];
 
           const allUnsubscribes = [];
+          const aggregatedCallLogs = [];
+          const aggregatedAgents = [];
 
-          // Also listen to mswasth collection for TL call logs
-          const mswasthRef = collection(db, "mswasth");
-          const tlUnsubscribe = onSnapshot(
-            mswasthRef,
-            (snapshot) => {
+          // Fetch Offline Visits data
+          const offlineVisitsRef = collection(db, "offlineVisits");
+          const offlineVisitsUnsubscribe = onSnapshot(offlineVisitsRef, (snapshot) => {
+            if (!mounted) return;
+            const users = [];
+            const visitLogs = [];
+            const manualCallLogs = [];
+            const trips = [];
+
+            snapshot.docs.forEach((userDoc) => {
+              const userData = userDoc.data();
+              const userId = userDoc.id;
+
+              users.push({
+                id: userId,
+                ...userData,
+              });
+
+              // Listen to offline visits subcollection
+              const visitsRef = collection(db, "offlineVisits", userId, "offlineVisits");
+              const visitsQuery = query(visitsRef, orderBy("timestamp", "desc"));
+              const visitsUnsubscribe = onSnapshot(visitsQuery, (visitsSnapshot) => {
+                if (!mounted) return;
+                visitsSnapshot.docs.forEach((visitDoc) => {
+                  visitLogs.push({
+                    id: visitDoc.id,
+                    userId,
+                    userName: userData.name,
+                    userEmpId: userData.empId,
+                    ...visitDoc.data(),
+                  });
+                });
+                setOfflineVisitsData((prev) => ({
+                  ...prev,
+                  visitLogs: [...visitLogs],
+                }));
+              });
+              allUnsubscribes.push(visitsUnsubscribe);
+
+              // Listen to visitLogs subcollection (for DC agents)
+              const dcVisitLogsRef = collection(db, "offlineVisits", userId, "visitLogs");
+              const dcVisitLogsQuery = query(dcVisitLogsRef, orderBy("createdAt", "desc"));
+              const dcVisitLogsUnsubscribe = onSnapshot(dcVisitLogsQuery, (dcVisitsSnapshot) => {
+                if (!mounted) return;
+                dcVisitsSnapshot.docs.forEach((visitDoc) => {
+                  visitLogs.push({
+                    id: visitDoc.id,
+                    userId,
+                    userName: userData.name,
+                    userEmpId: userData.empId,
+                    ...visitDoc.data(),
+                  });
+                });
+                setOfflineVisitsData((prev) => ({
+                  ...prev,
+                  visitLogs: [...visitLogs],
+                }));
+              });
+              allUnsubscribes.push(dcVisitLogsUnsubscribe);
+
+              // Listen to manual call logs subcollection
+              const manualLogsRef = collection(db, "offlineVisits", userId, "manualCallLogs");
+              const manualLogsQuery = query(manualLogsRef, orderBy("timestamp", "desc"));
+              const manualLogsUnsubscribe = onSnapshot(manualLogsQuery, (logsSnapshot) => {
+                if (!mounted) return;
+                logsSnapshot.docs.forEach((logDoc) => {
+                  manualCallLogs.push({
+                    id: logDoc.id,
+                    userId,
+                    userName: userData.name,
+                    userEmpId: userData.empId,
+                    ...logDoc.data(),
+                  });
+                });
+                setOfflineVisitsData((prev) => ({
+                  ...prev,
+                  manualCallLogs: [...manualCallLogs],
+                }));
+              });
+              allUnsubscribes.push(manualLogsUnsubscribe);
+
+              // Listen to trips subcollection
+              const tripsRef = collection(db, "offlineVisits", userId, "trips");
+              const tripsQuery = query(tripsRef, orderBy("startTime", "desc"));
+              const tripsUnsubscribe = onSnapshot(tripsQuery, (tripsSnapshot) => {
+                if (!mounted) return;
+                tripsSnapshot.docs.forEach((tripDoc) => {
+                  trips.push({
+                    id: tripDoc.id,
+                    userId,
+                    userName: userData.name,
+                    userEmpId: userData.empId,
+                    ...tripDoc.data(),
+                  });
+                });
+                setOfflineVisitsData((prev) => ({
+                  ...prev,
+                  trips: [...trips],
+                }));
+              });
+              allUnsubscribes.push(tripsUnsubscribe);
+            });
+
+            setOfflineVisitsData((prev) => ({
+              ...prev,
+              users,
+            }));
+          });
+          allUnsubscribes.push(offlineVisitsUnsubscribe);
+
+          // Fetch TL data
+          tlCollections.forEach((tlCollection) => {
+            const tlRef = collection(db, tlCollection);
+            const tlUnsubscribe = onSnapshot(tlRef, (snapshot) => {
               if (!mounted) return;
               snapshot.docs.forEach((tlDoc) => {
                 const tlData = tlDoc.data();
                 const tlId = tlDoc.id;
 
-                // Only process Team Leaders
-                if (tlData.role === "teamlead") {
-                  const tlCallLogsRef = collection(db, "mswasth", tlId, "callLogs");
-                  const tlLogsUnsubscribe = onSnapshot(
-                    tlCallLogsRef,
-                    (logsSnapshot) => {
-                      if (!mounted) return;
-                      const logs = logsSnapshot.docs.map((log) => {
-                        const data = log.data();
-                        let startTime = null;
-                        let endTime = null;
-                        if (data.startTime instanceof Timestamp) {
-                          startTime = data.startTime.toDate();
-                        } else if (typeof data.startTime === "string") {
-                          startTime = new Date(data.startTime);
-                          if (isNaN(startTime)) startTime = null;
-                        }
-                        if (data.endTime instanceof Timestamp) {
-                          endTime = data.endTime.toDate();
-                        } else if (typeof data.endTime === "string") {
-                          endTime = new Date(data.endTime);
-                          if (isNaN(endTime)) endTime = null;
-                        }
-                        return {
-                          id: log.id,
-                          ...data,
-                          timestamp: data.timestamp
-                            ? data.timestamp instanceof Timestamp
-                              ? data.timestamp.toDate()
-                              : new Date(data.timestamp)
-                            : null,
-                          startTime,
-                          endTime,
-                          agentId: tlId,
-                          collectionName: "mswasth",
-                        };
-                      });
-                      logs.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
-                      const totalCalls = logs.length;
-                      const connectedCalls = logs.filter((log) => log.callConnected).length;
-                      const disconnectedCalls = totalCalls - connectedCalls;
-                      const performance =
-                        totalCalls > 0 ? Math.round((connectedCalls / totalCalls) * 100) : 0;
-
-                      if (mounted) {
-                        setAgents((prevAgents) => {
-                          const existingTLIndex = prevAgents.findIndex(
-                            (a) => a.id === tlId && a.collection === "mswasth"
-                          );
-                          if (existingTLIndex > -1) {
-                            const updatedAgents = [...prevAgents];
-                            updatedAgents[existingTLIndex] = {
-                              id: tlId,
-                              collection: "mswasth",
-                              name: tlData.name || "Unknown TL",
-                              status: tlData.status || "Idle",
-                              avatar: tlData.avatar || tlData.name?.charAt(0)?.toUpperCase() || "TL",
-                              department: "Team Lead",
-                              performance,
-                              totalCalls,
-                              connectedCalls,
-                              disconnectedCalls,
-                            };
-                            return updatedAgents;
-                          } else {
-                            return [
-                              ...prevAgents,
-                              {
-                                id: tlId,
-                                collection: "mswasth",
-                                name: tlData.name || "Unknown TL",
-                                status: tlData.status || "Idle",
-                                avatar: tlData.avatar || tlData.name?.charAt(0)?.toUpperCase() || "TL",
-                                department: "Team Lead",
-                                performance,
-                                totalCalls,
-                                connectedCalls,
-                                disconnectedCalls,
-                              },
-                            ];
-                          }
-                        });
-
-                        setCallLogs((prevLogs) => [
-                          ...prevLogs.filter(
-                            (log) => log.agentId !== tlId || log.collectionName !== "mswasth"
-                          ),
-                          ...logs,
-                        ]);
-                      }
-                    },
-                    (error) => {
-                      console.error(`Error fetching TL call logs for ${tlId}:`, error);
-                    }
-                  );
-                  allUnsubscribes.push(tlLogsUnsubscribe);
-                }
-              });
-            },
-            (error) => {
-              console.error("Error fetching TL data:", error);
-            }
-          );
-          allUnsubscribes.push(tlUnsubscribe);
-
-          agentCollections.forEach((collectionName) => {
-            const agentsRef = collection(db, collectionName);
-            const unsubscribe = onSnapshot(
-              agentsRef,
-              (snapshot) => {
-                if (!mounted) return;
-                const agentDocs = snapshot.docs.map((agentDoc) => {
-                  const agentData = agentDoc.data();
-                  const agentId = agentDoc.id;
-                  const callLogsRef = collection(
-                    db,
-                    collectionName,
-                    agentId,
-                    "callLogs"
-                  );
-                  const logsUnsubscribe = onSnapshot(
-                    callLogsRef,
-                    (logsSnapshot) => {
-                      if (!mounted) return;
-                      const logs = logsSnapshot.docs.map((log) => {
-                        const data = log.data();
-                        let startTime = null;
-                        let endTime = null;
-                        if (data.startTime instanceof Timestamp) {
-                          startTime = data.startTime.toDate();
-                        } else if (typeof data.startTime === "string") {
-                          startTime = new Date(data.startTime);
-                          if (isNaN(startTime)) {
-                            console.warn(
-                              `Invalid startTime string for ${collectionName}/${agentId}/${log.id}:`,
-                              data.startTime
-                            );
-                            startTime = null;
-                          }
-                        } else {
-                          console.warn(
-                            `Unexpected startTime type for ${collectionName}/${agentId}/${log.id}:`,
-                            typeof data.startTime
-                          );
-                        }
-                        if (data.endTime instanceof Timestamp) {
-                          endTime = data.endTime.toDate();
-                        } else if (typeof data.endTime === "string") {
-                          endTime = new Date(data.endTime);
-                          if (isNaN(endTime)) {
-                            console.warn(
-                              `Invalid endTime string for ${collectionName}/${agentId}/${log.id}:`,
-                              data.endTime
-                            );
-                            endTime = null;
-                          }
-                        } else {
-                          console.warn(
-                            `Unexpected endTime type for ${collectionName}/${agentId}/${log.id}:`,
-                            typeof data.endTime
-                          );
-                        }
-                        return {
-                          id: log.id,
-                          ...data,
-                          timestamp: data.timestamp
-                            ? data.timestamp instanceof Timestamp
-                              ? data.timestamp.toDate()
-                              : new Date(data.timestamp)
-                            : null,
-                          startTime,
-                          endTime,
-                          agentId,
-                          collectionName,
-                        };
-                      });
-                      logs.sort(
-                        (a, b) => (b.startTime || 0) - (a.startTime || 0)
-                      );
-                      const totalCalls = logs.length;
-                      const connectedCalls = logs.filter(
-                        (log) => log.callConnected
-                      ).length;
-                      const disconnectedCalls = totalCalls - connectedCalls;
-                      const performance =
-                        totalCalls > 0
-                          ? Math.round((connectedCalls / totalCalls) * 100)
-                          : 0;
-
-                      if (mounted) {
-                        setAgents((prevAgents) => {
-                          const existingAgentIndex = prevAgents.findIndex(
-                            (a) =>
-                              a.id === agentId &&
-                              a.collection === collectionName
-                          );
-                          if (existingAgentIndex > -1) {
-                            const updatedAgents = [...prevAgents];
-                            updatedAgents[existingAgentIndex] = {
-                              id: agentId,
-                              collection: collectionName,
-                              name: agentData.name || "Unknown Agent",
-                              status: agentData.status || "Idle",
-                              avatar:
-                                agentData.avatar ||
-                                agentId.slice(0, 2).toUpperCase(),
-                              department: agentData.department || "Unknown",
-                              performance,
-                              totalCalls,
-                              connectedCalls,
-                              disconnectedCalls,
-                            };
-                            return updatedAgents;
-                          } else {
-                            return [
-                              ...prevAgents,
-                              {
-                                id: agentId,
-                                collection: collectionName,
-                                name: agentData.name || "Unknown Agent",
-                                status: agentData.status || "Idle",
-                                avatar:
-                                  agentData.avatar ||
-                                  agentId.slice(0, 2).toUpperCase(),
-                                department: agentData.department || "Unknown",
-                                performance,
-                                totalCalls,
-                                connectedCalls,
-                                disconnectedCalls,
-                              },
-                            ];
-                          }
-                        });
-
-                        setCallLogs((prevLogs) => [
-                          ...prevLogs.filter(
-                            (log) =>
-                              log.agentId !== agentId ||
-                              log.collectionName !== collectionName
-                          ),
-                          ...logs,
-                        ]);
-                      }
-                    },
-                    (error) => {
-                      console.error(
-                        `Error fetching call logs for ${collectionName}/${agentId}:`,
-                        error
-                      );
-                    }
-                  );
-                  allUnsubscribes.push(logsUnsubscribe);
-                  return {
-                    id: agentDoc.id,
-                    collection: collectionName,
-                    name: agentData.name || "Unknown Agent",
-                    status: agentData.status || "Idle",
-                    avatar:
-                      agentData.avatar || agentId.slice(0, 2).toUpperCase(),
-                    department: agentData.department || "Unknown",
-                  };
+                aggregatedAgents.push({
+                  id: tlId,
+                  collection: tlCollection,
+                  name: tlData.name || "Unknown TL",
+                  department: tlData.department || "Team Lead",
                 });
 
-                if (mounted) {
-                  setAgents((prevAgents) => [
-                    ...prevAgents.filter(
-                      (a) => !agentCollections.includes(a.collection)
-                    ),
-                    ...agentDocs,
-                  ]);
-                  setLoading(false);
-                }
-              },
-              (error) => {
-                console.error(
-                  `Error fetching agents for ${collectionName}:`,
-                  error
-                );
-                if (mounted) setLoading(false);
-              }
-            );
+                const tlCallLogsRef = collection(db, tlCollection, tlId, "callLogs");
+                const tlLogsUnsubscribe = onSnapshot(tlCallLogsRef, (logsSnapshot) => {
+                  if (!mounted) return;
+                  logsSnapshot.docs.forEach((log) => {
+                    const data = log.data();
+                    aggregatedCallLogs.push({
+                      id: log.id,
+                      ...data,
+                      timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
+                      agentId: tlId,
+                      agentName: tlData.name,
+                      collectionName: tlCollection,
+                    });
+                  });
+                  setAllCallLogs([...aggregatedCallLogs]);
+                });
+                allUnsubscribes.push(tlLogsUnsubscribe);
+              });
+              setAllAgents([...aggregatedAgents]);
+            });
+            allUnsubscribes.push(tlUnsubscribe);
+          });
 
+          // Fetch agent collections
+          agentCollections.forEach((collectionName) => {
+            const agentsRef = collection(db, collectionName);
+            const unsubscribe = onSnapshot(agentsRef, (snapshot) => {
+              if (!mounted) return;
+              snapshot.docs.forEach((agentDoc) => {
+                const agentData = agentDoc.data();
+                const agentId = agentDoc.id;
+
+                aggregatedAgents.push({
+                  id: agentId,
+                  collection: collectionName,
+                  name: agentData.name || "Unknown Agent",
+                  department: agentData.department || "Unknown",
+                });
+
+                const callLogsRef = collection(db, collectionName, agentId, "callLogs");
+                const logsUnsubscribe = onSnapshot(callLogsRef, (logsSnapshot) => {
+                  if (!mounted) return;
+                  logsSnapshot.docs.forEach((log) => {
+                    const data = log.data();
+                    aggregatedCallLogs.push({
+                      id: log.id,
+                      ...data,
+                      timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
+                      agentId,
+                      agentName: agentData.name,
+                      collectionName,
+                    });
+                  });
+                  setAllCallLogs([...aggregatedCallLogs]);
+                });
+                allUnsubscribes.push(logsUnsubscribe);
+              });
+              setAllAgents([...aggregatedAgents]);
+            });
             allUnsubscribes.push(unsubscribe);
           });
 
+          // Fetch quick stats
+          await fetchQuickStats();
+          setLoading(false);
+
           return () => allUnsubscribes.forEach((unsub) => unsub());
         } else {
-          if (mounted) {
-            setLoading(false);
-          }
+          setLoading(false);
         }
       } catch (error) {
-        console.error("Error in fetchManagerRole:", error);
-        if (mounted) setLoading(false);
+        console.error("Error fetching analytics data:", error);
+        setLoading(false);
       }
     };
 
-    fetchManagerRole();
+    fetchAllData();
 
     return () => {
       mounted = false;
     };
   }, [currentUser]);
 
-  const formatDuration = (duration) => {
-    if (
-      !duration ||
-      typeof duration !== "object" ||
-      (!duration.hours && !duration.minutes && !duration.seconds)
-    )
-      return "N/A";
-    return `${duration.hours || 0}h ${duration.minutes || 0}m ${
-      duration.seconds || 0
-    }s`;
-  };
-
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp || isNaN(timestamp)) return "N/A";
-    return timestamp.toLocaleString("en-IN", {
-      timeZone: "Asia/Kolkata",
-      hour12: true,
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const calculateActualTime = (startTime, endTime) => {
-    if (!startTime || isNaN(startTime)) return "N/A";
-    const end = endTime || currentTime.toDate();
-    const diffMs = end - startTime;
-    if (diffMs < 0) return "N/A"; // Invalid case
-    const diffSeconds = Math.floor(diffMs / 1000);
-    const hours = Math.floor(diffSeconds / 3600);
-    const minutes = Math.floor((diffSeconds % 3600) / 60);
-    const seconds = diffSeconds % 60;
-    return `${hours}h ${minutes}m ${seconds}s`;
-  };
-
-  const handleDownloadCSV = () => {
-    // Filter logs based on selected filter
-    let filteredLogs = callLogs;
-    const now = new Date();
-
-    if (csvFilter === "daily") {
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      filteredLogs = callLogs.filter(log => log.timestamp && log.timestamp >= oneDayAgo);
-    } else if (csvFilter === "weekly") {
-      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      filteredLogs = callLogs.filter(log => log.timestamp && log.timestamp >= oneWeekAgo);
-    } else if (csvFilter === "monthly") {
-      const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      filteredLogs = callLogs.filter(log => log.timestamp && log.timestamp >= oneMonthAgo);
+  // Update quick stats when call logs change
+  useEffect(() => {
+    if (allCallLogs.length > 0) {
+      setQuickStats(prev => ({
+        ...prev,
+        totalCalls: allCallLogs.length,
+        connectedCalls: allCallLogs.filter(log => log.callConnected || log.status === "completed").length,
+      }));
     }
+  }, [allCallLogs]);
 
-    const headers = [
-      "Agent ID",
-      "Agent Name",
-      "Department",
-      "Status",
-      "Call ID",
-      "Client Number",
-      "Call Type",
-      "Call Category",
-      "Partner",
-      "Timestamp",
-      "Call Connected",
-      "Call Status",
-      "Not Connected Reason",
-      "Remarks",
-      "Duration",
-      "Actual Time",
-    ];
-
-    const rows = filteredLogs.map((log) => {
-      const agent = agents.find(
-        (a) => a.id === log.agentId && a.collection === log.collectionName
-      );
-      return [
-        log.agentId || "N/A",
-        agent ? agent.name || "Unknown Agent" : "N/A",
-        agent ? agent.department || "Unknown" : "N/A",
-        agent ? agent.status || "Idle" : "N/A",
-        log.id || "N/A",
-        log.clientNumber || "N/A",
-        log.callType || "N/A",
-        log.callCategory || "N/A",
-        log.partner || "N/A",
-        log.timestamp ? formatTimestamp(log.timestamp) : "N/A",
-        log.callConnected ? "Connected" : "Not Connected",
-        log.callConnected ? log.callStatus || "N/A" : "N/A",
-        log.callConnected ? "N/A" : log.notConnectedReason || "N/A",
-        log.remarks || "N/A",
-        formatDuration(log.duration),
-        calculateActualTime(log.startTime, log.endTime),
-      ];
-    });
-
-    // Add a fallback row for each agent with no call logs
-    if (rows.length === 0) {
-      agents.forEach((agent) => {
-        rows.push([
-          agent.id || "N/A",
-          agent.name || "N/A",
-          agent.department || "N/A",
-          agent.status || "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-          "N/A",
-        ]);
-      });
-    }
-
-    // Convert to CSV string
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) =>
-        row
-          .map(
-            (field) => `"${String(field).replace(/"/g, '""')}"` // Escape quotes
-          )
-          .join(",")
-      ),
-    ].join("\n");
-
-    // Create and trigger download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "manager_dashboard_all_agents.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchQuickStats();
+    setTimeout(() => setRefreshing(false), 1000);
   };
+
+  // Department tabs configuration
+  const departmentTabs = [
+    {
+      label: "Insurance",
+      icon: <Business />,
+      color: DEPARTMENT_COLORS.insurance,
+      gradient: DEPARTMENT_GRADIENTS.insurance,
+      bgHover: "#eff6ff",
+    },
+    {
+      label: "Health",
+      icon: <LocalHospital />,
+      color: DEPARTMENT_COLORS.health,
+      gradient: DEPARTMENT_GRADIENTS.health,
+      bgHover: "#f0fdf4",
+    },
+    {
+      label: "Call Analytics",
+      icon: <Analytics />,
+      color: DEPARTMENT_COLORS.analytics,
+      gradient: DEPARTMENT_GRADIENTS.analytics,
+      bgHover: "#fdf2f8",
+    },
+    {
+      label: "Offline Visits",
+      icon: <DirectionsWalk />,
+      color: DEPARTMENT_COLORS.offline,
+      gradient: DEPARTMENT_GRADIENTS.offline,
+      bgHover: "#f0f9ff",
+    },
+  ];
 
   if (loading) {
     return (
-      <Box className={styles.container}>
-        <Typography variant="h5">Loading agent data...</Typography>
-      </Box>
-    );
-  }
-
-  if (!agents || agents.length === 0) {
-    return (
-      <Box className={styles.container}>
-        <Typography variant="h5" color="error">
-          No agent data available
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        }}
+      >
+        <CircularProgress size={60} sx={{ color: "white", mb: 3 }} />
+        <Typography variant="h6" sx={{ color: "white", fontWeight: 500 }}>
+          Loading Super Manager Dashboard...
         </Typography>
       </Box>
     );
   }
 
-  const getStatusChip = (status) => {
-    const statusConfig = {
-      Busy: {
-        color: "info",
-        icon: <Circle sx={{ fontSize: 12, color: "inherit" }} />,
-        label: "On Call",
-        className: styles.statusAvailable,
-      },
-      Idle: {
-        color: "success",
-        icon: <Circle sx={{ fontSize: 12, color: "inherit" }} />,
-        label: "Available",
-        className: styles.statusAvailable,
-      },
-      "On Call": {
-        color: "info",
-        icon: <Circle sx={{ fontSize: 12, color: "inherit" }} />,
-        label: "On Call",
-        className: styles.statusAvailable,
-      },
-      Break: {
-        color: "warning",
-        icon: <AccessTime sx={{ fontSize: 12, color: "inherit" }} />,
-        label: "On Break",
-        className: styles.statusBreak,
-      },
-      Logout: {
-        color: "default",
-        icon: <LogoutIcon sx={{ fontSize: 12, color: "inherit" }} />,
-        label: "Logged Out",
-        className: styles.statusChip,
-      },
-    };
-
-    const config = statusConfig[status] || {
-      color: "default",
-      icon: <Circle sx={{ fontSize: 12, color: "inherit" }} />,
-      label: status,
-      className: styles.statusChip,
-    };
-
-    return (
-      <Chip
-        icon={config.icon}
-        label={config.label}
-        size="small"
-        className={`${styles.statusChip} ${config.className}`}
-        sx={{
-          "& .MuiChip-icon": {
-            marginLeft: "8px",
-            marginRight: "-4px",
-          },
-        }}
-      />
-    );
-  };
-
-  const getDepartmentIcon = (department) => {
-    const icons = {
-      Sales: <TrendingUp sx={{ fontSize: 16 }} />,
-      Support: <Person sx={{ fontSize: 16 }} />,
-      Marketing: <Business sx={{ fontSize: 16 }} />,
-      Technical: <Business sx={{ fontSize: 16 }} />,
-    };
-    return icons[department] || <Business sx={{ fontSize: 16 }} />;
-  };
-
-  const handleCardClick = (agentId, collectionName) => {
-    navigate(`/agent-details/${collectionName}/${agentId}`);
-  };
-
-  const handleCreateUser = async () => {
-    // Validate inputs
-    if (!newUserData.name || !newUserData.email || !newUserData.password || !newUserData.id || !newUserData.mobile) {
-      alert("Please fill in all required fields");
-      return;
-    }
-
-    setCreating(true);
-
-    try {
-      // Create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        newUserData.email,
-        newUserData.password
-      );
-      const user = userCredential.user;
-
-      // Create user document in mswasth collection
-      const userDocData = {
-        name: newUserData.name,
-        email: newUserData.email,
-        id: newUserData.id,
-        mobile: newUserData.mobile,
-        role: newUserData.role,
-        designation: newUserData.designation,
-        status: "Logout",
-        department: newUserData.role === "agent" ? "Sales" : "Management",
-        createdAt: serverTimestamp(),
-        createdBy: currentUser.uid,
-      };
-
-      // If creating a TL, add teamMembers array
-      if (newUserData.role === "teamlead") {
-        userDocData.teamMembers = [];
-      }
-
-      await setDoc(doc(db, "mswasth", user.uid), userDocData);
-
-      alert(`${newUserData.role === "agent" ? "Agent" : "Team Lead"} created successfully!`);
-
-      // Reset form and close dialog
-      setNewUserData({
-        name: "",
-        email: "",
-        password: "",
-        id: "",
-        mobile: "",
-        role: "agent",
-        designation: "RE",
-      });
-      setOpenAddUserDialog(false);
-    } catch (error) {
-      console.error("Error creating user:", error);
-      if (error.code === "auth/email-already-in-use") {
-        alert("This email is already in use. Please use a different email.");
-      } else if (error.code === "auth/weak-password") {
-        alert("Password should be at least 6 characters.");
-      } else {
-        alert("Error creating user: " + error.message);
-      }
-    } finally {
-      setCreating(false);
-    }
-  };
-
   return (
-    <Box
-      className={styles.container}
-      sx={{
-        background:
-          "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)",
-        minHeight: "100vh",
-        position: "relative",
-        zIndex: 1,
-      }}
-    >
-      <Paper elevation={0} className={styles.header}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "#f8fafc" }}>
+      {/* Modern App Bar */}
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{
+          bgcolor: "white",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        {/* Top Header with Title and Actions */}
         <Box
           sx={{
+            px: 3,
+            py: 2,
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid",
+            borderColor: "divider",
           }}
         >
-          <Box>
-            <Typography
-              variant="h4"
-              component="h1"
-              className={styles.headerTitle}
-            >
-              Manager Dashboard
-            </Typography>
-            <Typography variant="subtitle1" className={styles.headerSubtitle}>
-              Monitor your team's real-time status and performance
-            </Typography>
-          </Box>
-          <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-            <FormControl
-              size="small"
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            {isMobile && (
+              <IconButton onClick={() => setMobileMenuOpen(true)}>
+                <MenuIcon />
+              </IconButton>
+            )}
+            <Box
               sx={{
-                minWidth: 120,
-                "& .MuiOutlinedInput-root": {
-                  color: "#f1f5f9",
-                  borderRadius: "12px",
-                  backgroundColor: "rgba(255, 255, 255, 0.05)",
-                  "& fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.2)",
+                width: 48,
+                height: 48,
+                borderRadius: 2,
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <DashboardIcon sx={{ color: "white", fontSize: 28 }} />
+            </Box>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: "#0f172a" }}>
+                Super Manager Dashboard
+              </Typography>
+              <Typography variant="caption" sx={{ color: "#64748b" }}>
+                Real-time monitoring and analytics
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Tooltip title="Refresh Data">
+              <IconButton
+                onClick={handleRefresh}
+                sx={{
+                  bgcolor: refreshing ? "primary.light" : "transparent",
+                  animation: refreshing ? "spin 1s linear infinite" : "none",
+                  "@keyframes spin": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
                   },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.4)",
+                }}
+              >
+                <Refresh />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}>
+              <IconButton onClick={toggleFullscreen}>
+                {isFullscreen ? <FullscreenExit /> : <Fullscreen />}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Notifications">
+              <IconButton>
+                <Badge badgeContent={3} color="error">
+                  <Notifications />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+
+        {/* Quick Stats Row */}
+        <Box sx={{ px: 3, py: 2, bgcolor: "#f8fafc" }}>
+          <Grid container spacing={2}>
+            <Grid item xs={6} sm={3}>
+              <QuickStatCard
+                title="TOTAL AGENTS"
+                value={quickStats.totalAgents}
+                icon={<People sx={{ fontSize: 24, color: "white" }} />}
+                gradient={DEPARTMENT_GRADIENTS.insurance}
+                subtitle={`${quickStats.activeUsers} Active`}
+              />
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <QuickStatCard
+                title="HEALTH DEPT"
+                value={quickStats.healthAgents}
+                icon={<LocalHospital sx={{ fontSize: 24, color: "white" }} />}
+                gradient={DEPARTMENT_GRADIENTS.health}
+              />
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <QuickStatCard
+                title="INSURANCE DEPT"
+                value={quickStats.insuranceAgents}
+                icon={<Business sx={{ fontSize: 24, color: "white" }} />}
+                gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+              />
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <QuickStatCard
+                title="DC AGENTS"
+                value={quickStats.dcAgents}
+                icon={<DirectionsWalk sx={{ fontSize: 24, color: "white" }} />}
+                gradient={DEPARTMENT_GRADIENTS.offline}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Department Tabs */}
+        {!isMobile && (
+          <Box sx={{ px: 3, bgcolor: "white" }}>
+            <Tabs
+              value={selectedTab}
+              onChange={handleTabChange}
+              sx={{
+                "& .MuiTab-root": {
+                  textTransform: "none",
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                  minHeight: 56,
+                  color: "#64748b",
+                  px: 3,
+                  transition: "all 0.3s ease",
+                  borderRadius: "12px 12px 0 0",
+                  mr: 1,
+                  "&.Mui-selected": {
+                    color: departmentTabs[selectedTab]?.color || "#667eea",
+                    bgcolor: departmentTabs[selectedTab]?.bgHover || "#f8fafc",
                   },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#22c55e",
+                  "&:hover": {
+                    bgcolor: "#f1f5f9",
                   },
                 },
-                "& .MuiInputLabel-root": {
-                  color: "rgba(241, 245, 249, 0.7)",
-                  "&.Mui-focused": {
-                    color: "#22c55e",
-                  },
+                "& .MuiTabs-indicator": {
+                  backgroundColor: departmentTabs[selectedTab]?.color || "#667eea",
+                  height: 3,
+                  borderRadius: "3px 3px 0 0",
                 },
               }}
             >
-              <InputLabel id="csv-filter-label">CSV Filter</InputLabel>
-              <Select
-                labelId="csv-filter-label"
-                value={csvFilter}
-                onChange={(e) => setCsvFilter(e.target.value)}
-                label="CSV Filter"
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      backgroundColor: "#1e293b",
-                      color: "#f1f5f9",
-                      "& .MuiMenuItem-root": {
-                        "&:hover": {
-                          backgroundColor: "rgba(34, 197, 94, 0.1)",
-                        },
-                        "&.Mui-selected": {
-                          backgroundColor: "rgba(34, 197, 94, 0.2)",
-                          "&:hover": {
-                            backgroundColor: "rgba(34, 197, 94, 0.3)",
-                          },
-                        },
-                      },
+              {departmentTabs.map((tab, index) => (
+                <Tab
+                  key={index}
+                  icon={tab.icon}
+                  iconPosition="start"
+                  label={tab.label}
+                />
+              ))}
+            </Tabs>
+          </Box>
+        )}
+      </AppBar>
+
+      {/* Mobile Drawer */}
+      <Drawer
+        anchor="left"
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        PaperProps={{
+          sx: { width: 280, borderRadius: "0 16px 16px 0" },
+        }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+            <Typography variant="h6" fontWeight="bold">
+              Departments
+            </Typography>
+            <IconButton onClick={() => setMobileMenuOpen(false)}>
+              <Close />
+            </IconButton>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <List>
+            {departmentTabs.map((tab, index) => (
+              <ListItem
+                button
+                key={index}
+                selected={selectedTab === index}
+                onClick={() => handleTabChange(null, index)}
+                sx={{
+                  borderRadius: 2,
+                  mb: 1,
+                  "&.Mui-selected": {
+                    bgcolor: tab.bgHover,
+                    "& .MuiListItemIcon-root": {
+                      color: tab.color,
+                    },
+                    "& .MuiListItemText-primary": {
+                      color: tab.color,
+                      fontWeight: 600,
                     },
                   },
                 }}
               >
-                <MenuItem value="all">All Time</MenuItem>
-                <MenuItem value="daily">Daily (24h)</MenuItem>
-                <MenuItem value="weekly">Weekly (7d)</MenuItem>
-                <MenuItem value="monthly">Monthly (30d)</MenuItem>
-              </Select>
-            </FormControl>
-            <Button
-              onClick={handleDownloadCSV}
-              sx={{
-                color: "#f1f5f9",
-                background: "linear-gradient(135deg, #22c55e, #4ade80)",
-                borderRadius: "12px",
-                px: 2,
-                py: 1,
-                fontWeight: 500,
-                textTransform: "none",
-                fontSize: "0.9rem",
-                transition: "all 0.3s ease",
-                "&:hover": {
-                  background: "linear-gradient(135deg, #16a34a, #22c55e)",
-                  transform: "translateY(-1px)",
-                  boxShadow: "0 4px 12px rgba(34, 197, 94, 0.4)",
-                },
-              }}
-              startIcon={<FileDownload />}
-              className={styles.downloadCsvButton}
-              aria-label="Download all agents data as CSV"
-            >
-              Download CSV
-            </Button>
-            <Button
-              onClick={() => setOpenAddUserDialog(true)}
-              sx={{
-                color: "#f1f5f9",
-                background: "linear-gradient(135deg, #3b82f6, #60a5fa)",
-                borderRadius: "12px",
-                px: 2,
-                py: 1,
-                fontWeight: 500,
-                textTransform: "none",
-                fontSize: "0.9rem",
-                transition: "all 0.3s ease",
-                "&:hover": {
-                  background: "linear-gradient(135deg, #2563eb, #3b82f6)",
-                  transform: "translateY(-1px)",
-                  boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)",
-                },
-              }}
-              startIcon={<PersonAdd />}
-              aria-label="Add new agent or team lead"
-            >
-              Add New User
-            </Button>
-          </Box>
+                <ListItemIcon sx={{ minWidth: 40 }}>{tab.icon}</ListItemIcon>
+                <ListItemText primary={tab.label} />
+              </ListItem>
+            ))}
+          </List>
         </Box>
-      </Paper>
+      </Drawer>
 
-      <Grid container spacing={2} className={styles.statsContainer}>
-        <Grid item xs={6} sm={3}>
-          <Paper
-            elevation={0}
-            className={`${styles.statCard} ${styles.statAvailable}`}
-          >
-            <Typography variant="h6" className={styles.statNumber}>
-              {agents.filter((a) => a.status === "Idle").length}
-            </Typography>
-            <Typography variant="caption" className={styles.statLabel}>
-              Available
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Paper
-            elevation={0}
-            className={`${styles.statCard} ${styles.statAvailable}`}
-          >
-            <Typography variant="h6" className={styles.statNumber}>
-              {
-                agents.filter(
-                  (a) => a.status === "Busy" || a.status === "On Call"
-                ).length
-              }
-            </Typography>
-            <Typography variant="caption" className={styles.statLabel}>
-              On Call
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Paper
-            elevation={0}
-            className={`${styles.statCard} ${styles.statBreak}`}
-          >
-            <Typography variant="h6" className={styles.statNumber}>
-              {agents.filter((a) => a.status === "Break").length}
-            </Typography>
-            <Typography variant="caption" className={styles.statLabel}>
-              On Break
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Paper
-            elevation={0}
-            className={`${styles.statCard} ${styles.statTotal}`}
-          >
-            <Typography variant="h6" className={styles.statNumber}>
-              {agents.filter((a) => a.status === "Logout").length}
-            </Typography>
-            <Typography variant="caption" className={styles.statLabel}>
-              Logged Out
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Paper
-            elevation={0}
-            className={`${styles.statCard} ${styles.statTotal}`}
-          >
-            <Typography variant="h6" className={styles.statNumber}>
-              {agents.length}
-            </Typography>
-            <Typography variant="caption" className={styles.statLabel}>
-              Total Agents
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
+      {/* Loading Progress */}
+      {refreshing && <LinearProgress sx={{ position: "absolute", top: 0, left: 0, right: 0 }} />}
 
-      <div className={styles.agentsContainer}>
-        <Typography variant="h5" className={styles.sectionTitle}>
-          Team Members
-        </Typography>
-        <div className={styles.agentsGrid}>
-          {agents.map((agent) => (
-            <Card
-              key={`${agent.collection}-${agent.id}`}
-              elevation={0}
-              className={styles.agentCard}
-              onClick={() => handleCardClick(agent.id, agent.collection)}
-              style={{ cursor: "pointer" }}
-            >
-              <CardContent sx={{ padding: 3 }}>
-                <div className={styles.agentHeader}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                    }}
-                  >
-                    <div className={styles.agentAvatar}>{agent.avatar}</div>
-                    <div className={styles.agentInfo}>
-                      <h3>{agent.name}</h3>
-                      <p>
-                        <span className={styles.departmentIcon}>
-                          {getDepartmentIcon(agent.department)}
-                        </span>
-                        {agent.department}
-                      </p>
-                    </div>
-                  </div>
-                  {getStatusChip(agent.status)}
-                </div>
-
-                <div className={styles.performanceSection}>
-                  <div className={styles.statusBox}>
-                    <p className={styles.performanceLabel}>Performance</p>
-                    <p className={styles.performanceText}>
-                      {agent.performance}%
-                    </p>
-                  </div>
-                  <div className={styles.performanceBar}>
-                    <div
-                      className={styles.performanceFill}
-                      style={{
-                        width: `${agent.performance}%`,
-                        backgroundColor: "#4caf50",
-                        height: "8px",
-                        borderRadius: "4px",
-                        transition: "width 0.3s ease-in-out",
-                      }}
-                    />
-                  </div>
-                  <div className={styles.callStats}>
-                    <Typography variant="caption" className={styles.callLabel}>
-                      Total Calls: {agent.totalCalls}
-                    </Typography>
-                    <Typography variant="caption" className={styles.callLabel}>
-                      Connected: {agent.connectedCalls}
-                    </Typography>
-                    <Typography variant="caption" className={styles.callLabel}>
-                      Disconnected: {agent.disconnectedCalls}
-                    </Typography>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Add New User Dialog */}
-      <Dialog
-        open={openAddUserDialog}
-        onClose={() => !creating && setOpenAddUserDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            backgroundColor: "#1e293b",
-            color: "#f1f5f9",
-            borderRadius: "16px",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontSize: "1.5rem",
-            fontWeight: 600,
-            borderBottom: "1px solid rgba(241, 245, 249, 0.1)",
-          }}
-        >
-          Add New User
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-            <TextField
-              label="Full Name"
-              value={newUserData.name}
-              onChange={(e) =>
-                setNewUserData({ ...newUserData, name: e.target.value })
-              }
-              fullWidth
-              required
-              disabled={creating}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  color: "#f1f5f9",
-                  "& fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.2)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.4)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#3b82f6",
-                  },
-                },
-                "& .MuiInputLabel-root": {
-                  color: "rgba(241, 245, 249, 0.7)",
-                  "&.Mui-focused": {
-                    color: "#3b82f6",
-                  },
-                },
-              }}
-            />
-            <TextField
-              label="Email"
-              type="email"
-              value={newUserData.email}
-              onChange={(e) =>
-                setNewUserData({ ...newUserData, email: e.target.value })
-              }
-              fullWidth
-              required
-              disabled={creating}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  color: "#f1f5f9",
-                  "& fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.2)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.4)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#3b82f6",
-                  },
-                },
-                "& .MuiInputLabel-root": {
-                  color: "rgba(241, 245, 249, 0.7)",
-                  "&.Mui-focused": {
-                    color: "#3b82f6",
-                  },
-                },
-              }}
-            />
-            <TextField
-              label="Password"
-              type="password"
-              value={newUserData.password}
-              onChange={(e) =>
-                setNewUserData({ ...newUserData, password: e.target.value })
-              }
-              fullWidth
-              required
-              disabled={creating}
-              helperText="Minimum 6 characters"
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  color: "#f1f5f9",
-                  "& fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.2)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.4)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#3b82f6",
-                  },
-                },
-                "& .MuiInputLabel-root": {
-                  color: "rgba(241, 245, 249, 0.7)",
-                  "&.Mui-focused": {
-                    color: "#3b82f6",
-                  },
-                },
-                "& .MuiFormHelperText-root": {
-                  color: "rgba(241, 245, 249, 0.5)",
-                },
-              }}
-            />
-            <TextField
-              label="User ID (e.g., MS01234)"
-              value={newUserData.id}
-              onChange={(e) =>
-                setNewUserData({ ...newUserData, id: e.target.value })
-              }
-              fullWidth
-              required
-              disabled={creating}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  color: "#f1f5f9",
-                  "& fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.2)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.4)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#3b82f6",
-                  },
-                },
-                "& .MuiInputLabel-root": {
-                  color: "rgba(241, 245, 249, 0.7)",
-                  "&.Mui-focused": {
-                    color: "#3b82f6",
-                  },
-                },
-              }}
-            />
-            <TextField
-              label="Mobile Number"
-              value={newUserData.mobile}
-              onChange={(e) =>
-                setNewUserData({ ...newUserData, mobile: e.target.value })
-              }
-              fullWidth
-              required
-              disabled={creating}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  color: "#f1f5f9",
-                  "& fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.2)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.4)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#3b82f6",
-                  },
-                },
-                "& .MuiInputLabel-root": {
-                  color: "rgba(241, 245, 249, 0.7)",
-                  "&.Mui-focused": {
-                    color: "#3b82f6",
-                  },
-                },
-              }}
-            />
-            <TextField
-              label="Designation"
-              value={newUserData.designation}
-              onChange={(e) =>
-                setNewUserData({ ...newUserData, designation: e.target.value })
-              }
-              fullWidth
-              disabled={creating}
-              placeholder="e.g., RE, SE, TL"
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  color: "#f1f5f9",
-                  "& fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.2)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(241, 245, 249, 0.4)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#3b82f6",
-                  },
-                },
-                "& .MuiInputLabel-root": {
-                  color: "rgba(241, 245, 249, 0.7)",
-                  "&.Mui-focused": {
-                    color: "#3b82f6",
-                  },
-                },
-              }}
-            />
-            <FormControl component="fieldset" disabled={creating}>
-              <FormLabel
-                component="legend"
-                sx={{
-                  color: "rgba(241, 245, 249, 0.7)",
-                  "&.Mui-focused": {
-                    color: "#3b82f6",
-                  },
-                }}
-              >
-                Role
-              </FormLabel>
-              <RadioGroup
-                value={newUserData.role}
-                onChange={(e) =>
-                  setNewUserData({ ...newUserData, role: e.target.value })
-                }
-                row
-              >
-                <FormControlLabel
-                  value="agent"
-                  control={
-                    <Radio
-                      sx={{
-                        color: "rgba(241, 245, 249, 0.5)",
-                        "&.Mui-checked": {
-                          color: "#3b82f6",
-                        },
-                      }}
-                    />
-                  }
-                  label="Agent"
-                  sx={{ color: "#f1f5f9" }}
-                />
-                <FormControlLabel
-                  value="teamlead"
-                  control={
-                    <Radio
-                      sx={{
-                        color: "rgba(241, 245, 249, 0.5)",
-                        "&.Mui-checked": {
-                          color: "#3b82f6",
-                        },
-                      }}
-                    />
-                  }
-                  label="Team Lead"
-                  sx={{ color: "#f1f5f9" }}
-                />
-              </RadioGroup>
-            </FormControl>
-          </Box>
-        </DialogContent>
-        <DialogActions
-          sx={{
-            borderTop: "1px solid rgba(241, 245, 249, 0.1)",
-            px: 3,
-            py: 2,
-          }}
-        >
-          <Button
-            onClick={() => setOpenAddUserDialog(false)}
-            disabled={creating}
-            sx={{
-              color: "#f1f5f9",
-              textTransform: "none",
-              "&:hover": {
-                backgroundColor: "rgba(241, 245, 249, 0.1)",
-              },
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreateUser}
-            disabled={creating}
-            sx={{
-              color: "#f1f5f9",
-              background: "linear-gradient(135deg, #3b82f6, #60a5fa)",
-              borderRadius: "8px",
-              px: 3,
-              textTransform: "none",
-              "&:hover": {
-                background: "linear-gradient(135deg, #2563eb, #3b82f6)",
-              },
-              "&:disabled": {
-                background: "rgba(59, 130, 246, 0.3)",
-                color: "rgba(241, 245, 249, 0.5)",
-              },
-            }}
-          >
-            {creating ? "Creating..." : "Create User"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Tab Content */}
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <TabPanel value={selectedTab} index={0}>
+          <InsuranceManagerDashboard currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel value={selectedTab} index={1}>
+          <HealthManagerDashboard currentUser={currentUser} />
+        </TabPanel>
+        <TabPanel value={selectedTab} index={2}>
+          <CallAnalytics
+            callLogs={allCallLogs}
+            agents={allAgents}
+            onBack={() => setSelectedTab(0)}
+          />
+        </TabPanel>
+        <TabPanel value={selectedTab} index={3}>
+          <OfflineVisitsManager offlineVisitsData={offlineVisitsData} />
+        </TabPanel>
+      </Box>
     </Box>
   );
 }

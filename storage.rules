@@ -1,0 +1,58 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Offline Visits Images - stored under offline_visits/{userId}/
+    match /offline_visits/{userId}/{allPaths=**} {
+      // User can upload their own visit images
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Managers can read all images
+      allow read: if request.auth != null &&
+                  exists(/databases/$(database)/documents/admin/$(request.auth.uid));
+
+      // Validate file size (max 20MB) and type (images only)
+      allow write: if request.auth != null &&
+                   request.auth.uid == userId &&
+                   request.resource.size <= 20 * 1024 * 1024 &&
+                   request.resource.contentType.matches('image/.*');
+    }
+
+    // DC Agent Offline Visits Images - stored under offline_visits_dc/{userId}/
+    match /offline_visits_dc/{userId}/{allPaths=**} {
+      // DC agent can upload their own visit images
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Managers can read all images
+      allow read: if request.auth != null &&
+                  exists(/databases/$(database)/documents/admin/$(request.auth.uid));
+
+      // Validate file size (max 20MB) and type (images only)
+      allow write: if request.auth != null &&
+                   request.auth.uid == userId &&
+                   request.resource.size <= 20 * 1024 * 1024 &&
+                   request.resource.contentType.matches('image/.*');
+    }
+
+    // Daily Task Images for Health Agents - stored under daily_tasks/{userId}/
+    match /daily_tasks/{userId}/{allPaths=**} {
+      // Health agent can upload their own daily task images
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // TLs and Managers can read all images
+      allow read: if request.auth != null &&
+                  exists(/databases/$(database)/documents/admin/$(request.auth.uid));
+
+      // Validate file size (max 20MB) and type (images only)
+      allow write: if request.auth != null &&
+                   request.auth.uid == userId &&
+                   request.resource.size <= 20 * 1024 * 1024 &&
+                   request.resource.contentType.matches('image/.*');
+    }
+
+    // Default deny all other storage access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

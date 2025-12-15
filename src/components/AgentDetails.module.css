@@ -1,12 +1,7 @@
 .container {
   min-height: 100vh !important;
   padding: 16px !important;
-  background: linear-gradient(
-    135deg,
-    #0f172a 0%,
-    #1e293b 50%,
-    #334155 100%
-  ) !important;
+  background: #f5f7fa !important;
   position: relative !important;
   overflow: hidden !important;
   display: flex !important;
@@ -15,20 +10,7 @@
 }
 
 .container::before {
-  content: "" !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  background-image: radial-gradient(
-    circle at 2px 2px,
-    rgba(148, 163, 184, 0.1) 1px,
-    transparent 0
-  ) !important;
-  background-size: 24px 24px !important;
-  pointer-events: none !important;
-  z-index: -1 !important;
+  content: none !important;
 }
 
 .container > * {
@@ -37,57 +19,54 @@
 }
 
 .headerSection {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
-  color: #f1f5f9 !important;
+  background: linear-gradient(135deg, #26a69a 0%, #1e8a7f 100%) !important;
+  color: #fff !important;
   padding: 24px !important;
-  border-radius: 8px !important;
+  border-radius: 16px !important;
   margin-bottom: 16px !important;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  border: none !important;
+  box-shadow: 0 4px 20px rgba(38, 166, 154, 0.2) !important;
   display: flex !important;
   align-items: center !important;
   gap: 20px !important;
+  transition: all 0.3s ease !important;
 }
 
 .agentAvatar {
   width: clamp(40px, 10vw, 48px) !important;
   height: clamp(40px, 10vw, 48px) !important;
-  border-radius: 8px !important;
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   color: white !important;
   font-weight: 700 !important;
   font-size: clamp(16px, 4vw, 18px) !important;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(102, 187, 106, 0.3) !important;
 }
 
 .agentName {
   font-size: clamp(24px, 5vw, 28px) !important;
-  font-weight: 800 !important;
+  font-weight: 700 !important;
   margin: 0 !important;
-  background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  color: #fff !important;
 }
 
 .agentInfo {
   font-size: clamp(14px, 3vw, 16px) !important;
-  color: #cbd5e1 !important;
+  color: rgba(255, 255, 255, 0.9) !important;
   margin: 8px 0 0 0 !important;
   font-weight: 500 !important;
 }
 
 .logPaper {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  border-radius: 8px !important;
-  padding: 16px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(38, 166, 154, 0.2) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
   position: relative !important;
   overflow: hidden !important;
 }
@@ -98,16 +77,15 @@
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 2px !important;
-  background: linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%) !important;
+  height: 3px !important;
+  background: linear-gradient(90deg, #26a69a 0%, #66bb6a 50%, #ff7043 100%) !important;
 }
 
 .logTitle {
   font-size: clamp(20px, 4vw, 24px) !important;
   font-weight: 700 !important;
-  color: #f1f5f9 !important;
+  color: #26a69a !important;
   margin: 0 0 16px 0 !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 
 .logList {
@@ -120,8 +98,9 @@
 }
 
 .logItem:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2) !important;
+  transform: translateX(4px) !important;
+  background-color: rgba(38, 166, 154, 0.05) !important;
+  border-radius: 12px !important;
 }
 
 .logItemContent {
@@ -147,24 +126,24 @@
   justify-content: center !important;
   width: clamp(30px, 8vw, 40px) !important;
   height: clamp(30px, 8vw, 40px) !important;
-  background: rgba(51, 65, 85, 0.8) !important;
+  background: rgba(38, 166, 154, 0.1) !important;
   border-radius: 50% !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: none !important;
 }
 
 .logPhoneIcon {
-  color: #94a3b8 !important;
+  color: #26a69a !important;
   font-size: clamp(16px, 4vw, 20px) !important;
 }
 
 .logPrimary {
   font-size: clamp(14px, 3.5vw, 16px) !important;
-  font-weight: 500 !important;
-  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+  color: #26a69a !important;
 }
 
 .logTime {
-  color: #cbd5e1 !important;
+  color: #546e7a !important;
   font-size: clamp(12px, 2.5vw, 13px) !important;
 }
 
@@ -192,22 +171,24 @@
 .logDetailLabel {
   font-size: clamp(12px, 2.5vw, 13px) !important;
   font-weight: 500 !important;
-  color: #94a3b8 !important;
+  color: #546e7a !important;
 }
 
 .logDetailValue {
   font-size: clamp(12px, 2.5vw, 13px) !important;
-  color: #cbd5e1 !important;
+  color: #26a69a !important;
+  font-weight: 500 !important;
 }
 
 .durationIcon {
   font-size: clamp(14px, 3vw, 16px) !important;
-  color: #94a3b8 !important;
+  color: #66bb6a !important;
 }
 
 .logDurationValue {
   margin-left: 5px !important;
-  color: #cbd5e1 !important;
+  color: #26a69a !important;
+  font-weight: 500 !important;
 }
 
 .emptyLogItem {
@@ -223,18 +204,18 @@
 }
 
 .emptyIcon {
-  color: #94a3b8 !important;
+  color: #26a69a !important;
   font-size: clamp(30px, 7vw, 40px) !important;
 }
 
 .emptyText {
   font-size: clamp(16px, 4vw, 18px) !important;
-  color: #f1f5f9 !important;
+  color: #546e7a !important;
   font-weight: 500 !important;
 }
 
 .logDivider {
-  border-color: rgba(148, 163, 184, 0.2) !important;
+  border-color: rgba(38, 166, 154, 0.15) !important;
 }
 
 /* Media Queries for Responsiveness */

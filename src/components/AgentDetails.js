@@ -32,6 +32,7 @@ import {
 } from "@mui/icons-material";
 import { collection, onSnapshot, doc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { THEME } from "../theme/theme";
 import styles from "./AgentDetails.module.css";
 
 function AgentDetails() {
@@ -345,21 +346,21 @@ function AgentDetails() {
         <Button
           onClick={handleBack}
           sx={{
-            color: "#f1f5f9",
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
+            color: "#fff",
+            backgroundColor: "rgba(255, 255, 255, 0.15)",
             backdropFilter: "blur(10px)",
-            border: "1px solid rgba(148, 163, 184, 0.2)",
+            border: "none",
             borderRadius: "12px",
-            px: 1.5,
-            py: 0.5,
-            fontWeight: 500,
+            px: 2,
+            py: 0.75,
+            fontWeight: 600,
             textTransform: "none",
             fontSize: "0.9rem",
             transition: "all 0.3s ease",
             "&:hover": {
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
-              transform: "translateY(-1px)",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+              backgroundColor: "rgba(255, 255, 255, 0.25)",
+              transform: "translateY(-2px)",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
             },
             marginRight: "12px",
           }}
@@ -370,21 +371,20 @@ function AgentDetails() {
         <Button
           onClick={handleAssignCall}
           sx={{
-            color: "#f1f5f9",
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(148, 163, 184, 0.2)",
+            color: "#fff",
+            backgroundColor: THEME.accent,
+            border: "none",
             borderRadius: "12px",
-            px: 1.5,
-            py: 0.5,
-            fontWeight: 500,
+            px: 2,
+            py: 0.75,
+            fontWeight: 600,
             textTransform: "none",
             fontSize: "0.9rem",
             transition: "all 0.3s ease",
             "&:hover": {
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
-              transform: "translateY(-1px)",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+              backgroundColor: "#ff5722",
+              transform: "translateY(-2px)",
+              boxShadow: "0 4px 12px rgba(255, 112, 67, 0.3)",
             },
             marginRight: "12px",
           }}
@@ -397,29 +397,29 @@ function AgentDetails() {
             minWidth: 120,
             marginRight: "12px",
             "& .MuiOutlinedInput-root": {
-              color: "#f1f5f9",
-              backgroundColor: "rgba(255, 255, 255, 0.1)",
+              color: "#fff",
+              backgroundColor: "rgba(255, 255, 255, 0.15)",
               backdropFilter: "blur(10px)",
-              border: "1px solid rgba(148, 163, 184, 0.2)",
+              border: "none",
               borderRadius: "12px",
               "&:hover": {
-                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                backgroundColor: "rgba(255, 255, 255, 0.2)",
               },
               "&.Mui-focused": {
-                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                backgroundColor: "rgba(255, 255, 255, 0.2)",
               },
               "& fieldset": {
                 border: "none",
               },
             },
             "& .MuiInputLabel-root": {
-              color: "#94a3b8",
+              color: "rgba(255, 255, 255, 0.9)",
               "&.Mui-focused": {
-                color: "#f1f5f9",
+                color: "#fff",
               },
             },
             "& .MuiSelect-icon": {
-              color: "#f1f5f9",
+              color: "#fff",
             },
           }}
         >
@@ -432,16 +432,18 @@ function AgentDetails() {
             MenuProps={{
               PaperProps: {
                 sx: {
-                  backgroundColor: "#1e293b",
-                  color: "#f1f5f9",
+                  backgroundColor: "#fff",
+                  color: THEME.textPrimary,
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
                   "& .MuiMenuItem-root": {
                     "&:hover": {
-                      backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      backgroundColor: `${THEME.primary}10`,
                     },
                     "&.Mui-selected": {
-                      backgroundColor: "rgba(59, 130, 246, 0.2)",
+                      backgroundColor: `${THEME.primary}20`,
                       "&:hover": {
-                        backgroundColor: "rgba(59, 130, 246, 0.3)",
+                        backgroundColor: `${THEME.primary}30`,
                       },
                     },
                   },
@@ -458,27 +460,26 @@ function AgentDetails() {
         <Button
           onClick={handleDownloadCSV}
           sx={{
-            color: "#f1f5f9",
-            backgroundColor: "rgba(255, 255, 255, 0.1)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(148, 163, 184, 0.2)",
+            color: "#fff",
+            backgroundColor: THEME.secondary,
+            border: "none",
             borderRadius: "12px",
-            px: 1.5,
-            py: 0.5,
-            fontWeight: 500,
+            px: 2,
+            py: 0.75,
+            fontWeight: 600,
             textTransform: "none",
             fontSize: "0.9rem",
             transition: "all 0.3s ease",
             "&:hover": {
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
-              transform: "translateY(-1px)",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+              backgroundColor: "#4caf50",
+              transform: "translateY(-2px)",
+              boxShadow: "0 4px 12px rgba(102, 187, 106, 0.3)",
             },
             marginRight: "12px",
           }}
           startIcon={<FileDownload />}
         >
-          Download CSV
+          CSV
         </Button>
         <Avatar className={styles.agentAvatar}>{agent.avatar}</Avatar>
         <Box>
@@ -550,18 +551,18 @@ function AgentDetails() {
                             size="small"
                             sx={{
                               backgroundColor:
-                                log.callType === "Manual Lead" ? 'rgba(147, 51, 234, 0.2)' :
-                                log.callType === "Inbound Call" ? 'rgba(16, 185, 129, 0.2)' :
-                                'rgba(59, 130, 246, 0.2)',
+                                log.callType === "Manual Lead" ? `${THEME.accent}20` :
+                                log.callType === "Inbound Call" ? `${THEME.secondary}20` :
+                                `${THEME.primary}20`,
                               color:
-                                log.callType === "Manual Lead" ? '#a855f7' :
-                                log.callType === "Inbound Call" ? '#10b981' :
-                                '#3b82f6',
+                                log.callType === "Manual Lead" ? THEME.accent :
+                                log.callType === "Inbound Call" ? THEME.secondary :
+                                THEME.primary,
                               border: '1px solid',
                               borderColor:
-                                log.callType === "Manual Lead" ? 'rgba(147, 51, 234, 0.3)' :
-                                log.callType === "Inbound Call" ? 'rgba(16, 185, 129, 0.3)' :
-                                'rgba(59, 130, 246, 0.3)',
+                                log.callType === "Manual Lead" ? `${THEME.accent}40` :
+                                log.callType === "Inbound Call" ? `${THEME.secondary}40` :
+                                `${THEME.primary}40`,
                               fontWeight: 600,
                             }}
                           />
@@ -626,25 +627,28 @@ function AgentDetails() {
         fullWidth
         PaperProps={{
           sx: {
-            backgroundColor: '#1e293b',
-            color: '#f1f5f9',
-            borderRadius: '16px',
-            border: '1px solid rgba(148, 163, 184, 0.2)',
+            backgroundColor: '#ffffff',
+            color: THEME.textPrimary,
+            borderRadius: '20px',
+            border: `1px solid ${THEME.primary}20`,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
           }
         }}
       >
         <DialogTitle sx={{
-          borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
+          borderBottom: `1px solid ${THEME.primary}20`,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          background: `linear-gradient(135deg, ${THEME.primary} 0%, ${THEME.secondary} 100%)`,
+          color: '#fff',
         }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, color: '#f1f5f9' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff' }}>
             Call Details
           </Typography>
           <Button
             onClick={handleCloseDialog}
-            sx={{ minWidth: 'auto', color: '#94a3b8' }}
+            sx={{ minWidth: 'auto', color: '#fff' }}
           >
             <Close />
           </Button>
@@ -664,18 +668,18 @@ function AgentDetails() {
                       label={selectedCall.callType}
                       sx={{
                         backgroundColor:
-                          selectedCall.callType === "Manual Lead" ? 'rgba(147, 51, 234, 0.2)' :
-                          selectedCall.callType === "Inbound Call" ? 'rgba(16, 185, 129, 0.2)' :
-                          'rgba(59, 130, 246, 0.2)',
+                          selectedCall.callType === "Manual Lead" ? `${THEME.accent}20` :
+                          selectedCall.callType === "Inbound Call" ? `${THEME.secondary}20` :
+                          `${THEME.primary}20`,
                         color:
-                          selectedCall.callType === "Manual Lead" ? '#a855f7' :
-                          selectedCall.callType === "Inbound Call" ? '#10b981' :
-                          '#3b82f6',
+                          selectedCall.callType === "Manual Lead" ? THEME.accent :
+                          selectedCall.callType === "Inbound Call" ? THEME.secondary :
+                          THEME.primary,
                         border: '1px solid',
                         borderColor:
-                          selectedCall.callType === "Manual Lead" ? 'rgba(147, 51, 234, 0.3)' :
-                          selectedCall.callType === "Inbound Call" ? 'rgba(16, 185, 129, 0.3)' :
-                          'rgba(59, 130, 246, 0.3)',
+                          selectedCall.callType === "Manual Lead" ? `${THEME.accent}40` :
+                          selectedCall.callType === "Inbound Call" ? `${THEME.secondary}40` :
+                          `${THEME.primary}40`,
                         fontWeight: 600,
                       }}
                     />
@@ -689,16 +693,16 @@ function AgentDetails() {
 
               {selectedCall.sid && (
                 <Grid item xs={12}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     Call SID (Exotel ID)
                   </Typography>
                   <Typography sx={{
-                    color: '#f1f5f9',
+                    color: THEME.primary,
                     fontWeight: 500,
                     fontFamily: 'monospace',
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                    backgroundColor: `${THEME.primary}10`,
                     padding: '8px 12px',
-                    borderRadius: '6px',
+                    borderRadius: '8px',
                     wordBreak: 'break-all'
                   }}>
                     {selectedCall.sid}
@@ -707,20 +711,20 @@ function AgentDetails() {
               )}
 
               <Grid item xs={12} sm={6}>
-                <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                   Client Number
                 </Typography>
-                <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                   {selectedCall.clientNumber || "N/A"}
                 </Typography>
               </Grid>
 
               {selectedCall.agentName && (
                 <Grid item xs={12} sm={6}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     Agent Name
                   </Typography>
-                  <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                  <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                     {selectedCall.agentName}
                   </Typography>
                 </Grid>
@@ -728,10 +732,10 @@ function AgentDetails() {
 
               {selectedCall.callerId && (
                 <Grid item xs={12} sm={6}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     ExoPhone (Caller ID)
                   </Typography>
-                  <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                  <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                     {selectedCall.callerId}
                   </Typography>
                 </Grid>
@@ -739,10 +743,10 @@ function AgentDetails() {
 
               {selectedCall.partner && (
                 <Grid item xs={12} sm={6}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     Partner
                   </Typography>
-                  <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                  <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                     {selectedCall.partner}
                   </Typography>
                 </Grid>
@@ -750,30 +754,30 @@ function AgentDetails() {
 
               {selectedCall.callCategory && (
                 <Grid item xs={12} sm={6}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     Call Category
                   </Typography>
-                  <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                  <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                     {selectedCall.callCategory || "N/A"}
                   </Typography>
                 </Grid>
               )}
 
               <Grid item xs={12} sm={6}>
-                <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                   Timestamp
                 </Typography>
-                <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                   {selectedCall.timestamp ? formatTimestamp(selectedCall.timestamp) : "N/A"}
                 </Typography>
               </Grid>
 
               {selectedCall.startTime && (
                 <Grid item xs={12} sm={6}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     Start Time
                   </Typography>
-                  <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                  <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                     {new Date(selectedCall.startTime).toLocaleString()}
                   </Typography>
                 </Grid>
@@ -781,20 +785,20 @@ function AgentDetails() {
 
               {selectedCall.endTime && (
                 <Grid item xs={12} sm={6}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     End Time
                   </Typography>
-                  <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                  <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                     {new Date(selectedCall.endTime).toLocaleString()}
                   </Typography>
                 </Grid>
               )}
 
               <Grid item xs={12}>
-                <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                   Call Status
                 </Typography>
-                <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                <Typography sx={{ color: THEME.primary, fontWeight: 600 }}>
                   {selectedCall.callConnected
                     ? selectedCall.callStatus || "N/A"
                     : selectedCall.notConnectedReason || "N/A"}
@@ -803,10 +807,10 @@ function AgentDetails() {
 
               {selectedCall.callConnected && selectedCall.duration && (
                 <Grid item xs={12}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     Call Duration
                   </Typography>
-                  <Typography sx={{ color: '#f1f5f9', fontWeight: 500 }}>
+                  <Typography sx={{ color: THEME.secondary, fontWeight: 600 }}>
                     {formatDuration(selectedCall.duration) || "N/A"}
                   </Typography>
                 </Grid>
@@ -814,16 +818,17 @@ function AgentDetails() {
 
               {selectedCall.remarks && (
                 <Grid item xs={12}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: '0.875rem', mb: 0.5 }}>
+                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.875rem', mb: 0.5 }}>
                     Remarks
                   </Typography>
                   <Typography sx={{
-                    color: '#f1f5f9',
+                    color: THEME.textPrimary,
                     fontWeight: 400,
-                    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+                    backgroundColor: `${THEME.primary}05`,
                     padding: '12px',
                     borderRadius: '8px',
-                    whiteSpace: 'pre-wrap'
+                    whiteSpace: 'pre-wrap',
+                    border: `1px solid ${THEME.primary}20`,
                   }}>
                     {selectedCall.remarks}
                   </Typography>
@@ -832,14 +837,22 @@ function AgentDetails() {
             </Grid>
           )}
         </DialogContent>
-        <DialogActions sx={{ borderTop: '1px solid rgba(148, 163, 184, 0.2)', p: 2 }}>
+        <DialogActions sx={{ borderTop: `1px solid ${THEME.primary}20`, p: 2 }}>
           <Button
             onClick={handleCloseDialog}
             sx={{
-              color: '#f1f5f9',
-              backgroundColor: 'rgba(59, 130, 246, 0.2)',
+              color: '#fff',
+              backgroundColor: THEME.primary,
+              borderRadius: '12px',
+              px: 3,
+              py: 1,
+              fontWeight: 600,
+              textTransform: 'none',
+              transition: 'all 0.3s ease',
               '&:hover': {
-                backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                backgroundColor: '#1e8a7f',
+                transform: 'translateY(-2px)',
+                boxShadow: `0 4px 12px ${THEME.primary}40`,
               }
             }}
           >

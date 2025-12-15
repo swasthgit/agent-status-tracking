@@ -19,16 +19,20 @@ import { Save, Cancel } from "@mui/icons-material";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
-const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
+const ManualCallLogForm = ({ onSubmit, initialClientNumber, agentType }) => {
   const [formData, setFormData] = useState({
     clientNumber: initialClientNumber || "",
     callConnected: true,
     callStatus: "",
-    callType: "", // Client, Branch Manager, Nurse
+    callType: "", // Client, Branch Manager, Nurse OR Customer Awareness, BM Review, etc. (Health)
     callCategory: "", // Query Update, Claim Status, etc.
     partner: "", // Partner name
+    escalation: "", // Yes / No
+    department: "", // Insurance Claim / Insurance Policy (not for Health)
     notConnectedReason: "",
     remarks: "",
+    callRating: "", // For Health agent type when certain categories selected (Excellent/Good/Average/Poor)
+    callRatingNumeric: "", // For Health agent type - numeric rating 1-5
     duration: {
       hours: 0,
       minutes: 0,
@@ -96,13 +100,67 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
     }
 
     if (!formData.callType) {
-      alert("Please select a Call Type (Client/Branch Manager/Nurse)");
+      alert("Please select a Call Type");
       return;
     }
 
-    if (formData.callConnected && !formData.callCategory) {
-      alert("Please select a Call Category");
+    // Escalation is always mandatory (especially for Health)
+    if (!formData.escalation) {
+      alert("Please select Escalation (Yes/No)");
       return;
+    }
+
+    // Department is not required for Health agent type
+    if (agentType !== "Health" && !formData.department) {
+      alert("Please select Department Name");
+      return;
+    }
+
+    if (formData.callConnected) {
+      // For Health: all fields mandatory except duration and remarks
+      if (agentType === "Health") {
+        if (!formData.callCategory) {
+          alert("Please select a Call Category");
+          return;
+        }
+        if (!formData.callStatus) {
+          alert("Please select a Call Status");
+          return;
+        }
+        if (!formData.partner) {
+          alert("Please select a Partner");
+          return;
+        }
+        // Check call rating if required
+        if (showCallRating && !formData.callRating) {
+          alert("Please select a Call Rating");
+          return;
+        }
+        // Check numeric call rating if required
+        if (showCallRating && !formData.callRatingNumeric) {
+          alert("Please select a Numeric Call Rating (1-5)");
+          return;
+        }
+      } else {
+        // For other agent types
+        if (!formData.callCategory) {
+          alert("Please select a Call Category");
+          return;
+        }
+        if (!formData.callStatus) {
+          alert("Please select a Call Status");
+          return;
+        }
+        if (!formData.partner) {
+          alert("Please select a Partner");
+          return;
+        }
+      }
+    } else {
+      if (!formData.notConnectedReason) {
+        alert("Please select a Not Connected Reason");
+        return;
+      }
     }
 
     const logEntry = {
@@ -120,31 +178,55 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
       callType: "",
       callCategory: "",
       partner: "",
+      escalation: "",
+      department: "",
       notConnectedReason: "",
       remarks: "",
+      callRating: "",
+      callRatingNumeric: "",
       duration: { hours: 0, minutes: 0, seconds: 0 },
     });
     setClientNumberError("");
   };
 
-  const callTypes = ["Client", "Branch Manager", "Nurse"];
+  // Dynamic options based on agentType
+  const callTypes = agentType === "Health"
+    ? ["Customer Awareness", "BM Review", "Consultation", "Feedback Call"]
+    : ["Client", "Branch Manager", "Nurse"];
 
-  const callCategories = [
-    "Query Update",
-    "Claim Status",
-    "Negotiation Call",
-    "Intimation Call",
-    "Product Information",
-  ];
+  const callCategories = agentType === "Health"
+    ? ["BM Review Done", "Consultation Done", "Customer Awareness Done"]
+    : [
+        "Query Update",
+        "Claim Status",
+        "Negotiation Call",
+        "Intimation Call",
+        "Product Information",
+      ];
 
-  const callStatuses = [
-    "Completed Successfully",
-    "Follow-up Required",
-    "Information Provided",
-    "Appointment Scheduled",
-    "Issue Resolved",
-    "Transferred to Specialist",
-  ];
+  const callStatuses = agentType === "Health"
+    ? [
+        "Completed Successfully",
+        "Follow-up Required",
+        "Information Provided",
+        "Issue Resolved",
+      ]
+    : [
+        "Completed Successfully",
+        "Follow-up Required",
+        "Information Provided",
+        "Appointment Scheduled",
+        "Issue Resolved",
+        "Transferred to Specialist",
+      ];
+
+  const callRatings = ["Excellent", "Good", "Average", "Poor"];
+  const numericRatings = ["1", "2", "3", "4", "5"];
+
+  // Check if call rating should be shown (Health agent + specific categories)
+  const showCallRating = agentType === "Health" &&
+    formData.callConnected &&
+    ["BM Review Done", "Consultation Done", "Customer Awareness Done"].includes(formData.callCategory);
 
   const notConnectedReasons = [
     "No Answer",
@@ -159,7 +241,7 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
     <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
       <Typography
         variant="h6"
-        sx={{ mb: 3, fontWeight: 600, color: "#f8fafc" }}
+        sx={{ mb: 3, fontWeight: 700, color: "#26a69a", fontSize: "1.3rem" }}
       >
         Log Call Details
       </Typography>
@@ -180,33 +262,38 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
             inputProps={{ maxLength: 10 }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                borderRadius: "6px",
-                backgroundColor: "rgba(17, 24, 39, 0.5)",
+                borderRadius: "12px",
+                backgroundColor: "#ffffff",
                 "& fieldset": {
                   borderColor: clientNumberError
                     ? "#f44336"
-                    : "rgba(75, 85, 99, 0.6)",
+                    : "rgba(38, 166, 154, 0.3)",
                 },
                 "&:hover fieldset": {
                   borderColor: clientNumberError
                     ? "#f44336"
-                    : "rgba(156, 163, 175, 0.8)",
+                    : "#26a69a",
                 },
                 "&.Mui-focused fieldset": {
-                  borderColor: clientNumberError ? "#f44336" : "#3b82f6",
+                  borderColor: clientNumberError ? "#f44336" : "#26a69a",
                 },
               },
               "& .MuiInputLabel-root": {
-                color: clientNumberError ? "#f44336" : "#d1d5db",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: clientNumberError ? "#f44336" : "#546e7a",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
                 "&.Mui-focused": {
-                  color: clientNumberError ? "#f44336" : "#3b82f6",
+                  color: clientNumberError ? "#f44336" : "#26a69a",
                 },
               },
               "& .MuiOutlinedInput-input": {
-                color: "#f8fafc",
+                color: "#1e293b",
+                fontWeight: "500",
                 "&::placeholder": {
-                  color: "#9ca3af",
-                  opacity: 1,
+                  color: "#546e7a",
+                  opacity: 0.7,
                 },
               },
               "& .MuiFormHelperText-root": {
@@ -223,11 +310,13 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
               id="call-type-label"
               shrink={true}
               sx={{
-                fontSize: "1rem",
+                fontSize: "0.85rem",
                 fontWeight: 600,
-                color: formData.callType ? "#d1d5db" : "#ff9800",
+                color: formData.callType ? "#546e7a" : "#ff9800",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
                 "&.Mui-focused": {
-                  color: formData.callType ? "#3b82f6" : "#ff9800",
+                  color: formData.callType ? "#26a69a" : "#ff9800",
                 },
               }}
             >
@@ -240,37 +329,39 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
               label="Call Type *"
               required
               sx={{
-                borderRadius: "6px",
-                backgroundColor: "rgba(17, 24, 39, 0.5)",
-                color: "#f8fafc",
+                borderRadius: "12px",
+                backgroundColor: "#ffffff",
+                color: "#1e293b",
                 "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: formData.callType
-                    ? "rgba(75, 85, 99, 0.6)"
+                    ? "rgba(38, 166, 154, 0.3)"
                     : "#ff9800",
                 },
                 "&:hover .MuiOutlinedInput-notchedOutline": {
                   borderColor: formData.callType
-                    ? "rgba(156, 163, 175, 0.8)"
+                    ? "#26a69a"
                     : "#ff9800",
                 },
                 "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#3b82f6",
+                  borderColor: "#26a69a",
                 },
                 "& .MuiSelect-icon": {
-                  color: "#d1d5db",
+                  color: "#546e7a",
                 },
               }}
               MenuProps={{
                 PaperProps: {
                   sx: {
-                    backgroundColor: "#374151",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                    borderRadius: "12px",
                     "& .MuiMenuItem-root": {
-                      color: "#f8fafc",
+                      color: "#1e293b",
                       "&:hover": {
-                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                        backgroundColor: "rgba(38, 166, 154, 0.1)",
                       },
                       "&.Mui-disabled": {
-                        color: "#9ca3af",
+                        color: "#546e7a",
                       },
                     },
                   },
@@ -292,54 +383,63 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
 
         {/* Partner Dropdown */}
         <Grid item xs={12} sm={6}>
-          <FormControl fullWidth variant="outlined">
+          <FormControl fullWidth variant="outlined" required>
             <InputLabel
               id="partner-label"
               shrink={true}
               sx={{
-                fontSize: "1rem",
+                fontSize: "0.85rem",
                 fontWeight: 600,
-                color: "#d1d5db",
+                color: formData.partner ? "#546e7a" : "#ff9800",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
                 "&.Mui-focused": {
-                  color: "#3b82f6",
+                  color: formData.partner ? "#26a69a" : "#ff9800",
                 },
               }}
             >
-              Partner
+              Partner *
             </InputLabel>
             <Select
               labelId="partner-label"
               value={formData.partner}
               onChange={(e) => handleInputChange("partner", e.target.value)}
-              label="Partner"
+              label="Partner *"
+              required
               sx={{
-                borderRadius: "6px",
-                backgroundColor: "rgba(17, 24, 39, 0.5)",
-                color: "#f8fafc",
+                borderRadius: "12px",
+                backgroundColor: "#ffffff",
+                color: "#1e293b",
                 "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "rgba(75, 85, 99, 0.6)",
+                  borderColor: formData.partner
+                    ? "rgba(38, 166, 154, 0.3)"
+                    : "#ff9800",
                 },
                 "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "rgba(156, 163, 175, 0.8)",
+                  borderColor: formData.partner
+                    ? "#26a69a"
+                    : "#ff9800",
                 },
                 "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "#3b82f6",
+                  borderColor: "#26a69a",
                 },
                 "& .MuiSelect-icon": {
-                  color: "#d1d5db",
+                  color: "#546e7a",
                 },
               }}
               MenuProps={{
                 PaperProps: {
                   sx: {
-                    backgroundColor: "#374151",
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                    borderRadius: "12px",
                     "& .MuiMenuItem-root": {
-                      color: "#f8fafc",
+                      color: "#1e293b",
                       "&:hover": {
-                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                        backgroundColor: "rgba(38, 166, 154, 0.1)",
                       },
                       "&.Mui-disabled": {
-                        color: "#9ca3af",
+                        color: "#546e7a",
                       },
                     },
                   },
@@ -350,6 +450,9 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
               <MenuItem value="" disabled>
                 Select Partner
               </MenuItem>
+              {agentType === "Health" && (
+                <MenuItem value="Multi Partner">Multi Partner</MenuItem>
+              )}
               {partners.map((partner) => (
                 <MenuItem key={partner.id} value={partner.name}>
                   {partner.name}
@@ -359,11 +462,163 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
           </FormControl>
         </Grid>
 
+        {/* Escalation Dropdown */}
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth variant="outlined" required>
+            <InputLabel
+              id="escalation-label"
+              shrink={true}
+              sx={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: formData.escalation ? "#546e7a" : "#ff9800",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                "&.Mui-focused": {
+                  color: formData.escalation ? "#26a69a" : "#ff9800",
+                },
+              }}
+            >
+              Escalation *
+            </InputLabel>
+            <Select
+              labelId="escalation-label"
+              value={formData.escalation}
+              onChange={(e) => handleInputChange("escalation", e.target.value)}
+              label="Escalation *"
+              required
+              sx={{
+                borderRadius: "12px",
+                backgroundColor: "#ffffff",
+                color: "#1e293b",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.escalation
+                    ? "rgba(38, 166, 154, 0.3)"
+                    : "#ff9800",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.escalation
+                    ? "#26a69a"
+                    : "#ff9800",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#26a69a",
+                },
+                "& .MuiSelect-icon": {
+                  color: "#546e7a",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#ffffff",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                    borderRadius: "12px",
+                    "& .MuiMenuItem-root": {
+                      color: "#1e293b",
+                      "&:hover": {
+                        backgroundColor: "rgba(38, 166, 154, 0.1)",
+                      },
+                      "&.Mui-disabled": {
+                        color: "#546e7a",
+                      },
+                    },
+                  },
+                },
+              }}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Escalation
+              </MenuItem>
+              <MenuItem value="Yes">Yes</MenuItem>
+              <MenuItem value="No">No</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* Department Name Dropdown - Not shown for Health agent type */}
+        {agentType !== "Health" && (
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth variant="outlined" required>
+              <InputLabel
+                id="department-label"
+                shrink={true}
+                sx={{
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  color: formData.department ? "#546e7a" : "#ff9800",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  "&.Mui-focused": {
+                    color: formData.department ? "#26a69a" : "#ff9800",
+                  },
+                }}
+              >
+                Department Name *
+              </InputLabel>
+              <Select
+                labelId="department-label"
+                value={formData.department}
+                onChange={(e) => handleInputChange("department", e.target.value)}
+                label="Department Name *"
+                required
+                sx={{
+                  borderRadius: "12px",
+                  backgroundColor: "#ffffff",
+                  color: "#1e293b",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: formData.department
+                      ? "rgba(38, 166, 154, 0.3)"
+                      : "#ff9800",
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    borderColor: formData.department
+                      ? "#26a69a"
+                      : "#ff9800",
+                  },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#26a69a",
+                  },
+                  "& .MuiSelect-icon": {
+                    color: "#546e7a",
+                  },
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      backgroundColor: "#ffffff",
+                      boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                      borderRadius: "12px",
+                      "& .MuiMenuItem-root": {
+                        color: "#1e293b",
+                        "&:hover": {
+                          backgroundColor: "rgba(38, 166, 154, 0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "#546e7a",
+                        },
+                      },
+                    },
+                  },
+                }}
+                displayEmpty
+              >
+                <MenuItem value="" disabled>
+                  Select Department
+                </MenuItem>
+                <MenuItem value="Insurance Claim">Insurance Claim</MenuItem>
+                <MenuItem value="Insurance Policy">Insurance Policy</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+        )}
+
         <Grid item xs={12}>
           <FormControl component="fieldset">
             <FormLabel
               component="legend"
-              sx={{ fontWeight: 600, color: "#f8fafc", mb: 1 }}
+              sx={{ fontWeight: 700, color: "#26a69a", mb: 1, fontSize: "1.1rem" }}
             >
               Call Status
             </FormLabel>
@@ -375,18 +630,19 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
               row
               sx={{
                 "& .MuiFormControlLabel-label": {
-                  color: "#d1d5db",
+                  color: "#1e293b",
+                  fontWeight: 500,
                 },
               }}
             >
               <FormControlLabel
                 value={true}
-                control={<Radio color="success" />}
+                control={<Radio sx={{ color: "#26a69a", "&.Mui-checked": { color: "#26a69a" } }} />}
                 label="Connected"
               />
               <FormControlLabel
                 value={false}
-                control={<Radio color="error" />}
+                control={<Radio sx={{ color: "#26a69a", "&.Mui-checked": { color: "#26a69a" } }} />}
                 label="Not Connected"
               />
             </RadioGroup>
@@ -402,11 +658,13 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
                   id="call-category-label"
                   shrink={true}
                   sx={{
-                    fontSize: "1rem",
+                    fontSize: "0.85rem",
                     fontWeight: 600,
-                    color: formData.callCategory ? "#d1d5db" : "#ff9800",
+                    color: formData.callCategory ? "#546e7a" : "#ff9800",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
                     "&.Mui-focused": {
-                      color: formData.callCategory ? "#3b82f6" : "#ff9800",
+                      color: formData.callCategory ? "#26a69a" : "#ff9800",
                     },
                   }}
                 >
@@ -421,37 +679,39 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
                   label="Call Category *"
                   required
                   sx={{
-                    borderRadius: "6px",
-                    backgroundColor: "rgba(17, 24, 39, 0.5)",
-                    color: "#f8fafc",
+                    borderRadius: "12px",
+                    backgroundColor: "#ffffff",
+                    color: "#1e293b",
                     "& .MuiOutlinedInput-notchedOutline": {
                       borderColor: formData.callCategory
-                        ? "rgba(75, 85, 99, 0.6)"
+                        ? "rgba(38, 166, 154, 0.3)"
                         : "#ff9800",
                     },
                     "&:hover .MuiOutlinedInput-notchedOutline": {
                       borderColor: formData.callCategory
-                        ? "rgba(156, 163, 175, 0.8)"
+                        ? "#26a69a"
                         : "#ff9800",
                     },
                     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                      borderColor: "#3b82f6",
+                      borderColor: "#26a69a",
                     },
                     "& .MuiSelect-icon": {
-                      color: "#d1d5db",
+                      color: "#546e7a",
                     },
                   }}
                   MenuProps={{
                     PaperProps: {
                       sx: {
-                        backgroundColor: "#374151",
+                        backgroundColor: "#ffffff",
+                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                        borderRadius: "12px",
                         "& .MuiMenuItem-root": {
-                          color: "#f8fafc",
+                          color: "#1e293b",
                           "&:hover": {
-                            backgroundColor: "rgba(59, 130, 246, 0.1)",
+                            backgroundColor: "rgba(38, 166, 154, 0.1)",
                           },
                           "&.Mui-disabled": {
-                            color: "#9ca3af",
+                            color: "#546e7a",
                           },
                         },
                       },
@@ -471,17 +731,179 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
               </FormControl>
             </Grid>
 
+            {/* Call Rating - Shown only for Health agent type with specific categories */}
+            {showCallRating && (
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth variant="outlined" required>
+                  <InputLabel
+                    id="call-rating-label"
+                    shrink={true}
+                    sx={{
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      color: formData.callRating ? "#546e7a" : "#ff9800",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      "&.Mui-focused": {
+                        color: formData.callRating ? "#26a69a" : "#ff9800",
+                      },
+                    }}
+                  >
+                    Call Rating *
+                  </InputLabel>
+                  <Select
+                    labelId="call-rating-label"
+                    value={formData.callRating}
+                    onChange={(e) => handleInputChange("callRating", e.target.value)}
+                    label="Call Rating *"
+                    required
+                    sx={{
+                      borderRadius: "12px",
+                      backgroundColor: "#ffffff",
+                      color: "#1e293b",
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: formData.callRating
+                          ? "rgba(38, 166, 154, 0.3)"
+                          : "#ff9800",
+                      },
+                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: formData.callRating
+                          ? "#26a69a"
+                          : "#ff9800",
+                      },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#26a69a",
+                      },
+                      "& .MuiSelect-icon": {
+                        color: "#546e7a",
+                      },
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          backgroundColor: "#ffffff",
+                          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                          borderRadius: "12px",
+                          "& .MuiMenuItem-root": {
+                            color: "#1e293b",
+                            "&:hover": {
+                              backgroundColor: "rgba(38, 166, 154, 0.1)",
+                            },
+                            "&.Mui-disabled": {
+                              color: "#546e7a",
+                            },
+                          },
+                        },
+                      },
+                    }}
+                    displayEmpty
+                  >
+                    <MenuItem value="" disabled>
+                      Select Rating
+                    </MenuItem>
+                    {callRatings.map((rating) => (
+                      <MenuItem key={rating} value={rating}>
+                        {rating}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
+
+            {/* Numeric Call Rating (1-5) - Shown only for Health agent type with specific categories */}
+            {showCallRating && (
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth variant="outlined" required>
+                  <InputLabel
+                    id="call-rating-numeric-label"
+                    shrink={true}
+                    sx={{
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      color: formData.callRatingNumeric ? "#546e7a" : "#ff9800",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      "&.Mui-focused": {
+                        color: formData.callRatingNumeric ? "#26a69a" : "#ff9800",
+                      },
+                    }}
+                  >
+                    Numeric Rating (1-5) *
+                  </InputLabel>
+                  <Select
+                    labelId="call-rating-numeric-label"
+                    value={formData.callRatingNumeric}
+                    onChange={(e) => handleInputChange("callRatingNumeric", e.target.value)}
+                    label="Numeric Rating (1-5) *"
+                    required
+                    sx={{
+                      borderRadius: "12px",
+                      backgroundColor: "#ffffff",
+                      color: "#1e293b",
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: formData.callRatingNumeric
+                          ? "rgba(38, 166, 154, 0.3)"
+                          : "#ff9800",
+                      },
+                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: formData.callRatingNumeric
+                          ? "#26a69a"
+                          : "#ff9800",
+                      },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#26a69a",
+                      },
+                      "& .MuiSelect-icon": {
+                        color: "#546e7a",
+                      },
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          backgroundColor: "#ffffff",
+                          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                          borderRadius: "12px",
+                          "& .MuiMenuItem-root": {
+                            color: "#1e293b",
+                            "&:hover": {
+                              backgroundColor: "rgba(38, 166, 154, 0.1)",
+                            },
+                            "&.Mui-disabled": {
+                              color: "#546e7a",
+                            },
+                          },
+                        },
+                      },
+                    }}
+                    displayEmpty
+                  >
+                    <MenuItem value="" disabled>
+                      Select Rating (1-5)
+                    </MenuItem>
+                    {numericRatings.map((rating) => (
+                      <MenuItem key={rating} value={rating}>
+                        {rating}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
+
             <Grid item xs={12}>
               <FormControl fullWidth variant="outlined" required>
                 <InputLabel
                   id="call-status-label"
                   shrink={true}
                   sx={{
-                    fontSize: "1rem",
+                    fontSize: "0.85rem",
                     fontWeight: 600,
-                    color: formData.callStatus ? "#d1d5db" : "#ff9800",
+                    color: formData.callStatus ? "#546e7a" : "#ff9800",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
                     "&.Mui-focused": {
-                      color: formData.callStatus ? "#3b82f6" : "#ff9800",
+                      color: formData.callStatus ? "#26a69a" : "#ff9800",
                     },
                   }}
                 >
@@ -496,38 +918,40 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
                   label="Call Outcome"
                   required
                   sx={{
-                    borderRadius: "6px",
-                    backgroundColor: "rgba(17, 24, 39, 0.5)",
-                    color: "#f8fafc",
+                    borderRadius: "12px",
+                    backgroundColor: "#ffffff",
+                    color: "#1e293b",
                     minWidth: "30px",
                     "& .MuiOutlinedInput-notchedOutline": {
                       borderColor: formData.callStatus
-                        ? "rgba(75, 85, 99, 0.6)"
+                        ? "rgba(38, 166, 154, 0.3)"
                         : "#ff9800",
                     },
                     "&:hover .MuiOutlinedInput-notchedOutline": {
                       borderColor: formData.callStatus
-                        ? "rgba(156, 163, 175, 0.8)"
+                        ? "#26a69a"
                         : "#ff9800",
                     },
                     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                      borderColor: "#3b82f6",
+                      borderColor: "#26a69a",
                     },
                     "& .MuiSelect-icon": {
-                      color: "#d1d5db",
+                      color: "#546e7a",
                     },
                   }}
                   MenuProps={{
                     PaperProps: {
                       sx: {
-                        backgroundColor: "#374151",
+                        backgroundColor: "#ffffff",
+                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                        borderRadius: "12px",
                         "& .MuiMenuItem-root": {
-                          color: "#f8fafc",
+                          color: "#1e293b",
                           "&:hover": {
-                            backgroundColor: "rgba(59, 130, 246, 0.1)",
+                            backgroundColor: "rgba(38, 166, 154, 0.1)",
                           },
                           "&.Mui-disabled": {
-                            color: "#9ca3af",
+                            color: "#546e7a",
                           },
                         },
                       },
@@ -550,7 +974,7 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
             <Grid item xs={12}>
               <Typography
                 variant="subtitle2"
-                sx={{ mb: 2, fontWeight: 600, color: "#f8fafc" }}
+                sx={{ mb: 2, fontWeight: 700, color: "#26a69a", fontSize: "1.1rem" }}
               >
                 Call Duration
               </Typography>
@@ -569,26 +993,31 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
                       variant="outlined"
                       sx={{
                         "& .MuiOutlinedInput-root": {
-                          borderRadius: "6px",
-                          backgroundColor: "rgba(17, 24, 39, 0.5)",
+                          borderRadius: "12px",
+                          backgroundColor: "#ffffff",
                           "& fieldset": {
-                            borderColor: "rgba(75, 85, 99, 0.6)",
+                            borderColor: "rgba(38, 166, 154, 0.3)",
                           },
                           "&:hover fieldset": {
-                            borderColor: "rgba(156, 163, 175, 0.8)",
+                            borderColor: "#26a69a",
                           },
                           "&.Mui-focused fieldset": {
-                            borderColor: "#3b82f6",
+                            borderColor: "#26a69a",
                           },
                         },
                         "& .MuiInputLabel-root": {
-                          color: "#d1d5db",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                          color: "#546e7a",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
                           "&.Mui-focused": {
-                            color: "#3b82f6",
+                            color: "#26a69a",
                           },
                         },
                         "& .MuiOutlinedInput-input": {
-                          color: "#f8fafc",
+                          color: "#1e293b",
+                          fontWeight: "500",
                         },
                       }}
                     />
@@ -604,11 +1033,13 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
                 id="not-connected-reason-label"
                 shrink={true}
                 sx={{
-                  fontSize: "1rem",
+                  fontSize: "0.85rem",
                   fontWeight: 600,
-                  color: formData.notConnectedReason ? "#d1d5db" : "#ff9800",
+                  color: formData.notConnectedReason ? "#546e7a" : "#ff9800",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
                   "&.Mui-focused": {
-                    color: formData.notConnectedReason ? "#3b82f6" : "#ff9800",
+                    color: formData.notConnectedReason ? "#26a69a" : "#ff9800",
                   },
                 }}
               >
@@ -623,38 +1054,40 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
                 label="Reason Not Connected"
                 required
                 sx={{
-                  borderRadius: "6px",
-                  backgroundColor: "rgba(17, 24, 39, 0.5)",
-                  color: "#f8fafc",
+                  borderRadius: "12px",
+                  backgroundColor: "#ffffff",
+                  color: "#1e293b",
                   minWidth: "30px",
                   "& .MuiOutlinedInput-notchedOutline": {
                     borderColor: formData.notConnectedReason
-                      ? "rgba(75, 85, 99, 0.6)"
+                      ? "rgba(38, 166, 154, 0.3)"
                       : "#ff9800",
                   },
                   "&:hover .MuiOutlinedInput-notchedOutline": {
                     borderColor: formData.notConnectedReason
-                      ? "rgba(156, 163, 175, 0.8)"
+                      ? "#26a69a"
                       : "#ff9800",
                   },
                   "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#3b82f6",
+                    borderColor: "#26a69a",
                   },
                   "& .MuiSelect-icon": {
-                    color: "#d1d5db",
+                    color: "#546e7a",
                   },
                 }}
                 MenuProps={{
                   PaperProps: {
                     sx: {
-                      backgroundColor: "#374151",
+                      backgroundColor: "#ffffff",
+                      boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                      borderRadius: "12px",
                       "& .MuiMenuItem-root": {
-                        color: "#f8fafc",
+                        color: "#1e293b",
                         "&:hover": {
-                          backgroundColor: "rgba(59, 130, 246, 0.1)",
+                          backgroundColor: "rgba(38, 166, 154, 0.1)",
                         },
                         "&.Mui-disabled": {
-                          color: "#9ca3af",
+                          color: "#546e7a",
                         },
                       },
                     },
@@ -687,29 +1120,34 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
             placeholder="Add any additional notes or comments..."
             sx={{
               "& .MuiOutlinedInput-root": {
-                borderRadius: "6px",
-                backgroundColor: "rgba(17, 24, 39, 0.5)",
+                borderRadius: "12px",
+                backgroundColor: "#ffffff",
                 "& fieldset": {
-                  borderColor: "rgba(75, 85, 99, 0.6)",
+                  borderColor: "rgba(38, 166, 154, 0.3)",
                 },
                 "&:hover fieldset": {
-                  borderColor: "rgba(156, 163, 175, 0.8)",
+                  borderColor: "#26a69a",
                 },
                 "&.Mui-focused fieldset": {
-                  borderColor: "#3b82f6",
+                  borderColor: "#26a69a",
                 },
               },
               "& .MuiInputLabel-root": {
-                color: "#d1d5db",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "#546e7a",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
                 "&.Mui-focused": {
-                  color: "#3b82f6",
+                  color: "#26a69a",
                 },
               },
               "& .MuiOutlinedInput-input": {
-                color: "#f8fafc",
+                color: "#1e293b",
+                fontWeight: "500",
                 "&::placeholder": {
-                  color: "#9ca3af",
-                  opacity: 1,
+                  color: "#546e7a",
+                  opacity: 0.7,
                 },
               },
             }}
@@ -717,7 +1155,7 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
         </Grid>
 
         <Grid item xs={12}>
-          <Divider sx={{ my: 2, backgroundColor: "rgba(75, 85, 99, 0.6)" }} />
+          <Divider sx={{ my: 2, backgroundColor: "rgba(38, 166, 154, 0.2)" }} />
           <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
             <Button
               type="button"
@@ -731,23 +1169,27 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
                   callType: "",
                   callCategory: "",
                   partner: "",
+                  escalation: "",
+                  department: "",
                   notConnectedReason: "",
                   remarks: "",
+                  callRating: "",
+                  callRatingNumeric: "",
                   duration: { hours: 0, minutes: 0, seconds: 0 },
                 });
                 setClientNumberError("");
               }}
               sx={{
-                borderRadius: "6px",
+                borderRadius: "8px",
                 textTransform: "none",
                 fontWeight: 600,
                 px: 3,
                 py: 1.5,
-                color: "#d1d5db",
-                borderColor: "rgba(75, 85, 99, 0.6)",
+                color: "#546e7a",
+                borderColor: "rgba(38, 166, 154, 0.3)",
                 "&:hover": {
-                  borderColor: "rgba(156, 163, 175, 0.8)",
-                  backgroundColor: "rgba(55, 65, 81, 0.1)",
+                  borderColor: "#26a69a",
+                  backgroundColor: "rgba(38, 166, 154, 0.05)",
                 },
               }}
             >
@@ -759,24 +1201,23 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber }) => {
               startIcon={<Save />}
               disabled={!!clientNumberError}
               sx={{
-                borderRadius: "6px",
+                borderRadius: "8px",
                 textTransform: "none",
                 fontWeight: 600,
                 px: 3,
                 py: 1.5,
-                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                boxShadow: "0 4px 20px rgba(16, 185, 129, 0.3)",
+                background: "linear-gradient(135deg, #26a69a 0%, #1e8a7f 100%)",
+                boxShadow: "0 4px 12px rgba(38, 166, 154, 0.3)",
                 "&:hover": {
-                  background:
-                    "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                  background: "linear-gradient(135deg, #1e8a7f 0%, #16665f 100%)",
                   transform: "translateY(-2px)",
-                  boxShadow: "0 8px 30px rgba(16, 185, 129, 0.4)",
+                  boxShadow: "0 6px 16px rgba(38, 166, 154, 0.4)",
                 },
                 "&.Mui-disabled": {
-                  background: "rgba(16, 185, 129, 0.5)",
-                  color: "#d1d5db",
+                  background: "rgba(38, 166, 154, 0.5)",
+                  color: "#ffffff",
                 },
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                transition: "all 0.2s ease",
               }}
             >
               Save Call Log

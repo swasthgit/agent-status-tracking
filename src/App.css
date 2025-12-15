@@ -4,24 +4,19 @@
 .App {
   text-align: center;
   min-height: 100vh;
-  /* Added beautiful grid pattern background */
-  background: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-    #282c34;
-  background-size: 20px 20px;
+  /* Clean solid background - no grid pattern */
+  background: #f5f7fa;
   background-attachment: fixed;
 }
 
 .App-header {
-  background: transparent; /* Made transparent to show grid pattern */
+  background: transparent;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: white;
-  /* Added subtle backdrop for better text readability */
-  backdrop-filter: blur(0.5px);
+  color: #333;
 }
 
 .App-link {
@@ -34,20 +29,9 @@
   color: #21a9c7;
 }
 
-/* Added responsive grid pattern for mobile */
+/* Responsive adjustments for mobile */
 @media (max-width: 768px) {
   .App {
-    background-size: 15px 15px;
+    background: #f5f7fa;
   }
-}
-
-/* Added alternative dot pattern option */
-.App.dots-pattern {
-  background: radial-gradient(
-      circle,
-      rgba(255, 255, 255, 0.1) 1px,
-      transparent 1px
-    ),
-    #282c34;
-  background-size: 20px 20px;
 }
