@@ -202,3 +202,9 @@ UPDATED_FIRESTORE_RULES.txt
 # FIREBASE CONFIG
 # ===========================================
 .firebaserc
+
+# ===========================================
+# SAMPLE DATA WITH CREDENTIALS (Security Risk)
+# ===========================================
+src/sampleData.js
+**/sampleData.js
