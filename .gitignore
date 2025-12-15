@@ -8,6 +8,8 @@
 .pnp.js
 functions/node_modules
 firebase-admin/node_modules
+server/node_modules
+**/node_modules
 
 # ===========================================
 # TESTING & BUILD
