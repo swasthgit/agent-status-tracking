@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Grid,
-  Card,
-  CardContent,
   Typography,
   CircularProgress,
   Chip,
@@ -16,9 +14,13 @@ import {
   IconButton,
   Tooltip,
   LinearProgress,
-  Divider,
-  Paper,
-  useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Alert,
+  Snackbar,
 } from "@mui/material";
 import {
   People,
@@ -27,22 +29,21 @@ import {
   PersonAdd,
   TrendingUp,
   Refresh,
-  ArrowUpward,
-  ArrowDownward,
   AccessTime,
   CheckCircle,
-  Warning,
   Speed,
   Storage,
   CloudDone,
-  MoreVert,
   LocalHospital,
   Shield,
   DirectionsWalk,
   SupervisorAccount,
+  ExitToApp,
+  Warning,
 } from "@mui/icons-material";
-import { collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import { collection, getDocs } from "firebase/firestore";
+import { db, functions } from "../firebaseConfig";
+import { httpsCallable } from "firebase/functions";
 import {
   PieChart,
   Pie,
@@ -55,336 +56,295 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   Legend,
-  AreaChart,
-  Area,
 } from "recharts";
+import { colors, transitions } from "../theme/adminTheme";
+import { GlassCard, StatCard } from "./admin";
+import { fadeInUp, fadeInDown, pulse } from "../styles/adminStyles";
+import { keyframes } from "@mui/system";
 
-// Animated counter hook
-const useAnimatedCounter = (end, duration = 1500) => {
-  const [count, setCount] = useState(0);
-  const countRef = useRef(null);
+// Spin animation for refresh button
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
 
-  useEffect(() => {
-    if (end === 0) {
-      setCount(0);
-      return;
-    }
-
-    const startTime = Date.now();
-    const startValue = 0;
-
-    const animate = () => {
-      const now = Date.now();
-      const progress = Math.min((now - startTime) / duration, 1);
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-      const currentValue = Math.floor(startValue + (end - startValue) * easeOut);
-
-      setCount(currentValue);
-
-      if (progress < 1) {
-        countRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    countRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (countRef.current) {
-        cancelAnimationFrame(countRef.current);
-      }
-    };
-  }, [end, duration]);
-
-  return count;
-};
-
-// Animated Stat Card Component
-const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue }) => {
-  const animatedValue = useAnimatedCounter(value);
-
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        background: gradient,
-        color: "white",
-        borderRadius: 3,
-        overflow: "hidden",
-        position: "relative",
-        transition: "all 0.3s ease",
-        "&:hover": {
-          transform: "translateY(-8px)",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
-        },
-      }}
-    >
-      <CardContent sx={{ p: 3, position: "relative", zIndex: 1 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <Box>
-            <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontWeight: 500 }}>
-              {title}
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-              {animatedValue}
-            </Typography>
-            {subtitle && (
-              <Chip
-                label={subtitle}
-                size="small"
-                sx={{
-                  bgcolor: "rgba(255,255,255,0.2)",
-                  color: "white",
-                  fontWeight: 600,
-                  fontSize: "0.7rem",
-                }}
-              />
-            )}
-            {trend && (
-              <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
-                {trend === "up" ? (
-                  <ArrowUpward sx={{ fontSize: 16, mr: 0.5 }} />
-                ) : (
-                  <ArrowDownward sx={{ fontSize: 16, mr: 0.5 }} />
-                )}
-                <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                  {trendValue}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-          <Box
-            sx={{
-              bgcolor: "rgba(255,255,255,0.2)",
-              borderRadius: 2,
-              p: 1.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {icon}
-          </Box>
-        </Box>
-      </CardContent>
-      {/* Decorative circles */}
-      <Box
-        sx={{
-          position: "absolute",
-          top: -30,
-          right: -30,
-          width: 120,
-          height: 120,
-          borderRadius: "50%",
-          bgcolor: "rgba(255,255,255,0.1)",
-        }}
-      />
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: -40,
-          right: 40,
-          width: 80,
-          height: 80,
-          borderRadius: "50%",
-          bgcolor: "rgba(255,255,255,0.08)",
-        }}
-      />
-    </Card>
-  );
-};
-
-// System Health Card
+// System Health Card Component
 const SystemHealthCard = ({ status, uptime, lastSync }) => {
   const isHealthy = status === "healthy";
 
-  return (
-    <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 3, height: "100%" }}>
-      <CardContent sx={{ p: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
-          <Speed sx={{ fontSize: 28, color: isHealthy ? "success.main" : "warning.main", mr: 1.5 }} />
-          <Typography variant="h6" fontWeight="bold">
-            System Health
-          </Typography>
-        </Box>
-
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-            <CheckCircle sx={{ fontSize: 20, color: "success.main", mr: 1 }} />
-            <Typography variant="body2">Firebase Connection</Typography>
-            <Chip label="Active" size="small" color="success" sx={{ ml: "auto" }} />
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-            <Storage sx={{ fontSize: 20, color: "info.main", mr: 1 }} />
-            <Typography variant="body2">Database Status</Typography>
-            <Chip label="Online" size="small" color="info" sx={{ ml: "auto" }} />
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <CloudDone sx={{ fontSize: 20, color: "primary.main", mr: 1 }} />
-            <Typography variant="body2">Cloud Functions</Typography>
-            <Chip label="Running" size="small" color="primary" sx={{ ml: "auto" }} />
-          </Box>
-        </Box>
-
-        <Divider sx={{ my: 2 }} />
-
-        <Box>
-          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-            System Uptime
-          </Typography>
-          <LinearProgress
-            variant="determinate"
-            value={uptime}
-            sx={{
-              height: 8,
-              borderRadius: 4,
-              bgcolor: "grey.200",
-              "& .MuiLinearProgress-bar": {
-                borderRadius: 4,
-                background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
-              },
-            }}
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-            {uptime}% - Last sync: {lastSync}
-          </Typography>
-        </Box>
-      </CardContent>
-    </Card>
-  );
-};
-
-// Quick Actions Card
-const QuickActionsCard = ({ onRefresh, onAddUser, onManageTeams, onViewReports, onDepartmentSettings }) => {
-  const actions = [
-    { label: "Add New User", icon: <PersonAdd />, color: "#667eea", onClick: onAddUser },
-    { label: "View Reports", icon: <TrendingUp />, color: "#764ba2", onClick: onViewReports },
-    { label: "Manage Teams", icon: <Groups />, color: "#f093fb", onClick: onManageTeams },
-    { label: "Department Settings", icon: <Business />, color: "#f5576c", onClick: onDepartmentSettings },
+  const healthItems = [
+    { label: "Firebase Connection", status: "Active", icon: CheckCircle, color: colors.accent.success },
+    { label: "Database Status", status: "Online", icon: Storage, color: colors.accent.secondary },
+    { label: "Cloud Functions", status: "Running", icon: CloudDone, color: colors.accent.primary },
   ];
 
   return (
-    <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 3, height: "100%" }}>
-      <CardContent sx={{ p: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
-          <Typography variant="h6" fontWeight="bold">
-            Quick Actions
-          </Typography>
-          <Tooltip title="Refresh Data">
-            <IconButton size="small" onClick={onRefresh}>
-              <Refresh />
-            </IconButton>
-          </Tooltip>
+    <GlassCard hoverable={false} sx={{ height: "100%" }}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            borderRadius: "10px",
+            backgroundColor: isHealthy ? colors.accent.primaryLight : colors.accent.warningLight,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            mr: 2,
+          }}
+        >
+          <Speed sx={{ fontSize: 22, color: isHealthy ? colors.accent.primary : colors.accent.warning }} />
         </Box>
+        <Typography variant="h6" sx={{ fontWeight: 600, color: colors.text.primary }}>
+          System Health
+        </Typography>
+      </Box>
 
-        <Grid container spacing={2}>
-          {actions.map((action, index) => (
+      <Box sx={{ mb: 3 }}>
+        {healthItems.map((item, index) => (
+          <Box
+            key={index}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              py: 1.5,
+              borderBottom: index < healthItems.length - 1 ? `1px solid ${colors.border.subtle}` : "none",
+            }}
+          >
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                backgroundColor: item.color,
+                boxShadow: `0 0 8px ${item.color}`,
+                animation: `${pulse} 2s ease-in-out infinite`,
+                mr: 2,
+              }}
+            />
+            <Typography variant="body2" sx={{ color: colors.text.secondary, flex: 1 }}>
+              {item.label}
+            </Typography>
+            <Chip
+              label={item.status}
+              size="small"
+              sx={{
+                backgroundColor: `${item.color}20`,
+                color: item.color,
+                fontWeight: 600,
+                fontSize: "0.7rem",
+                height: 24,
+              }}
+            />
+          </Box>
+        ))}
+      </Box>
+
+      <Box>
+        <Typography variant="caption" sx={{ color: colors.text.muted, display: "block", mb: 1 }}>
+          System Uptime
+        </Typography>
+        <LinearProgress
+          variant="determinate"
+          value={uptime}
+          sx={{
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: "rgba(255,255,255,0.1)",
+            "& .MuiLinearProgress-bar": {
+              borderRadius: 3,
+              background: `linear-gradient(90deg, ${colors.accent.primary} 0%, ${colors.accent.secondary} 100%)`,
+            },
+          }}
+        />
+        <Typography variant="caption" sx={{ color: colors.text.muted, mt: 1, display: "block" }}>
+          {uptime}% - Last sync: {lastSync}
+        </Typography>
+      </Box>
+    </GlassCard>
+  );
+};
+
+// Quick Actions Card Component
+const QuickActionsCard = ({ onRefresh, onAddUser, onManageTeams, onViewReports, onForceLogout, forceLogoutLoading }) => {
+  const actions = [
+    { label: "Add New User", icon: PersonAdd, color: colors.accent.primary, onClick: onAddUser },
+    { label: "View Reports", icon: TrendingUp, color: colors.accent.secondary, onClick: onViewReports },
+    { label: "Manage Teams", icon: Groups, color: colors.accent.purple, onClick: onManageTeams },
+    { label: "Force Logout", icon: ExitToApp, color: colors.accent.error, onClick: onForceLogout, loading: forceLogoutLoading },
+  ];
+
+  return (
+    <GlassCard hoverable={false} sx={{ height: "100%" }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, color: colors.text.primary }}>
+          Quick Actions
+        </Typography>
+        <Tooltip title="Refresh Data">
+          <IconButton
+            size="small"
+            onClick={onRefresh}
+            sx={{
+              color: colors.text.muted,
+              "&:hover": { color: colors.accent.primary, backgroundColor: colors.accent.primaryLight },
+            }}
+          >
+            <Refresh fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      <Grid container spacing={2}>
+        {actions.map((action, index) => {
+          const Icon = action.icon;
+          return (
             <Grid item xs={6} key={index}>
               <Button
                 fullWidth
                 variant="outlined"
                 onClick={action.onClick}
+                disabled={action.loading}
                 sx={{
                   py: 2,
-                  borderRadius: 2,
+                  borderRadius: "12px",
                   display: "flex",
                   flexDirection: "column",
-                  borderColor: "divider",
-                  color: action.color,
-                  transition: "all 0.2s ease",
+                  gap: 1,
+                  borderColor: colors.border.card,
+                  backgroundColor: "rgba(255,255,255,0.02)",
+                  transition: `all ${transitions.fast}`,
                   "&:hover": {
                     borderColor: action.color,
-                    bgcolor: `${action.color}10`,
+                    backgroundColor: `${action.color}15`,
                     transform: "translateY(-2px)",
                   },
                 }}
               >
-                <Box sx={{ color: action.color, mb: 0.5 }}>{action.icon}</Box>
-                <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 500 }}>
-                  {action.label}
+                <Box sx={{ color: action.color }}>
+                  {action.loading ? <CircularProgress size={24} color="inherit" /> : <Icon />}
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{ color: colors.text.secondary, fontWeight: 500, fontSize: "0.7rem" }}
+                >
+                  {action.loading ? "Processing..." : action.label}
                 </Typography>
               </Button>
             </Grid>
-          ))}
-        </Grid>
-      </CardContent>
-    </Card>
+          );
+        })}
+      </Grid>
+    </GlassCard>
   );
 };
 
-// Recent Activity Card
+// Recent Activity Card Component
 const RecentActivityCard = ({ activities, onRefresh, loading }) => (
-  <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 3 }}>
-    <CardContent sx={{ p: 3 }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-        <Typography variant="h6" fontWeight="bold">
-          Recent Activity
-        </Typography>
-        <Tooltip title="Refresh Activities">
-          <IconButton size="small" onClick={onRefresh} disabled={loading}>
-            <Refresh sx={{ animation: loading ? "spin 1s linear infinite" : "none", "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } } }} />
-          </IconButton>
-        </Tooltip>
-      </Box>
+  <GlassCard hoverable={false} sx={{ height: "100%" }}>
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+      <Typography variant="h6" sx={{ fontWeight: 600, color: colors.text.primary }}>
+        Recent Activity
+      </Typography>
+      <Tooltip title="Refresh Activities">
+        <IconButton
+          size="small"
+          onClick={onRefresh}
+          disabled={loading}
+          sx={{
+            color: colors.text.muted,
+            "&:hover": { color: colors.accent.primary },
+          }}
+        >
+          <Refresh
+            fontSize="small"
+            sx={{ animation: loading ? `${spin} 1s linear infinite` : "none" }}
+          />
+        </IconButton>
+      </Tooltip>
+    </Box>
 
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress size={30} />
-        </Box>
-      ) : activities.length === 0 ? (
-        <Box sx={{ textAlign: "center", py: 4 }}>
-          <Typography variant="body2" color="text.secondary">
-            No recent activity found
-          </Typography>
-        </Box>
-      ) : (
-        <List sx={{ p: 0 }}>
-          {activities.map((activity, index) => (
-            <ListItem
-              key={index}
-              sx={{
-                px: 0,
-                py: 1.5,
-                borderBottom: index < activities.length - 1 ? "1px solid" : "none",
-                borderColor: "divider",
-              }}
-            >
-              <ListItemAvatar>
-                <Avatar
-                  sx={{
-                    bgcolor: activity.color + ".light",
-                    color: activity.color + ".main",
-                    width: 40,
-                    height: 40,
-                  }}
-                >
-                  {activity.icon}
-                </Avatar>
-              </ListItemAvatar>
-              <ListItemText
-                primary={
-                  <Typography variant="body2" fontWeight={600}>
-                    {activity.title}
+    {loading ? (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+        <CircularProgress size={30} sx={{ color: colors.accent.primary }} />
+      </Box>
+    ) : activities.length === 0 ? (
+      <Box sx={{ textAlign: "center", py: 4 }}>
+        <Typography variant="body2" sx={{ color: colors.text.muted }}>
+          No recent activity found
+        </Typography>
+      </Box>
+    ) : (
+      <List sx={{ p: 0, maxHeight: 280, overflow: "auto" }}>
+        {activities.map((activity, index) => (
+          <ListItem
+            key={index}
+            sx={{
+              px: 0,
+              py: 1.5,
+              borderBottom: index < activities.length - 1 ? `1px solid ${colors.border.subtle}` : "none",
+            }}
+          >
+            <ListItemAvatar>
+              <Avatar
+                sx={{
+                  width: 36,
+                  height: 36,
+                  backgroundColor: `${activity.iconColor}20`,
+                  color: activity.iconColor,
+                }}
+              >
+                {activity.icon}
+              </Avatar>
+            </ListItemAvatar>
+            <ListItemText
+              primary={
+                <Typography variant="body2" sx={{ fontWeight: 500, color: colors.text.primary, fontSize: "0.8rem" }}>
+                  {activity.title}
+                </Typography>
+              }
+              secondary={
+                <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
+                  <AccessTime sx={{ fontSize: 12, mr: 0.5, color: colors.text.muted }} />
+                  <Typography variant="caption" sx={{ color: colors.text.muted }}>
+                    {activity.time}
                   </Typography>
-                }
-                secondary={
-                  <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
-                    <AccessTime sx={{ fontSize: 14, mr: 0.5, color: "text.disabled" }} />
-                    <Typography variant="caption" color="text.secondary">
-                      {activity.time}
-                    </Typography>
-                  </Box>
-                }
-              />
-            </ListItem>
-          ))}
-        </List>
-      )}
-    </CardContent>
-  </Card>
+                </Box>
+              }
+            />
+          </ListItem>
+        ))}
+      </List>
+    )}
+  </GlassCard>
 );
 
+// Custom Tooltip for Charts
+const CustomChartTooltip = ({ active, payload, totalUsers }) => {
+  if (active && payload && payload.length) {
+    return (
+      <Box
+        sx={{
+          background: colors.background.secondary,
+          backdropFilter: "blur(10px)",
+          border: `1px solid ${colors.border.card}`,
+          borderRadius: "8px",
+          p: 1.5,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+        }}
+      >
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.text.primary }}>
+          {payload[0].name}
+        </Typography>
+        <Typography variant="body2" sx={{ color: colors.text.secondary }}>
+          {payload[0].value} users ({((payload[0].value / totalUsers) * 100).toFixed(1)}%)
+        </Typography>
+      </Box>
+    );
+  }
+  return null;
+};
+
 function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSettings }) {
-  const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [stats, setStats] = useState({
@@ -401,12 +361,17 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
   const [roleData, setRoleData] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
 
-  const COLORS = ["#667eea", "#764ba2", "#f093fb", "#f5576c", "#4facfe", "#00f2fe"];
+  // Force logout states
+  const [forceLogoutDialogOpen, setForceLogoutDialogOpen] = useState(false);
+  const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  // Chart colors matching our theme
   const DEPARTMENT_COLORS = {
-    Health: "#4caf50",
-    Insurance: "#f44336",
-    "Offline Visits": "#2196f3",
-    Management: "#9c27b0",
+    Health: colors.accent.secondary,
+    Insurance: colors.accent.purple,
+    "Offline Visits": colors.accent.cyan,
+    Management: colors.accent.primary,
   };
 
   useEffect(() => {
@@ -418,30 +383,24 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
     try {
       setLoading(true);
 
-      // Fetch Health Agents
       const healthAgentsSnap = await getDocs(collection(db, "healthAgents"));
       const healthAgentsCount = healthAgentsSnap.size;
       const activeHealthAgents = healthAgentsSnap.docs.filter(
         (doc) => doc.data().status === "active"
       ).length;
 
-      // Fetch Health TLs
       const healthTLsSnap = await getDocs(collection(db, "healthTeamLeads"));
       const healthTLsCount = healthTLsSnap.size;
 
-      // Fetch Offline Visits (DC Agents)
       const offlineVisitsSnap = await getDocs(collection(db, "offlineVisits"));
       const offlineVisitsCount = offlineVisitsSnap.size;
 
-      // Fetch Insurance Agents
       const insuranceAgentsSnap = await getDocs(collection(db, "insuranceAgents"));
       const insuranceAgentsCount = insuranceAgentsSnap.size;
 
-      // Fetch Insurance TLs
       const insuranceTLsSnap = await getDocs(collection(db, "insuranceTeamLeads"));
       const insuranceTLsCount = insuranceTLsSnap.size;
 
-      // Fetch Managers
       const managersSnap = await getDocs(collection(db, "managers"));
       const managersCount = managersSnap.size;
 
@@ -464,7 +423,6 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
         totalUsers,
       });
 
-      // Department distribution data for pie chart
       setDepartmentData([
         { name: "Health", value: healthAgentsCount + healthTLsCount, color: DEPARTMENT_COLORS.Health },
         { name: "Insurance", value: insuranceAgentsCount + insuranceTLsCount, color: DEPARTMENT_COLORS.Insurance },
@@ -472,16 +430,14 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
         { name: "Management", value: managersCount, color: DEPARTMENT_COLORS.Management },
       ]);
 
-      // Role distribution data for bar chart
       setRoleData([
-        { name: "Health Agents", count: healthAgentsCount, fill: "#4caf50" },
-        { name: "Health TLs", count: healthTLsCount, fill: "#81c784" },
-        { name: "Insurance Agents", count: insuranceAgentsCount, fill: "#f44336" },
-        { name: "Insurance TLs", count: insuranceTLsCount, fill: "#ef9a9a" },
-        { name: "DC Agents", count: offlineVisitsCount, fill: "#2196f3" },
-        { name: "Managers", count: managersCount, fill: "#9c27b0" },
+        { name: "Health Agents", count: healthAgentsCount, fill: colors.accent.secondary },
+        { name: "Health TLs", count: healthTLsCount, fill: `${colors.accent.secondary}99` },
+        { name: "Insurance Agents", count: insuranceAgentsCount, fill: colors.accent.purple },
+        { name: "Insurance TLs", count: insuranceTLsCount, fill: `${colors.accent.purple}99` },
+        { name: "DC Agents", count: offlineVisitsCount, fill: colors.accent.cyan },
+        { name: "Managers", count: managersCount, fill: colors.accent.primary },
       ]);
-
     } catch (error) {
       console.error("Error fetching statistics:", error);
     } finally {
@@ -489,10 +445,8 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
     }
   };
 
-  // Helper function to format relative time
   const formatRelativeTime = (dateString) => {
     if (!dateString) return "Unknown time";
-
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now - date;
@@ -501,63 +455,53 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString();
   };
 
-  // Fetch real recent activities from user collections
   const fetchRecentActivities = async () => {
     try {
       setActivitiesLoading(true);
       const activities = [];
 
       const collections = [
-        { name: "healthAgents", label: "Health Agent", icon: <LocalHospital fontSize="small" />, color: "success" },
-        { name: "healthTeamLeads", label: "Health TL", icon: <SupervisorAccount fontSize="small" />, color: "success" },
-        { name: "insuranceAgents", label: "Insurance Agent", icon: <Shield fontSize="small" />, color: "error" },
-        { name: "insuranceTeamLeads", label: "Insurance TL", icon: <SupervisorAccount fontSize="small" />, color: "error" },
-        { name: "offlineVisits", label: "DC Agent", icon: <DirectionsWalk fontSize="small" />, color: "info" },
-        { name: "managers", label: "Manager", icon: <Business fontSize="small" />, color: "secondary" },
+        { name: "healthAgents", label: "Health Agent", icon: <LocalHospital fontSize="small" />, iconColor: colors.accent.secondary },
+        { name: "healthTeamLeads", label: "Health TL", icon: <SupervisorAccount fontSize="small" />, iconColor: colors.accent.secondary },
+        { name: "insuranceAgents", label: "Insurance Agent", icon: <Shield fontSize="small" />, iconColor: colors.accent.purple },
+        { name: "insuranceTeamLeads", label: "Insurance TL", icon: <SupervisorAccount fontSize="small" />, iconColor: colors.accent.purple },
+        { name: "offlineVisits", label: "DC Agent", icon: <DirectionsWalk fontSize="small" />, iconColor: colors.accent.cyan },
+        { name: "managers", label: "Manager", icon: <Business fontSize="small" />, iconColor: colors.accent.primary },
       ];
 
       for (const coll of collections) {
         const snapshot = await getDocs(collection(db, coll.name));
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
-
-          // Check for createdAt timestamp
           if (data.createdAt) {
             activities.push({
-              title: `New ${coll.label} added: ${data.name || "Unknown"}`,
+              title: `New ${coll.label}: ${data.name || "Unknown"}`,
               time: formatRelativeTime(data.createdAt),
               timestamp: new Date(data.createdAt).getTime(),
               icon: coll.icon,
-              color: coll.color,
-              type: "created",
+              iconColor: coll.iconColor,
             });
           }
-
-          // Check for updatedAt timestamp (only if different from createdAt)
           if (data.updatedAt && data.updatedAt !== data.createdAt) {
             activities.push({
               title: `${coll.label} updated: ${data.name || "Unknown"}`,
               time: formatRelativeTime(data.updatedAt),
               timestamp: new Date(data.updatedAt).getTime(),
               icon: <People fontSize="small" />,
-              color: "primary",
-              type: "updated",
+              iconColor: colors.accent.primary,
             });
           }
         });
       }
 
-      // Sort by timestamp (most recent first) and take top 10
       activities.sort((a, b) => b.timestamp - a.timestamp);
-      const recentOnly = activities.slice(0, 10);
-
-      setRecentActivities(recentOnly);
+      setRecentActivities(activities.slice(0, 10));
     } catch (error) {
       console.error("Error fetching recent activities:", error);
       setRecentActivities([]);
@@ -566,21 +510,37 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
     }
   };
 
-  // Custom tooltip for pie chart
-  const CustomPieTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      return (
-        <Paper sx={{ p: 1.5, boxShadow: 3 }}>
-          <Typography variant="body2" fontWeight="bold">
-            {payload[0].name}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {payload[0].value} users ({((payload[0].value / stats.totalUsers) * 100).toFixed(1)}%)
-          </Typography>
-        </Paper>
-      );
+  const handleForceLogoutClick = () => setForceLogoutDialogOpen(true);
+
+  const handleForceLogoutConfirm = async () => {
+    setForceLogoutDialogOpen(false);
+    setForceLogoutLoading(true);
+
+    try {
+      const manualAutoLogout = httpsCallable(functions, "manualAutoLogout");
+      const result = await manualAutoLogout();
+
+      setSnackbar({
+        open: true,
+        message: result.data.message || `Successfully logged out ${result.data.agentsLoggedOut} agents`,
+        severity: "success",
+      });
+
+      fetchStatistics();
+    } catch (error) {
+      console.error("Error triggering force logout:", error);
+      let errorMessage = "Failed to trigger force logout. Please try again.";
+      if (error.code === "functions/not-found") {
+        errorMessage = "Function not deployed. Please deploy Cloud Functions first.";
+      } else if (error.code === "functions/permission-denied") {
+        errorMessage = "Permission denied. Only admins can trigger force logout.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      setSnackbar({ open: true, message: errorMessage, severity: "error" });
+    } finally {
+      setForceLogoutLoading(false);
     }
-    return null;
   };
 
   if (loading) {
@@ -594,8 +554,17 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
           minHeight: 400,
         }}
       >
-        <CircularProgress size={60} sx={{ color: "#667eea" }} />
-        <Typography variant="body1" sx={{ mt: 2, color: "text.secondary" }}>
+        <Box
+          sx={{
+            width: 50,
+            height: 50,
+            borderRadius: "50%",
+            border: `3px solid ${colors.border.card}`,
+            borderTopColor: colors.accent.primary,
+            animation: `${spin} 1s linear infinite`,
+          }}
+        />
+        <Typography variant="body2" sx={{ mt: 2, color: colors.text.muted }}>
           Loading dashboard data...
         </Typography>
       </Box>
@@ -604,12 +573,26 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
 
   return (
     <Box>
-      {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
+      {/* Page Header */}
+      <Box
+        sx={{
+          mb: 4,
+          animation: `${fadeInDown} 400ms ease`,
+          animationFillMode: "both",
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 700,
+            color: colors.text.primary,
+            letterSpacing: "-0.02em",
+            mb: 1,
+          }}
+        >
           System Overview
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body2" sx={{ color: colors.text.muted }}>
           Real-time statistics and insights for M-Swasth system
         </Typography>
       </Box>
@@ -617,38 +600,45 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
       {/* Main Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Total Users"
+          <StatCard
+            label="Total Users"
             value={stats.totalUsers}
-            icon={<People sx={{ fontSize: 32 }} />}
-            gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+            icon={People}
+            iconColor={colors.accent.primary}
+            accentColor={colors.accent.primary}
             trend="up"
             trendValue="+12% this month"
+            animationDelay={0}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Health Department"
+          <StatCard
+            label="Health Department"
             value={stats.totalHealthAgents + stats.totalHealthTLs}
-            icon={<LocalHospital sx={{ fontSize: 32 }} />}
-            gradient="linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
-            subtitle={`${stats.activeUsers} Active Agents`}
+            icon={LocalHospital}
+            iconColor={colors.accent.secondary}
+            accentColor={colors.accent.secondary}
+            animationDelay={50}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Insurance Department"
+          <StatCard
+            label="Insurance Department"
             value={stats.totalInsuranceAgents + stats.totalInsuranceTLs}
-            icon={<Shield sx={{ fontSize: 32 }} />}
-            gradient="linear-gradient(135deg, #eb3349 0%, #f45c43 100%)"
+            icon={Shield}
+            iconColor={colors.accent.purple}
+            accentColor={colors.accent.purple}
+            animationDelay={100}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="DC Agents"
+          <StatCard
+            label="DC Agents"
             value={stats.totalOfflineVisits}
-            icon={<DirectionsWalk sx={{ fontSize: 32 }} />}
-            gradient="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+            icon={DirectionsWalk}
+            iconColor={colors.accent.cyan}
+            accentColor={colors.accent.cyan}
+            animationDelay={150}
           />
         </Grid>
       </Grid>
@@ -656,114 +646,115 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
       {/* Secondary Stats Row */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={4}>
-          <AnimatedStatCard
-            title="Health Team Leads"
+          <StatCard
+            label="Health Team Leads"
             value={stats.totalHealthTLs}
-            icon={<SupervisorAccount sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)"
+            icon={SupervisorAccount}
+            iconColor={colors.accent.secondary}
+            animationDelay={200}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <AnimatedStatCard
-            title="Insurance Team Leads"
+          <StatCard
+            label="Insurance Team Leads"
             value={stats.totalInsuranceTLs}
-            icon={<SupervisorAccount sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)"
+            icon={SupervisorAccount}
+            iconColor={colors.accent.purple}
+            animationDelay={250}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <AnimatedStatCard
-            title="Managers"
+          <StatCard
+            label="Managers"
             value={stats.totalManagers}
-            icon={<Business sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)"
+            icon={Business}
+            iconColor={colors.accent.primary}
+            animationDelay={300}
           />
         </Grid>
       </Grid>
 
       {/* Charts Row */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* Department Distribution Pie Chart */}
         <Grid item xs={12} md={6}>
-          <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 3 }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Department Distribution
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                User distribution across departments
-              </Typography>
-              <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={departmentData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      animationBegin={0}
-                      animationDuration={1500}
-                    >
-                      {departmentData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip content={<CustomPieTooltip />} />
-                    <Legend
-                      verticalAlign="bottom"
-                      height={36}
-                      formatter={(value, entry) => (
-                        <span style={{ color: "#333", fontWeight: 500 }}>{value}</span>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Box>
-            </CardContent>
-          </Card>
+          <GlassCard hoverable={false} animationDelay={350}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+              Department Distribution
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.text.muted, mb: 3 }}>
+              User distribution across departments
+            </Typography>
+            <Box sx={{ height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={departmentData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={4}
+                    dataKey="value"
+                    animationBegin={0}
+                    animationDuration={1500}
+                  >
+                    {departmentData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip content={<CustomChartTooltip totalUsers={stats.totalUsers} />} />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    formatter={(value) => (
+                      <span style={{ color: colors.text.secondary, fontSize: "0.8rem" }}>{value}</span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </Box>
+          </GlassCard>
         </Grid>
 
-        {/* Role Distribution Bar Chart */}
         <Grid item xs={12} md={6}>
-          <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 3 }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Role Distribution
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                User count by role type
-              </Typography>
-              <Box sx={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={roleData} layout="vertical" margin={{ left: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
-                    <RechartsTooltip
-                      contentStyle={{
-                        borderRadius: 8,
-                        border: "none",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      }}
-                    />
-                    <Bar
-                      dataKey="count"
-                      radius={[0, 4, 4, 0]}
-                      animationBegin={0}
-                      animationDuration={1500}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Box>
-            </CardContent>
-          </Card>
+          <GlassCard hoverable={false} animationDelay={400}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: colors.text.primary, mb: 0.5 }}>
+              Role Distribution
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.text.muted, mb: 3 }}>
+              User count by role type
+            </Typography>
+            <Box sx={{ height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={roleData} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={colors.border.subtle} horizontal={true} vertical={false} />
+                  <XAxis type="number" tick={{ fill: colors.text.muted, fontSize: 12 }} axisLine={{ stroke: colors.border.subtle }} />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    width={95}
+                    tick={{ fill: colors.text.secondary, fontSize: 11 }}
+                    axisLine={{ stroke: colors.border.subtle }}
+                  />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: colors.background.secondary,
+                      border: `1px solid ${colors.border.card}`,
+                      borderRadius: 8,
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                    }}
+                    labelStyle={{ color: colors.text.primary }}
+                    itemStyle={{ color: colors.text.secondary }}
+                  />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]} animationBegin={0} animationDuration={1500} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          </GlassCard>
         </Grid>
       </Grid>
 
-      {/* Bottom Row - System Health, Quick Actions, Recent Activity */}
+      {/* Bottom Row */}
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <SystemHealthCard status="healthy" uptime={99.9} lastSync="Just now" />
@@ -774,7 +765,8 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
             onAddUser={onAddUser}
             onManageTeams={onManageTeams}
             onViewReports={onViewReports}
-            onDepartmentSettings={onDepartmentSettings}
+            onForceLogout={handleForceLogoutClick}
+            forceLogoutLoading={forceLogoutLoading}
           />
         </Grid>
         <Grid item xs={12} md={4}>
@@ -785,6 +777,71 @@ function AdminOverview({ onAddUser, onManageTeams, onViewReports, onDepartmentSe
           />
         </Grid>
       </Grid>
+
+      {/* Force Logout Dialog */}
+      <Dialog
+        open={forceLogoutDialogOpen}
+        onClose={() => setForceLogoutDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            backgroundColor: colors.background.secondary,
+            backgroundImage: "none",
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: colors.accent.error, display: "flex", alignItems: "center", gap: 1 }}>
+          <Warning />
+          Force Logout All Agents
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: colors.text.secondary }}>
+            This action will immediately log out all Health and Insurance agents who are currently showing as
+            <strong style={{ color: colors.text.primary }}> Available</strong>,{" "}
+            <strong style={{ color: colors.text.primary }}>On Call</strong>,{" "}
+            <strong style={{ color: colors.text.primary }}>Login</strong>, or{" "}
+            <strong style={{ color: colors.text.primary }}>Break</strong>.
+            <br /><br />
+            <strong style={{ color: colors.text.primary }}>Note:</strong> DC Agents (Offline Visits) will NOT be affected.
+            <br /><br />
+            Are you sure you want to proceed?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, borderTop: `1px solid ${colors.border.subtle}` }}>
+          <Button
+            onClick={() => setForceLogoutDialogOpen(false)}
+            sx={{ color: colors.text.secondary }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleForceLogoutConfirm}
+            variant="contained"
+            color="error"
+            startIcon={<ExitToApp />}
+          >
+            Force Logout All
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{
+            backgroundColor: snackbar.severity === "success" ? colors.accent.primaryLight : colors.accent.errorLight,
+            color: snackbar.severity === "success" ? colors.accent.primary : colors.accent.error,
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -76,7 +76,6 @@ import {
   Notes,
   Person,
   Map,
-  Description,
 } from "@mui/icons-material";
 import {
   BarChart,
@@ -97,7 +96,7 @@ import {
   ComposedChart,
   Scatter,
 } from "recharts";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 // ⚠️ TEMPORARY OVERRIDE FOR MEETING - REMOVE AFTER MEETING ⚠️
@@ -484,26 +483,14 @@ const CSVExportDialog = ({ open, onClose, visitLogs, trips, manualCallLogs, dcAg
       `Generated: ${new Date().toLocaleString()}`,
       `Total Records: ${filtered.length}`,
       "",
-      "Date,Time,DC Name,Employee ID,Visit Type,Location/Clinic Name,Clinic Code,Branch Name,State,Contact Person/BM Name,Contact Number/BM Phone,Purpose,Discussion/Remarks,Duration,Images Count"
+      "Date,Time,DC Name,Employee ID,Clinic Code,Clinic Name,Branch Name,State,Visit Type,BM Name,Discussion Remarks,Duration,Images Count"
     ];
 
     filtered.forEach(visit => {
       const date = visit.createdAt ? formatDate(visit.createdAt) : "N/A";
       const time = visit.createdAt ? new Date(visit.createdAt.toDate?.() || visit.createdAt).toLocaleTimeString() : "N/A";
-      const isCustomVisit = visit.visitType === "custom_location";
-
-      // For custom visits, use custom fields; for regular visits, use clinic fields
-      const locationName = isCustomVisit ? (visit.locationName || "") : (visit.clinicName || "");
-      const clinicCode = isCustomVisit ? "" : (visit.clinicCode || "");
-      const branchName = isCustomVisit ? "" : (visit.branchName || "");
-      const state = isCustomVisit ? "" : (visit.state || "");
-      const contactPerson = isCustomVisit ? (visit.contactPerson || "") : (visit.bmName || "");
-      const contactNumber = isCustomVisit ? (visit.contactNumber || "") : (visit.bmPhone || "");
-      const purpose = isCustomVisit ? (visit.purpose || "") : "";
-      const remarks = (visit.remarks || visit.discussionRemarks || "").replace(/"/g, '""');
-
       rows.push(
-        `"${date}","${time}","${visit.userName || ""}","${visit.userEmpId || ""}","${visit.visitType || ""}","${locationName}","${clinicCode}","${branchName}","${state}","${contactPerson}","${contactNumber}","${purpose.replace(/"/g, '""')}","${remarks}","${visit.durationFormatted || visit.punchInData?.durationFormatted || "N/A"}","${visit.images?.length || 0}"`
+        `"${date}","${time}","${visit.userName || ""}","${visit.userEmpId || ""}","${visit.clinicCode || ""}","${visit.clinicName || ""}","${visit.branchName || ""}","${visit.state || ""}","${visit.visitType || ""}","${visit.bmName || ""}","${(visit.discussionRemarks || "").replace(/"/g, '""')}","${visit.punchInData?.durationFormatted || "N/A"}","${visit.images?.length || 0}"`
       );
     });
 
@@ -1163,65 +1150,33 @@ const VisitDetailDialog = ({ open, onClose, visit, formatTimestamp }) => {
             </Box>
           </Box>
 
-          {/* Visit Details Grid - Conditional based on visit type */}
-          {visit.visitType === "custom_location" ? (
-            <>
-              {/* Custom Location Information */}
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2, color: "#10b981" }}>
-                Custom Location Information
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <DetailRow icon={<LocalHospital fontSize="small" />} label="Location Name" value={visit.locationName} />
-                <DetailRow icon={<Map fontSize="small" />} label="Address" value={visit.address} fullWidth />
-                <DetailRow icon={<Person fontSize="small" />} label="Contact Person" value={visit.contactPerson} />
-                <DetailRow icon={<Phone fontSize="small" />} label="Contact Number" value={visit.contactNumber} />
-                <DetailRow icon={<Description fontSize="small" />} label="Purpose of Visit" value={visit.purpose} fullWidth />
-              </Grid>
+          {/* Visit Details Grid */}
+          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2, color: "#10b981" }}>
+            Clinic Information
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <DetailRow icon={<Business fontSize="small" />} label="Clinic Code" value={visit.clinicCode} />
+            <DetailRow icon={<LocalHospital fontSize="small" />} label="Clinic Name" value={visit.clinicName} />
+            <DetailRow icon={<Business fontSize="small" />} label="Branch Name" value={visit.branchName} />
+            <DetailRow icon={<Person fontSize="small" />} label="Partner Name" value={visit.partnerName} />
+            <DetailRow icon={<LocationOn fontSize="small" />} label="State" value={visit.state} />
+            <DetailRow icon={<Map fontSize="small" />} label="City" value={visit.city} />
+          </Grid>
 
-              <Divider sx={{ my: 2 }} />
+          <Divider sx={{ my: 2 }} />
 
-              {/* Visit Info for Custom Location */}
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2, color: "#10b981" }}>
-                Visit Information
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <DetailRow icon={<DirectionsWalk fontSize="small" />} label="Visit Type" value={visit.visitType} />
-                <DetailRow icon={<AccessTime fontSize="small" />} label="Duration" value={visit.durationFormatted || visit.punchInData?.durationFormatted} />
-                <DetailRow icon={<CalendarToday fontSize="small" />} label="Visit Date" value={formatTimestamp(visit.createdAt || visit.timestamp)} />
-                <DetailRow icon={<Schedule fontSize="small" />} label="Punch In" value={visit.punchInData?.time || visit.punchInTime} />
-              </Grid>
-            </>
-          ) : (
-            <>
-              {/* Regular Clinic Information */}
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2, color: "#10b981" }}>
-                Clinic Information
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <DetailRow icon={<Business fontSize="small" />} label="Clinic Code" value={visit.clinicCode} />
-                <DetailRow icon={<LocalHospital fontSize="small" />} label="Clinic Name" value={visit.clinicName} />
-                <DetailRow icon={<Business fontSize="small" />} label="Branch Name" value={visit.branchName} />
-                <DetailRow icon={<Person fontSize="small" />} label="Partner Name" value={visit.partnerName} />
-                <DetailRow icon={<LocationOn fontSize="small" />} label="State" value={visit.state} />
-                <DetailRow icon={<Map fontSize="small" />} label="City" value={visit.city} />
-              </Grid>
-
-              <Divider sx={{ my: 2 }} />
-
-              {/* Visit Info for Regular Clinic */}
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2, color: "#10b981" }}>
-                Visit Information
-              </Typography>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <DetailRow icon={<DirectionsWalk fontSize="small" />} label="Visit Type" value={visit.visitType} />
-                <DetailRow icon={<AccessTime fontSize="small" />} label="Duration" value={visit.durationFormatted || visit.punchInData?.durationFormatted} />
-                <DetailRow icon={<Person fontSize="small" />} label="BM Name" value={visit.bmName} />
-                <DetailRow icon={<Phone fontSize="small" />} label="BM Phone" value={visit.bmPhone} />
-                <DetailRow icon={<CalendarToday fontSize="small" />} label="Visit Date" value={formatTimestamp(visit.createdAt || visit.timestamp)} />
-                <DetailRow icon={<Schedule fontSize="small" />} label="Punch In" value={visit.punchInData?.time || visit.punchInTime} />
-              </Grid>
-            </>
-          )}
+          {/* Visit Info */}
+          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2, color: "#10b981" }}>
+            Visit Information
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <DetailRow icon={<DirectionsWalk fontSize="small" />} label="Visit Type" value={visit.visitType} />
+            <DetailRow icon={<AccessTime fontSize="small" />} label="Duration" value={visit.durationFormatted || visit.punchInData?.durationFormatted} />
+            <DetailRow icon={<Person fontSize="small" />} label="BM Name" value={visit.bmName} />
+            <DetailRow icon={<Phone fontSize="small" />} label="BM Phone" value={visit.bmPhone} />
+            <DetailRow icon={<CalendarToday fontSize="small" />} label="Visit Date" value={formatTimestamp(visit.createdAt || visit.timestamp)} />
+            <DetailRow icon={<Schedule fontSize="small" />} label="Punch In" value={visit.punchInData?.time || visit.punchInTime} />
+          </Grid>
 
           {/* Remarks */}
           {(visit.remarks || visit.discussionRemarks) && (
@@ -1439,7 +1394,7 @@ const VisitDetailDialog = ({ open, onClose, visit, formatTimestamp }) => {
 // MAIN COMPONENT
 // ============================================
 
-function OfflineVisitsManagerDashboardEnhanced({ currentUser }) {
+function OpsManagerDashboard({ currentUser }) {
   // State
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState(0);
@@ -1481,6 +1436,25 @@ function OfflineVisitsManagerDashboardEnhanced({ currentUser }) {
 
     const fetchData = async () => {
       try {
+        // First, fetch the ops manager's assigned DCs from clinicData
+        const clinicsQuery = query(
+          collection(db, "clinicData"),
+          where("opsManagerEmpId", "==", currentUser.empId)
+        );
+        const clinicsSnapshot = await getDocs(clinicsQuery);
+
+        // Extract unique DC IDs assigned to this ops manager
+        const assignedDCIds = new Set();
+        clinicsSnapshot.docs.forEach((doc) => {
+          const assignedDC = doc.data().assignedDC;
+          if (assignedDC) {
+            assignedDCIds.add(assignedDC);
+          }
+        });
+
+        console.log(`Ops Manager ${currentUser.name} has ${assignedDCIds.size} assigned DCs:`, Array.from(assignedDCIds));
+
+        // Now fetch offlineVisits, but only for assigned DCs
         const offlineVisitsRef = collection(db, "offlineVisits");
         const offlineVisitsUnsubscribe = onSnapshot(offlineVisitsRef, (snapshot) => {
           if (!mounted) return;
@@ -1490,6 +1464,12 @@ function OfflineVisitsManagerDashboardEnhanced({ currentUser }) {
           snapshot.docs.forEach((userDoc) => {
             const userData = userDoc.data();
             const userId = userDoc.id;
+
+            // FILTER: Only include DCs assigned to this ops manager
+            // Check by empId since assignedDC in clinicData uses employee IDs
+            if (!assignedDCIds.has(userData.empId)) {
+              return; // Skip this DC if not assigned to this ops manager
+            }
 
             users.push({
               id: userId,
@@ -2533,4 +2513,4 @@ function OfflineVisitsManagerDashboardEnhanced({ currentUser }) {
   );
 }
 
-export default OfflineVisitsManagerDashboardEnhanced;
+export default OpsManagerDashboard;

@@ -3,6 +3,9 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "./firebaseConfig";
+import { initVersionCheck } from "./utils/versionService";
+import { getFullVersionString } from "./config/version";
+import UpdateNotification from "./components/UpdateNotification";
 import LoginPage from "./components/LoginPage";
 import ManagerDashboard from "./components/ManagerDashboard";
 import DepartmentManagerDashboard from "./components/DepartmentManagerDashboard";
@@ -17,6 +20,8 @@ import OfflineVisitsDashboardNew from "./components/OfflineVisitsDashboardNew";
 import OfflineVisitsDashboardMobile from "./components/OfflineVisitsDashboardMobile";
 import DCDashboard from "./components/DCDashboard";
 import OfflineVisitsManagerDashboardEnhanced from "./components/OfflineVisitsManagerDashboardEnhanced";
+import OpsManagerDashboard from "./components/OpsManagerDashboard";
+import StateOpsManagerDashboard from "./components/StateOpsManagerDashboard";
 import AdminLogin from "./components/AdminLogin";
 import AdminDashboard from "./components/AdminDashboard";
 import { AppBar, Toolbar, Typography, Button, Container, useMediaQuery, useTheme, Box } from "@mui/material";
@@ -25,23 +30,41 @@ import "./App.css";
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Version check on app load
+  useEffect(() => {
+    const canProceed = initVersionCheck();
+    if (!canProceed) {
+      setIsUpdating(true);
+      // The page will refresh automatically
+    }
+    // Log version for debugging
+    console.log(`🚀 App Version: ${getFullVersionString()}`);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        console.log("🔍 App.js: Auth state changed - user logged in", user.uid);
         try {
           let userDoc = null;
           let foundCollection = null;
 
           // First, check the central userCollections mapping (fastest method for new users)
+          console.log("🔍 Checking userCollections mapping...");
           const userCollectionDoc = await getDoc(doc(db, "userCollections", user.uid));
           if (userCollectionDoc.exists()) {
             const mappingData = userCollectionDoc.data();
             foundCollection = mappingData.collection;
+            console.log("✅ Found in userCollections:", mappingData);
 
             // Use documentId from mapping if available (for users with empId as doc ID)
             const docId = mappingData.documentId || user.uid;
             userDoc = await getDoc(doc(db, foundCollection, docId));
+            console.log("✅ Retrieved user document from", foundCollection, userDoc.exists());
+          } else {
+            console.log("⚠️ Not found in userCollections, checking fallback collections...");
           }
 
           // Fallback: Check managers collection (for department managers)
@@ -129,6 +152,18 @@ function App() {
             }
           }
 
+          // Check opsManagers collection
+          if (!userDoc || !userDoc.exists()) {
+            console.log("🔍 Checking opsManagers collection...");
+            userDoc = await getDoc(doc(db, "opsManagers", user.uid));
+            if (userDoc.exists()) {
+              foundCollection = "opsManagers";
+              console.log("✅ Found in opsManagers collection");
+            } else {
+              console.log("⚠️ Not found in opsManagers");
+            }
+          }
+
           // Fallback: Check agent collections (agent1-agent50) - for legacy agents
           if (!userDoc || !userDoc.exists()) {
             for (let i = 1; i <= 50; i++) {
@@ -159,12 +194,16 @@ function App() {
               collection: foundCollection,
               documentId: userDoc.id
             });
-            setCurrentUser({
+            const currentUserData = {
               ...user,
               role: userData.role,
               department: userData.department,
-              collection: foundCollection
-            });
+              collection: foundCollection,
+              empId: userData.empId,
+              name: userData.name
+            };
+            console.log("✅ Setting currentUser:", currentUserData);
+            setCurrentUser(currentUserData);
           } else {
             console.error("❌ App.js: User document not found", {
               uid: user.uid,
@@ -173,7 +212,7 @@ function App() {
                 "userCollections", "managers", "admin", "teamleads",
                 "healthAgents", "insuranceAgents", "insuranceTeamLeads",
                 "healthTeamLeads", "offlineVisits", "offlineVisitsManagers",
-                "agent1-50", "email-based"
+                "opsManagers", "agent1-50", "email-based"
               ]
             });
             setCurrentUser(null);
@@ -206,8 +245,13 @@ function App() {
   // Check if user is on mobile and viewing offline visits
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 600;
   const isOfflineVisitsUser = currentUser?.role === "offlineVisits" || currentUser?.role === "Offline Visits";
-  const isDCUser = currentUser?.role === "dc_agent" || currentUser?.role === "DC Agent";
+  const isDCUser = currentUser?.role === "dc_agent" || currentUser?.role === "DC Agent" || currentUser?.role === "male_head_nurse" || currentUser?.role === "Male Head Nurse";
   const shouldHideAppBar = (isOfflineVisitsUser || isDCUser) && isMobile;
+
+  // Show update notification if version update in progress
+  if (isUpdating) {
+    return <UpdateNotification message="A new version is available. Updating now..." />;
+  }
 
   if (loading) {
     return <div>Loading...</div>;
@@ -339,6 +383,7 @@ function App() {
             path="/tl-dashboard"
             element={
               (currentUser?.role === "teamlead" ||
+               currentUser?.role === "teamLead" ||
                currentUser?.role === "Health TL" ||
                currentUser?.role === "Insurance TL") ? (
                 currentUser?.department === "Health" ? (
@@ -355,6 +400,7 @@ function App() {
             path="/tl-view"
             element={
               (currentUser?.role === "teamlead" ||
+               currentUser?.role === "teamLead" ||
                currentUser?.role === "Health TL" ||
                currentUser?.role === "Insurance TL") ? (
                 <TLView
@@ -399,11 +445,35 @@ function App() {
             path="/dc-dashboard"
             element={
               (currentUser?.role === "dc_agent" ||
-               currentUser?.role === "DC Agent") ? (
-                <DCDashboard
-                  userId={currentUser.uid}
-                  userRole={currentUser.role}
-                  userData={currentUser}
+               currentUser?.role === "DC Agent" ||
+               currentUser?.role === "male_head_nurse" ||
+               currentUser?.role === "Male Head Nurse") ? (
+                // Check if this DC is also a State Ops Manager
+                currentUser?.isStateOpsManager ? (
+                  <StateOpsManagerDashboard
+                    currentUser={currentUser}
+                    onLogout={handleLogout}
+                  />
+                ) : (
+                  <DCDashboard
+                    userId={currentUser.uid}
+                    userRole={currentUser.role}
+                    userData={currentUser}
+                  />
+                )
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          {/* State Ops Manager Route (explicit route) */}
+          <Route
+            path="/state-ops-manager"
+            element={
+              currentUser?.isStateOpsManager ? (
+                <StateOpsManagerDashboard
+                  currentUser={currentUser}
+                  onLogout={handleLogout}
                 />
               ) : (
                 <Navigate to="/" />
@@ -417,6 +487,18 @@ function App() {
               (currentUser?.role === "offlineVisitsManager" ||
                currentUser?.role === "Offline Visits Manager") ? (
                 <OfflineVisitsManagerDashboardEnhanced currentUser={currentUser} />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          {/* Ops Manager Route */}
+          <Route
+            path="/ops-manager-dashboard"
+            element={
+              (currentUser?.role === "opsManager" ||
+               currentUser?.role === "Ops Manager") ? (
+                <OpsManagerDashboard currentUser={currentUser} />
               ) : (
                 <Navigate to="/" />
               )

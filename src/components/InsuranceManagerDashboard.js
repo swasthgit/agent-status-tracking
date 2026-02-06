@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   collection,
-  onSnapshot,
   getDoc,
   getDocs,
   doc,
   Timestamp,
   setDoc,
   serverTimestamp,
+  query,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { db, firebaseConfig } from "../firebaseConfig";
 import { initializeApp } from "firebase/app";
@@ -148,12 +150,13 @@ const useAnimatedCounter = (end, duration = 1500) => {
 };
 
 // Animated Stat Card
-const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue }) => {
+const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue, onClick, isActive }) => {
   const animatedValue = useAnimatedCounter(value);
 
   return (
     <Card
       elevation={0}
+      onClick={onClick}
       sx={{
         background: gradient,
         color: "white",
@@ -161,9 +164,12 @@ const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trend
         overflow: "hidden",
         position: "relative",
         transition: "all 0.3s ease",
+        cursor: onClick ? "pointer" : "default",
+        border: isActive ? "3px solid #fff" : "3px solid transparent",
+        boxShadow: isActive ? "0 0 20px rgba(255,255,255,0.4)" : "none",
         "&:hover": {
           transform: "translateY(-8px)",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+          boxShadow: isActive ? "0 0 25px rgba(255,255,255,0.5)" : "0 20px 40px rgba(0,0,0,0.15)",
         },
       }}
     >
@@ -433,6 +439,7 @@ function InsuranceManagerDashboard({ currentUser }) {
   const [csvFilter, setCsvFilter] = useState("all");
   const [customDateFrom, setCustomDateFrom] = useState("");
   const [customDateTo, setCustomDateTo] = useState("");
+  const [globalTimeFilter, setGlobalTimeFilter] = useState("daily"); // "daily", "weekly", "monthly", "all"
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
   const [newUserData, setNewUserData] = useState({
     name: "",
@@ -458,79 +465,153 @@ function InsuranceManagerDashboard({ currentUser }) {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [openFilterDialog, setOpenFilterDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [scorecardFilter, setScorecardFilter] = useState(null); // "totalAgents", "available", "totalCalls", "successRate"
   const [loadingRecordings, setLoadingRecordings] = useState({});
   const navigate = useNavigate();
 
-  // Filter call logs based on search query
-  const filteredCallLogs = callLogs.filter((log) => {
-    if (!searchQuery.trim()) return true;
+  // Global time-filtered call logs - applies to all dashboard elements except CSV export
+  const timeFilteredCallLogs = useMemo(() => {
+    if (globalTimeFilter === "all") return callLogs;
+    const now = new Date();
+    let cutoff;
+    if (globalTimeFilter === "daily") {
+      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    } else if (globalTimeFilter === "weekly") {
+      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (globalTimeFilter === "monthly") {
+      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      return callLogs;
+    }
+    return callLogs.filter(log => log.timestamp && log.timestamp >= cutoff);
+  }, [callLogs, globalTimeFilter]);
+
+  // Agents with time-filtered call stats
+  const timeFilteredAgents = useMemo(() => {
+    if (globalTimeFilter === "all") return agents;
+    return agents.map(agent => {
+      const agentLogs = timeFilteredCallLogs.filter(log => log.agentId === agent.id);
+      const totalCalls = agentLogs.length;
+      const connectedCalls = agentLogs.filter(log => log.callConnected).length;
+      const disconnectedCalls = totalCalls - connectedCalls;
+      const performance = totalCalls > 0 ? Math.round((connectedCalls / totalCalls) * 100) : 0;
+      return { ...agent, totalCalls, connectedCalls, disconnectedCalls, performance };
+    });
+  }, [agents, timeFilteredCallLogs, globalTimeFilter]);
+
+  // Filter call logs based on search query - memoized
+  const filteredCallLogs = useMemo(() => {
+    if (!searchQuery.trim()) return timeFilteredCallLogs;
 
     const query = searchQuery.toLowerCase();
-    const agentName = (log.agentName || "").toLowerCase();
-    const clientNumber = (log.clientNumber || "").toLowerCase();
-    const sid = (log.sid || "").toLowerCase();
-    const callId = (log.callId || "").toLowerCase();
-    const agentId = (log.agentId || "").toLowerCase();
+    return timeFilteredCallLogs.filter((log) => {
+      const agentName = (log.agentName || "").toLowerCase();
+      const clientNumber = (log.clientNumber || "").toLowerCase();
+      const sid = (log.sid || "").toLowerCase();
+      const callId = (log.callId || "").toLowerCase();
+      const agentId = (log.agentId || "").toLowerCase();
 
-    return (
-      agentName.includes(query) ||
-      clientNumber.includes(query) ||
-      sid.includes(query) ||
-      callId.includes(query) ||
-      agentId.includes(query)
-    );
-  });
+      return (
+        agentName.includes(query) ||
+        clientNumber.includes(query) ||
+        sid.includes(query) ||
+        callId.includes(query) ||
+        agentId.includes(query)
+      );
+    });
+  }, [timeFilteredCallLogs, searchQuery]);
 
-  // Filter agents based on search query and status
-  const filteredAgents = agents.filter((agent) => {
-    if (!searchQuery.trim() && statusFilter === "all") return true;
+  // Filter agents based on search query, status, and scorecard filter - memoized
+  const filteredAgents = useMemo(() => {
+    let filtered = timeFilteredAgents;
 
-    const query = searchQuery.toLowerCase();
-    const agentName = (agent.name || "").toLowerCase();
-    const agentPhone = (agent.mobile || "").toLowerCase();
-    const agentId = (agent.id || "").toLowerCase();
-    const agentEmail = (agent.email || "").toLowerCase();
+    // Apply scorecard filter first
+    if (scorecardFilter) {
+      switch (scorecardFilter) {
+        case "available":
+          // Show only available/online agents
+          filtered = filtered.filter(agent =>
+            agent.status === "Login" || agent.status === "Available" || agent.status === "Idle"
+          );
+          break;
+        case "totalCalls":
+          // Show agents with at least 1 call (sorted by calls)
+          filtered = filtered.filter(agent => (agent.totalCalls || 0) > 0);
+          break;
+        case "successRate":
+          // Show agents with calls, sorted by success rate
+          filtered = filtered.filter(agent => (agent.totalCalls || 0) > 0);
+          break;
+        // "totalAgents" shows all agents (no additional filter)
+        default:
+          break;
+      }
+    }
 
-    const matchesSearch = !searchQuery.trim() || (
-      agentName.includes(query) ||
-      agentPhone.includes(query) ||
-      agentId.includes(query) ||
-      agentEmail.includes(query)
-    );
+    if (searchQuery.trim() || statusFilter !== "all") {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((agent) => {
+        const agentName = (agent.name || "").toLowerCase();
+        const agentPhone = (agent.mobile || "").toLowerCase();
+        const agentId = (agent.id || "").toLowerCase();
+        const agentEmail = (agent.email || "").toLowerCase();
 
-    const matchesStatus = statusFilter === "all" || agent.status === statusFilter;
+        const matchesSearch = !searchQuery.trim() || (
+          agentName.includes(query) ||
+          agentPhone.includes(query) ||
+          agentId.includes(query) ||
+          agentEmail.includes(query)
+        );
 
-    return matchesSearch && matchesStatus;
-  });
+        const matchesStatus = statusFilter === "all" || agent.status === statusFilter;
 
-  // Calculate stats (supports both new and legacy status values)
-  const stats = {
+        return matchesSearch && matchesStatus;
+      });
+    }
+
+    // Sort based on scorecard filter
+    return filtered.sort((a, b) => {
+      if (scorecardFilter === "successRate") {
+        // Sort by success rate (highest first)
+        const aRate = a.totalCalls > 0 ? (a.connectedCalls / a.totalCalls) : 0;
+        const bRate = b.totalCalls > 0 ? (b.connectedCalls / b.totalCalls) : 0;
+        return bRate - aRate;
+      }
+      // Default: sort by total calls (most calls first)
+      const aCallCount = a.totalCalls || 0;
+      const bCallCount = b.totalCalls || 0;
+      return bCallCount - aCallCount;
+    });
+  }, [timeFilteredAgents, searchQuery, statusFilter, scorecardFilter]);
+
+  // Calculate stats (supports both new and legacy status values) - memoized
+  const stats = useMemo(() => ({
     totalAgents: agents.length,
     availableAgents: agents.filter(a => a.status === "Idle" || a.status === "Available" || a.status === "Login").length,
     onCallAgents: agents.filter(a => a.status === "Busy" || a.status === "On Call").length,
     onBreakAgents: agents.filter(a => a.status === "Break").length,
     loggedOutAgents: agents.filter(a => a.status === "Logout" || a.status === "Unavailable" || a.status === "Logged Out").length,
-    totalCalls: callLogs.length,
-    connectedCalls: callLogs.filter(log => log.callConnected).length,
-    disconnectedCalls: callLogs.filter(log => !log.callConnected).length,
+    totalCalls: timeFilteredCallLogs.length,
+    connectedCalls: timeFilteredCallLogs.filter(log => log.callConnected).length,
+    disconnectedCalls: timeFilteredCallLogs.filter(log => !log.callConnected).length,
     teamLeads: agents.filter(a => a.department === "Team Lead").length,
-  };
+  }), [agents, timeFilteredCallLogs]);
 
-  // Prepare chart data
-  const statusDistribution = [
+  // Prepare chart data - memoized
+  const statusDistribution = useMemo(() => [
     { name: "Available", value: stats.availableAgents, color: "#48bb78" },
     { name: "On Call", value: stats.onCallAgents, color: "#667eea" },
     { name: "On Break", value: stats.onBreakAgents, color: "#ed8936" },
     { name: "Logged Out", value: stats.loggedOutAgents, color: "#a0aec0" },
-  ].filter(item => item.value > 0);
+  ].filter(item => item.value > 0), [stats]);
 
-  const callStatusData = [
+  const callStatusData = useMemo(() => [
     { name: "Connected", value: stats.connectedCalls, color: "#48bb78" },
     { name: "Not Connected", value: stats.disconnectedCalls, color: "#fc8181" },
-  ].filter(item => item.value > 0);
+  ].filter(item => item.value > 0), [stats]);
 
-  // Top performers
-  const topPerformers = [...agents]
+  // Top performers - memoized
+  const topPerformers = useMemo(() => [...timeFilteredAgents]
     .sort((a, b) => (b.performance || 0) - (a.performance || 0))
     .slice(0, 5)
     .map(agent => ({
@@ -538,22 +619,79 @@ function InsuranceManagerDashboard({ currentUser }) {
       calls: agent.totalCalls || 0,
       connected: agent.connectedCalls || 0,
       performance: agent.performance || 0,
+    })), [timeFilteredAgents]);
+
+  // Call Coordinator distribution - memoized (Client, Branch Manager, Nurse)
+  const callTypeData = useMemo(() => {
+    const types = {};
+    timeFilteredCallLogs.forEach(log => {
+      // Handle different data structures:
+      // - New calls: coordinatorType = "Client"/"Branch Manager"/"Nurse"
+      // - Regular outbound calls: callType = "Client"/"Branch Manager"/"Nurse"
+      // - Manual Leads: callType = "Manual Lead", coordinatorType or agentType
+      // - Inbound: callType = "Inbound", coordinatorType
+      let typeValue = null;
+
+      // Priority 1: Use coordinatorType field (new format)
+      if (log.coordinatorType && ['Client', 'Branch Manager', 'Nurse'].includes(log.coordinatorType)) {
+        typeValue = log.coordinatorType;
+      }
+      // Priority 2: For regular outbound calls, callType contains the coordinator
+      else if (log.callType && ['Client', 'Branch Manager', 'Nurse'].includes(log.callType)) {
+        typeValue = log.callType;
+      }
+      // Priority 3: Fallback to agentType if it has coordinator values
+      else if (log.agentType && ['Client', 'Branch Manager', 'Nurse'].includes(log.agentType)) {
+        typeValue = log.agentType;
+      }
+
+      // Only count if we found a valid coordinator type
+      if (typeValue) {
+        types[typeValue] = (types[typeValue] || 0) + 1;
+      }
+    });
+
+    return Object.entries(types).map(([name, value]) => ({
+      name,
+      value,
+      color: name === 'Nurse' ? '#ec4899' :
+             name === 'Branch Manager' ? '#8b5cf6' :
+             name === 'Client' ? '#14b8a6' :
+             '#6b7280'
     }));
+  }, [timeFilteredCallLogs]);
 
-  // Call type distribution
-  const callTypeData = callLogs.reduce((acc, log) => {
-    const type = log.callType || "Unknown";
-    const existing = acc.find(item => item.name === type);
-    if (existing) {
-      existing.value++;
-    } else {
-      acc.push({ name: type, value: 1 });
-    }
-    return acc;
-  }, []);
+  // Call Category Distribution - memoized
+  const callCategoryData = useMemo(() => {
+    const categories = {};
+    const categoryColors = {
+      'Query Update': '#3b82f6',
+      'Claim Status': '#10b981',
+      'Negotiation Call': '#f59e0b',
+      'Intimation Call': '#8b5cf6',
+      'Product Information': '#ec4899',
+      'Paid Call': '#06b6d4',
+      'Rejection Call': '#ef4444',
+    };
 
-  // Daily call trend (last 7 days)
-  const getDailyTrend = () => {
+    timeFilteredCallLogs.forEach(log => {
+      const category = log.callCategory;
+      if (category) {
+        categories[category] = (categories[category] || 0) + 1;
+      }
+    });
+
+    return Object.entries(categories)
+      .map(([name, value]) => ({
+        name,
+        value,
+        color: categoryColors[name] || '#6b7280'
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [timeFilteredCallLogs]);
+
+  // Daily call trend (last 7 days) - memoized
+  const dailyTrendData = useMemo(() => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
@@ -562,7 +700,7 @@ function InsuranceManagerDashboard({ currentUser }) {
       const dayStart = new Date(date.setHours(0, 0, 0, 0));
       const dayEnd = new Date(date.setHours(23, 59, 59, 999));
 
-      const dayCalls = callLogs.filter(log => {
+      const dayCalls = timeFilteredCallLogs.filter(log => {
         if (!log.timestamp) return false;
         const logDate = log.timestamp;
         return logDate >= dayStart && logDate <= dayEnd;
@@ -576,263 +714,207 @@ function InsuranceManagerDashboard({ currentUser }) {
       });
     }
     return days;
-  };
+  }, [timeFilteredCallLogs]);
 
-  const dailyTrendData = getDailyTrend();
+  // Optimized data fetching - batch queries instead of nested listeners
+  const fetchInsuranceData = useCallback(async () => {
+    try {
+      setLoading(true);
 
-  useEffect(() => {
-    let mounted = true;
-    if (!currentUser || !currentUser.uid) {
-      if (mounted) setLoading(false);
-      return;
-    }
+      // Check if user is manager
+      const userDoc = await getDoc(doc(db, "admin", currentUser?.uid));
+      if (!userDoc.exists() || userDoc.data().role !== "manager") {
+        setLoading(false);
+        return;
+      }
 
-    const fetchManagerRole = async () => {
-      try {
-        const userDoc = await getDoc(doc(db, "admin", currentUser.uid));
-        if (userDoc.exists() && userDoc.data().role === "manager") {
-          const agentCollections = ["insuranceAgents"];
-          const allUnsubscribes = [];
+      const allAgents = [];
+      const allCallLogs = [];
 
-          // Listen to insuranceTeamLeads collection
-          const insuranceTLsRef = collection(db, "insuranceTeamLeads");
-          const tlUnsubscribe = onSnapshot(
-            insuranceTLsRef,
-            (snapshot) => {
-              if (!mounted) return;
-              snapshot.docs.forEach((tlDoc) => {
-                const tlData = tlDoc.data();
-                const tlId = tlDoc.id;
+      // Fetch Insurance Team Leads (single query)
+      const insuranceTLsSnap = await getDocs(collection(db, "insuranceTeamLeads"));
 
-                const tlCallLogsRef = collection(db, "insuranceTeamLeads", tlId, "callLogs");
-                const tlLogsUnsubscribe = onSnapshot(
-                  tlCallLogsRef,
-                  (logsSnapshot) => {
-                    if (!mounted) return;
-                    const logs = logsSnapshot.docs.map((log) => {
-                      const data = log.data();
-                      let startTime = null;
-                      let endTime = null;
-                      if (data.startTime instanceof Timestamp) {
-                        startTime = data.startTime.toDate();
-                      } else if (typeof data.startTime === "string") {
-                        startTime = new Date(data.startTime);
-                        if (isNaN(startTime)) startTime = null;
-                      }
-                      if (data.endTime instanceof Timestamp) {
-                        endTime = data.endTime.toDate();
-                      } else if (typeof data.endTime === "string") {
-                        endTime = new Date(data.endTime);
-                        if (isNaN(endTime)) endTime = null;
-                      }
-                      return {
-                        id: log.id,
-                        ...data,
-                        timestamp: data.timestamp
-                          ? data.timestamp instanceof Timestamp
-                            ? data.timestamp.toDate()
-                            : new Date(data.timestamp)
-                          : null,
-                        startTime,
-                        endTime,
-                        agentId: tlId,
-                        agentName: tlData.name || "Unknown TL",
-                        collectionName: "insuranceTeamLeads",
-                      };
-                    });
-                    logs.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
-                    const totalCalls = logs.length;
-                    const connectedCalls = logs.filter((log) => log.callConnected).length;
-                    const disconnectedCalls = totalCalls - connectedCalls;
-                    const performance =
-                      totalCalls > 0 ? Math.round((connectedCalls / totalCalls) * 100) : 0;
+      // Batch fetch TL call logs with Promise.all
+      await Promise.all(
+        insuranceTLsSnap.docs.map(async (tlDoc) => {
+          const tlData = tlDoc.data();
+          const tlId = tlDoc.id;
 
-                    if (mounted) {
-                      setAgents((prevAgents) => {
-                        const existingTLIndex = prevAgents.findIndex(
-                          (a) => a.id === tlId && a.collection === "insuranceTeamLeads"
-                        );
-                        const tlAgent = {
-                          id: tlId,
-                          collection: "insuranceTeamLeads",
-                          name: tlData.name || "Unknown TL",
-                          status: tlData.status || "Idle",
-                          avatar: tlData.avatar || tlData.name?.charAt(0)?.toUpperCase() || "TL",
-                          department: "Team Lead",
-                          performance,
-                          totalCalls,
-                          connectedCalls,
-                          disconnectedCalls,
-                        };
-                        if (existingTLIndex > -1) {
-                          const updatedAgents = [...prevAgents];
-                          updatedAgents[existingTLIndex] = tlAgent;
-                          return updatedAgents;
-                        }
-                        return [...prevAgents, tlAgent];
-                      });
-
-                      setCallLogs((prevLogs) => [
-                        ...prevLogs.filter(
-                          (log) => log.agentId !== tlId || log.collectionName !== "insuranceTeamLeads"
-                        ),
-                        ...logs,
-                      ]);
-                    }
-                  },
-                  (error) => {
-                    console.error(`Error fetching TL call logs for ${tlId}:`, error);
-                  }
-                );
-                allUnsubscribes.push(tlLogsUnsubscribe);
-              });
-            },
-            (error) => {
-              console.error("Error fetching TL data:", error);
-            }
-          );
-          allUnsubscribes.push(tlUnsubscribe);
-
-          agentCollections.forEach((collectionName) => {
-            const agentsRef = collection(db, collectionName);
-            const unsubscribe = onSnapshot(
-              agentsRef,
-              (snapshot) => {
-                if (!mounted) return;
-                const agentDocs = snapshot.docs.map((agentDoc) => {
-                  const agentData = agentDoc.data();
-                  const agentId = agentDoc.id;
-                  const callLogsRef = collection(db, collectionName, agentId, "callLogs");
-                  const logsUnsubscribe = onSnapshot(
-                    callLogsRef,
-                    (logsSnapshot) => {
-                      if (!mounted) return;
-                      const logs = logsSnapshot.docs.map((log) => {
-                        const data = log.data();
-                        let startTime = null;
-                        let endTime = null;
-                        if (data.startTime instanceof Timestamp) {
-                          startTime = data.startTime.toDate();
-                        } else if (typeof data.startTime === "string") {
-                          startTime = new Date(data.startTime);
-                          if (isNaN(startTime)) startTime = null;
-                        }
-                        if (data.endTime instanceof Timestamp) {
-                          endTime = data.endTime.toDate();
-                        } else if (typeof data.endTime === "string") {
-                          endTime = new Date(data.endTime);
-                          if (isNaN(endTime)) endTime = null;
-                        }
-                        return {
-                          id: log.id,
-                          ...data,
-                          timestamp: data.timestamp
-                            ? data.timestamp instanceof Timestamp
-                              ? data.timestamp.toDate()
-                              : new Date(data.timestamp)
-                            : null,
-                          startTime,
-                          endTime,
-                          agentId,
-                          agentName: agentData.name || "Unknown Agent",
-                          collectionName,
-                        };
-                      });
-                      logs.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
-                      const totalCalls = logs.length;
-                      const connectedCalls = logs.filter((log) => log.callConnected).length;
-                      const disconnectedCalls = totalCalls - connectedCalls;
-                      const performance =
-                        totalCalls > 0 ? Math.round((connectedCalls / totalCalls) * 100) : 0;
-
-                      if (mounted) {
-                        setAgents((prevAgents) => {
-                          const existingAgentIndex = prevAgents.findIndex(
-                            (a) => a.id === agentId && a.collection === collectionName
-                          );
-                          const agent = {
-                            id: agentId,
-                            collection: collectionName,
-                            name: agentData.name || "Unknown Agent",
-                            status: agentData.status || "Idle",
-                            avatar: agentData.avatar || agentId.slice(0, 2).toUpperCase(),
-                            department: agentData.department || "Insurance",
-                            performance,
-                            totalCalls,
-                            connectedCalls,
-                            disconnectedCalls,
-                            empId: agentData.empId || agentId,
-                          };
-                          if (existingAgentIndex > -1) {
-                            const updatedAgents = [...prevAgents];
-                            updatedAgents[existingAgentIndex] = agent;
-                            return updatedAgents;
-                          }
-                          return [...prevAgents, agent];
-                        });
-
-                        setCallLogs((prevLogs) => [
-                          ...prevLogs.filter(
-                            (log) => log.agentId !== agentId || log.collectionName !== collectionName
-                          ),
-                          ...logs,
-                        ]);
-                      }
-                    },
-                    (error) => {
-                      console.error(`Error fetching call logs for ${collectionName}/${agentId}:`, error);
-                    }
-                  );
-                  allUnsubscribes.push(logsUnsubscribe);
-                  return {
-                    id: agentDoc.id,
-                    collection: collectionName,
-                    name: agentData.name || "Unknown Agent",
-                    status: agentData.status || "Idle",
-                    avatar: agentData.avatar || agentId.slice(0, 2).toUpperCase(),
-                    department: agentData.department || "Insurance",
-                    empId: agentData.empId || agentId,
-                  };
-                });
-
-                if (mounted) {
-                  setAgents((prevAgents) => [
-                    ...prevAgents.filter((a) => !agentCollections.includes(a.collection)),
-                    ...agentDocs,
-                  ]);
-                  setLoading(false);
-                }
-              },
-              (error) => {
-                console.error(`Error fetching agents for ${collectionName}:`, error);
-                if (mounted) setLoading(false);
-              }
+          let logs = [];
+          try {
+            // Fetch call logs with limit (max 100 per TL)
+            const logsSnap = await getDocs(
+              query(
+                collection(db, "insuranceTeamLeads", tlId, "callLogs"),
+                orderBy("timestamp", "desc"),
+                limit(100)
+              )
             );
 
-            allUnsubscribes.push(unsubscribe);
+            logs = logsSnap.docs.map((log) => {
+              const data = log.data();
+              let startTime = null;
+              let endTime = null;
+              if (data.startTime instanceof Timestamp) {
+                startTime = data.startTime.toDate();
+              } else if (typeof data.startTime === "string") {
+                startTime = new Date(data.startTime);
+                if (isNaN(startTime)) startTime = null;
+              }
+              if (data.endTime instanceof Timestamp) {
+                endTime = data.endTime.toDate();
+              } else if (typeof data.endTime === "string") {
+                endTime = new Date(data.endTime);
+                if (isNaN(endTime)) endTime = null;
+              }
+              return {
+                id: log.id,
+                ...data,
+                timestamp: data.timestamp
+                  ? data.timestamp instanceof Timestamp
+                    ? data.timestamp.toDate()
+                    : new Date(data.timestamp)
+                  : null,
+                startTime,
+                endTime,
+                agentId: tlId,
+                agentName: tlData.name || "Unknown TL",
+                collectionName: "insuranceTeamLeads",
+              };
+            });
+          } catch (logError) {
+            console.error(`Error fetching call logs for TL ${tlId}:`, logError);
+            // Continue with empty logs for this TL
+          }
+
+          const totalCalls = logs.length;
+          const connectedCalls = logs.filter((log) => log.callConnected).length;
+          const disconnectedCalls = totalCalls - connectedCalls;
+          const performance = totalCalls > 0 ? Math.round((connectedCalls / totalCalls) * 100) : 0;
+
+          allAgents.push({
+            id: tlId,
+            collection: "insuranceTeamLeads",
+            name: tlData.name || "Unknown TL",
+            status: tlData.status || "Idle",
+            avatar: tlData.avatar || tlData.name?.charAt(0)?.toUpperCase() || "TL",
+            department: "Team Lead",
+            performance,
+            totalCalls,
+            connectedCalls,
+            disconnectedCalls,
           });
 
-          return () => allUnsubscribes.forEach((unsub) => unsub());
-        } else {
-          if (mounted) setLoading(false);
-        }
-      } catch (error) {
-        console.error("Error in fetchManagerRole:", error);
-        if (mounted) setLoading(false);
-      }
-    };
+          allCallLogs.push(...logs);
+        })
+      );
 
-    fetchManagerRole();
+      // Fetch Insurance Agents (single query)
+      const insuranceAgentsSnap = await getDocs(collection(db, "insuranceAgents"));
 
-    return () => {
-      mounted = false;
-    };
+      // Batch fetch agent call logs with Promise.all
+      await Promise.all(
+        insuranceAgentsSnap.docs.map(async (agentDoc) => {
+          const agentData = agentDoc.data();
+          const agentId = agentDoc.id;
+
+          let logs = [];
+          try {
+            // Fetch call logs with limit (max 100 per agent)
+            const logsSnap = await getDocs(
+              query(
+                collection(db, "insuranceAgents", agentId, "callLogs"),
+                orderBy("timestamp", "desc"),
+                limit(100)
+              )
+            );
+
+            logs = logsSnap.docs.map((log) => {
+              const data = log.data();
+              let startTime = null;
+              let endTime = null;
+              if (data.startTime instanceof Timestamp) {
+                startTime = data.startTime.toDate();
+              } else if (typeof data.startTime === "string") {
+                startTime = new Date(data.startTime);
+                if (isNaN(startTime)) startTime = null;
+              }
+              if (data.endTime instanceof Timestamp) {
+                endTime = data.endTime.toDate();
+              } else if (typeof data.endTime === "string") {
+                endTime = new Date(data.endTime);
+                if (isNaN(endTime)) endTime = null;
+              }
+              return {
+                id: log.id,
+                ...data,
+                timestamp: data.timestamp
+                  ? data.timestamp instanceof Timestamp
+                    ? data.timestamp.toDate()
+                    : new Date(data.timestamp)
+                  : null,
+                startTime,
+                endTime,
+                agentId,
+                agentName: agentData.name || "Unknown Agent",
+                collectionName: "insuranceAgents",
+              };
+            });
+          } catch (logError) {
+            console.error(`Error fetching call logs for agent ${agentId}:`, logError);
+            // Continue with empty logs for this agent
+          }
+
+          const totalCalls = logs.length;
+          const connectedCalls = logs.filter((log) => log.callConnected).length;
+          const disconnectedCalls = totalCalls - connectedCalls;
+          const performance = totalCalls > 0 ? Math.round((connectedCalls / totalCalls) * 100) : 0;
+
+          allAgents.push({
+            id: agentId,
+            collection: "insuranceAgents",
+            name: agentData.name || "Unknown Agent",
+            status: agentData.status || "Idle",
+            avatar: agentData.avatar || agentId.slice(0, 2).toUpperCase(),
+            department: agentData.department || "Insurance",
+            performance,
+            totalCalls,
+            connectedCalls,
+            disconnectedCalls,
+            empId: agentData.empId || agentId,
+          });
+
+          allCallLogs.push(...logs);
+        })
+      );
+
+      // Sort agents by name
+      allAgents.sort((a, b) => a.name.localeCompare(b.name));
+
+      // Sort call logs by timestamp (most recent first)
+      allCallLogs.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
+
+      setAgents(allAgents);
+      setCallLogs(allCallLogs);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error in fetchInsuranceData:", error);
+      setLoading(false);
+    }
   }, [currentUser]);
 
-  const handleRefresh = () => {
+  useEffect(() => {
+    if (!currentUser || !currentUser.uid) {
+      setLoading(false);
+      return;
+    }
+    fetchInsuranceData();
+  }, [currentUser, fetchInsuranceData]);
+
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  };
+    fetchInsuranceData().finally(() => setRefreshing(false));
+  }, [fetchInsuranceData]);
 
   const formatDuration = (duration) => {
     if (!duration || typeof duration !== "object" || (!duration.hours && !duration.minutes && !duration.seconds))
@@ -899,8 +981,8 @@ function InsuranceManagerDashboard({ currentUser }) {
     }
 
     const headers = [
-      "Agent Name", "Department", "Call ID", "SID", "Client Number", "Call Type",
-      "Agent Type", "Escalation", "Call Category", "Partner", "Timestamp",
+      "Agent Name", "Call ID", "SID", "Client Number", "Call Type",
+      "Agent Type", "Escalation", "Department Name", "Call Category", "Partner", "Timestamp",
       "Call Duration", "Call Connected", "Call Status", "Not Connected Reason", "Remarks"
     ];
 
@@ -923,13 +1005,13 @@ function InsuranceManagerDashboard({ currentUser }) {
 
       return [
         agent?.name || "N/A",
-        agent?.department || "N/A",
         log.callId || "N/A",
         log.sid || "N/A",
         log.clientNumber || "N/A",
         log.callType || "N/A",
         log.agentType || "N/A",
         log.escalation || "N/A",
+        log.departmentName || log.department || agent?.department || "N/A",
         log.callCategory || "N/A",
         log.partner || "N/A",
         log.timestamp ? formatTimestamp(log.timestamp) : "N/A",
@@ -943,7 +1025,7 @@ function InsuranceManagerDashboard({ currentUser }) {
 
     if (rows.length === 0) {
       agents.forEach((agent) => {
-        rows.push([agent.name || "N/A", agent.department || "N/A", ...Array(14).fill("N/A")]);
+        rows.push([agent.name || "N/A", ...Array(15).fill("N/A")]);
       });
     }
 
@@ -1376,6 +1458,68 @@ function InsuranceManagerDashboard({ currentUser }) {
 
       {/* Stats Cards */}
       <Box sx={{ p: 3 }}>
+        {/* Global Time Filter */}
+        <Box sx={{ display: "flex", justifyContent: "flex-start", alignItems: "center", mb: 2, gap: 1 }}>
+          <FilterList sx={{ color: "#667eea", fontSize: 20 }} />
+          <Typography variant="body2" sx={{ fontWeight: 600, color: "#475569", mr: 1 }}>
+            Showing data for:
+          </Typography>
+          {[
+            { value: "daily", label: "Last 24 Hours" },
+            { value: "weekly", label: "Last 7 Days" },
+            { value: "monthly", label: "Last 30 Days" },
+            { value: "all", label: "All Time" },
+          ].map((option) => (
+            <Chip
+              key={option.value}
+              label={option.label}
+              size="small"
+              onClick={() => setGlobalTimeFilter(option.value)}
+              sx={{
+                fontWeight: 600,
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                bgcolor: globalTimeFilter === option.value ? "#667eea" : "#f1f5f9",
+                color: globalTimeFilter === option.value ? "#fff" : "#475569",
+                border: globalTimeFilter === option.value ? "none" : "1px solid #e2e8f0",
+                "&:hover": {
+                  bgcolor: globalTimeFilter === option.value ? "#5a67d8" : "#e2e8f0",
+                },
+              }}
+            />
+          ))}
+        </Box>
+
+        {/* Active Filter Indicator */}
+        {scorecardFilter && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 2,
+              bgcolor: "#e0e7ff",
+              borderRadius: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600, color: "#4338ca" }}>
+              Filtering by: {scorecardFilter === "totalAgents" ? "All Team Members" :
+                           scorecardFilter === "available" ? "Available Agents" :
+                           scorecardFilter === "totalCalls" ? "Agents with Calls" :
+                           scorecardFilter === "successRate" ? "Success Rate (High to Low)" : scorecardFilter}
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => setScorecardFilter(null)}
+              sx={{ color: "#4338ca", fontWeight: 600 }}
+            >
+              Clear Filter
+            </Button>
+          </Paper>
+        )}
+
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
             <AnimatedStatCard
@@ -1384,6 +1528,11 @@ function InsuranceManagerDashboard({ currentUser }) {
               icon={<Group sx={{ fontSize: 28 }} />}
               gradient={INSURANCE_GRADIENTS.primary}
               subtitle={`${stats.teamLeads} Team Leads`}
+              onClick={() => {
+                setScorecardFilter(scorecardFilter === "totalAgents" ? null : "totalAgents");
+                setTabValue(0); // Switch to Team Members tab
+              }}
+              isActive={scorecardFilter === "totalAgents"}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -1393,6 +1542,11 @@ function InsuranceManagerDashboard({ currentUser }) {
               icon={<CheckCircle sx={{ fontSize: 28 }} />}
               gradient={INSURANCE_GRADIENTS.success}
               subtitle="Ready to take calls"
+              onClick={() => {
+                setScorecardFilter(scorecardFilter === "available" ? null : "available");
+                setTabValue(0); // Switch to Team Members tab
+              }}
+              isActive={scorecardFilter === "available"}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -1402,6 +1556,11 @@ function InsuranceManagerDashboard({ currentUser }) {
               icon={<Phone sx={{ fontSize: 28 }} />}
               gradient={INSURANCE_GRADIENTS.secondary}
               subtitle={`${stats.connectedCalls} connected`}
+              onClick={() => {
+                setScorecardFilter(scorecardFilter === "totalCalls" ? null : "totalCalls");
+                setTabValue(0); // Switch to Team Members tab
+              }}
+              isActive={scorecardFilter === "totalCalls"}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -1411,6 +1570,11 @@ function InsuranceManagerDashboard({ currentUser }) {
               icon={<TrendingUp sx={{ fontSize: 28 }} />}
               gradient={INSURANCE_GRADIENTS.accent}
               subtitle="Connection rate"
+              onClick={() => {
+                setScorecardFilter(scorecardFilter === "successRate" ? null : "successRate");
+                setTabValue(0); // Switch to Team Members tab
+              }}
+              isActive={scorecardFilter === "successRate"}
             />
           </Grid>
         </Grid>
@@ -1702,20 +1866,76 @@ function InsuranceManagerDashboard({ currentUser }) {
                     </Card>
                   </Grid>
 
-                  {/* Call Type Distribution */}
+                  {/* Call Coordinator Distribution */}
                   <Grid item xs={12} md={6}>
                     <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
                       <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-                        Call Types
+                        Call Coordinator Distribution
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={callTypeData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="name" stroke="#64748b" />
-                          <YAxis stroke="#64748b" />
-                          <RechartsTooltip />
-                          <Bar dataKey="value" fill="#764ba2" name="Calls" radius={[4, 4, 0, 0]} />
-                        </BarChart>
+                        {callTypeData.length > 0 ? (
+                          <PieChart>
+                            <Pie
+                              data={callTypeData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                              labelLine={{ stroke: "#64748b", strokeWidth: 1 }}
+                            >
+                              {callTypeData.map((entry, index) => (
+                                <Cell key={`cell-coordinator-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <RechartsTooltip />
+                            <Legend />
+                          </PieChart>
+                        ) : (
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                            <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                              No coordinator data available yet
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "#cbd5e1", textAlign: "center", maxWidth: 200 }}>
+                              Data will appear as new calls are logged with coordinator selection
+                            </Typography>
+                          </Box>
+                        )}
+                      </ResponsiveContainer>
+                    </Card>
+                  </Grid>
+
+                  {/* Call Category Distribution */}
+                  <Grid item xs={12} md={6}>
+                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                        Call Category Distribution
+                      </Typography>
+                      <ResponsiveContainer width="100%" height={300}>
+                        {callCategoryData.length > 0 ? (
+                          <BarChart data={callCategoryData} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis type="number" stroke="#64748b" />
+                            <YAxis dataKey="name" type="category" stroke="#64748b" width={100} tick={{ fontSize: 11 }} />
+                            <RechartsTooltip />
+                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                              {callCategoryData.map((entry, index) => (
+                                <Cell key={`cell-category-${index}`} fill={entry.color} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        ) : (
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                            <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                              No category data available yet
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "#cbd5e1", textAlign: "center", maxWidth: 200 }}>
+                              Data will appear as calls are logged with category selection
+                            </Typography>
+                          </Box>
+                        )}
                       </ResponsiveContainer>
                     </Card>
                   </Grid>

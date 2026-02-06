@@ -38,9 +38,9 @@ import {
   LocalHospital,
   Save,
   CheckCircle,
-  Star,
   Image as ImageIcon,
   ExpandMore,
+  MedicalServices,
 } from "@mui/icons-material";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
@@ -58,6 +58,7 @@ const TASK_TYPES = {
   AWARENESS: "Awareness Call",
   BM_DISCUSSION: "BM Discussion on Policy Target",
   CLINIC_WORK: "Clinic Work Assigned by RO/DRO",
+  CONSULTATION: "Consultation",
 };
 
 // Rating calculation based on percentage
@@ -117,6 +118,10 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
     minutes: "",
   });
 
+  const [consultationForm, setConsultationForm] = useState({
+    consultationCount: "",
+  });
+
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split("T")[0];
 
@@ -171,6 +176,7 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
     setAwarenessForm({ connectedCalls: "", notConnectedCalls: "" });
     setBmDiscussionForm({ meetingCount: "" });
     setClinicWorkForm({ description: "", hours: "", minutes: "" });
+    setConsultationForm({ consultationCount: "" });
   };
 
   // Handle image upload for meetings
@@ -380,6 +386,36 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
     setSnackbar({ open: true, message: "Clinic work task added successfully", severity: "success" });
   };
 
+  // Add Consultation Task
+  const handleAddConsultation = () => {
+    const count = parseInt(consultationForm.consultationCount) || 0;
+
+    if (count === 0) {
+      setSnackbar({ open: true, message: "Please enter consultation count", severity: "error" });
+      return;
+    }
+
+    const duration = count * 10; // 10 mins per consultation
+
+    const newTask = {
+      id: editingTask?.id || generateId(),
+      type: "CONSULTATION",
+      consultationCount: count,
+      duration,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (editingTask) {
+      setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? newTask : t)));
+    } else {
+      setTasks((prev) => [...prev, newTask]);
+    }
+
+    setOpenDialog(null);
+    resetForms();
+    setSnackbar({ open: true, message: "Consultation task added successfully", severity: "success" });
+  };
+
   // Edit task
   const handleEditTask = (task) => {
     setEditingTask(task);
@@ -415,6 +451,12 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
           minutes: task.minutes.toString(),
         });
         setOpenDialog("CLINIC_WORK");
+        break;
+      case "CONSULTATION":
+        setConsultationForm({
+          consultationCount: task.consultationCount.toString(),
+        });
+        setOpenDialog("CONSULTATION");
         break;
       default:
         break;
@@ -508,6 +550,8 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
           return <Groups sx={{ color: "#ab47bc" }} />;
         case "CLINIC_WORK":
           return <LocalHospital sx={{ color: "#ef5350" }} />;
+        case "CONSULTATION":
+          return <MedicalServices sx={{ color: "#ff7043" }} />;
         default:
           return <AccessTime />;
       }
@@ -560,6 +604,12 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
                 "{task.description}"
               </Typography>
             </>
+          );
+        case "CONSULTATION":
+          return (
+            <Typography variant="body2" color="text.secondary">
+              {task.consultationCount} consultation{task.consultationCount > 1 ? "s" : ""} × 10 mins
+            </Typography>
           );
         default:
           return null;
@@ -694,6 +744,10 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
         <MenuItem onClick={() => handleSelectTaskType("CLINIC_WORK")}>
           <LocalHospital sx={{ mr: 1, color: "#ef5350" }} />
           {TASK_TYPES.CLINIC_WORK}
+        </MenuItem>
+        <MenuItem onClick={() => handleSelectTaskType("CONSULTATION")}>
+          <MedicalServices sx={{ mr: 1, color: "#ff7043" }} />
+          {TASK_TYPES.CONSULTATION}
         </MenuItem>
       </Menu>
 
@@ -1081,6 +1135,49 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
         </DialogActions>
       </Dialog>
 
+      {/* Consultation Dialog */}
+      <Dialog
+        open={openDialog === "CONSULTATION"}
+        onClose={() => setOpenDialog(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <MedicalServices sx={{ color: "#ff7043" }} />
+            {editingTask ? "Edit" : "Add"} Consultation
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mt: 2, mb: 2 }}>
+            Each consultation = 10 mins
+          </Alert>
+
+          <TextField
+            label="Number of Consultations"
+            type="number"
+            value={consultationForm.consultationCount}
+            onChange={(e) =>
+              setConsultationForm((prev) => ({ ...prev, consultationCount: e.target.value }))
+            }
+            fullWidth
+            inputProps={{ min: 0 }}
+          />
+
+          {consultationForm.consultationCount && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              Total Duration: {formatDuration((parseInt(consultationForm.consultationCount) || 0) * 10)}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddConsultation}>
+            {editingTask ? "Update" : "Add"} Consultation
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Summary Dialog */}
       <Dialog open={showSummary} onClose={() => setShowSummary(false)} maxWidth="md" fullWidth>
         <DialogTitle>
@@ -1159,6 +1256,11 @@ const DailyTaskForm = ({ agentId, agentName, agentCollection, currentUser }) => 
                   <Typography variant="body2">• {task.description}</Typography>
                   <Typography variant="body2">• Time: {formatDuration(task.duration)}</Typography>
                 </>
+              )}
+              {task.type === "CONSULTATION" && (
+                <Typography variant="body2">
+                  • {task.consultationCount} consultation{task.consultationCount > 1 ? "s" : ""} ({formatDuration(task.duration)})
+                </Typography>
               )}
             </Paper>
           ))}

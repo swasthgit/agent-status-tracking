@@ -143,46 +143,94 @@ function TripTrackerEnhanced({ agentId, agentCollection }) {
     return (R * c).toFixed(2);
   };
 
-  // Get current location
-  const getCurrentLocation = () => {
+  // Get current location with fallback and retry logic
+  const getCurrentLocation = (retryCount = 0) => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error("Geolocation is not supported"));
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: new Date().toISOString(),
-          });
-        },
-        (error) => {
-          let errorMessage = "Unable to get location";
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = "Location permission denied";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = "Location unavailable";
-              break;
-            case error.TIMEOUT:
-              errorMessage = "Location request timed out";
-              break;
-            default:
-              errorMessage = "Unknown location error";
+      // First try: High accuracy with 30s timeout
+      const tryHighAccuracy = () => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: new Date().toISOString(),
+            });
+          },
+          (error) => {
+            // If high accuracy fails, try low accuracy mode
+            if (retryCount === 0) {
+              console.log("High accuracy failed, trying low accuracy mode...");
+              tryLowAccuracy();
+            } else {
+              let errorMessage = "Unable to get location";
+              switch (error.code) {
+                case error.PERMISSION_DENIED:
+                  errorMessage = "Location permission denied. Please enable location access in your browser settings.";
+                  break;
+                case error.POSITION_UNAVAILABLE:
+                  errorMessage = "Location unavailable. Please ensure GPS is enabled and you have a clear view of the sky.";
+                  break;
+                case error.TIMEOUT:
+                  errorMessage = "Location request timed out. Please try again or move to an area with better GPS signal.";
+                  break;
+                default:
+                  errorMessage = "Unknown location error. Please try again.";
+              }
+              reject(new Error(errorMessage));
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 30000, // Increased to 30 seconds
+            maximumAge: 5000, // Allow cached location up to 5 seconds old
           }
-          reject(new Error(errorMessage));
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
-        }
-      );
+        );
+      };
+
+      // Fallback: Low accuracy mode (faster, less precise)
+      const tryLowAccuracy = () => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: new Date().toISOString(),
+            });
+          },
+          (error) => {
+            let errorMessage = "Unable to get location";
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = "Location permission denied. Please enable location access in your browser settings.";
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = "Location unavailable. Please ensure GPS is enabled.";
+                break;
+              case error.TIMEOUT:
+                errorMessage = "Location request timed out. Please try again.";
+                break;
+              default:
+                errorMessage = "Unknown location error. Please try again.";
+            }
+            reject(new Error(errorMessage));
+          },
+          {
+            enableHighAccuracy: false, // Use network/WiFi location (faster)
+            timeout: 15000, // 15 seconds for low accuracy
+            maximumAge: 10000, // Allow cached location up to 10 seconds old
+          }
+        );
+      };
+
+      // Start with high accuracy
+      tryHighAccuracy();
     });
   };
 

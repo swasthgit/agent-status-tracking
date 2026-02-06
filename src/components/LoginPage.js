@@ -12,7 +12,11 @@ import {
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import GoogleIcon from "@mui/icons-material/Google";
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+} from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
 import { useNavigate } from "react-router-dom";
@@ -171,13 +175,17 @@ const LoginPage = () => {
 
         // Map display roles to routes
         const roleRouteMapping = {
-          // System roles (old format)
+          // System roles (old format - various casing)
           "agent": "/agent-view",
           "teamlead": "/tl-dashboard",
+          "teamLead": "/tl-dashboard",
+          "TeamLead": "/tl-dashboard",
           "manager": "/manager-dashboard",
           "offlineVisits": "/offline-visits",
           "dc_agent": "/dc-dashboard",
+          "male_head_nurse": "/dc-dashboard",
           "offlineVisitsManager": "/offline-visits-manager",
+          "opsManager": "/ops-manager-dashboard",
 
           // Display roles (new format)
           "Health Agent": "/agent-view",
@@ -185,8 +193,10 @@ const LoginPage = () => {
           "Health TL": "/tl-dashboard",
           "Insurance TL": "/tl-dashboard",
           "DC Agent": "/dc-dashboard",
+          "Male Head Nurse": "/dc-dashboard",
           "Offline Visits": "/offline-visits",
           "Offline Visits Manager": "/offline-visits-manager",
+          "Ops Manager": "/ops-manager-dashboard",
         };
 
         // Special handling for Managers (they need state passed)
@@ -205,8 +215,20 @@ const LoginPage = () => {
         console.warn("User document not found for UID:", user.uid);
       }
     } catch (error) {
-      setError("Incorrect email or password");
       console.error("Login error:", error);
+
+      // Handle authentication errors
+      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+        // Note: fetchSignInMethodsForEmail returns empty array due to Email Enumeration Protection
+        // So we provide a generic but helpful error message
+        setError("Invalid credentials. If you signed up with Google, please use 'Sign in with Google' below.");
+      } else if (error.code === "auth/user-not-found") {
+        setError("No account found with this email. Please contact your administrator.");
+      } else if (error.code === "auth/too-many-requests") {
+        setError("Too many failed attempts. Please try again later or use Google Sign-In.");
+      } else {
+        setError("Login failed. Try using 'Sign in with Google' if you have a Google account.");
+      }
     }
   };
 

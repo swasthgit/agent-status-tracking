@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import ExoPhones from "./ExoPhones";
 import ManualLeads from "./ManualLeads";
 import InboundCalls from "./InboundCalls";
 import CallHistory from "./CallHistory";
 import DailyTaskForm from "./DailyTaskForm";
+import StatusLoginModal from "./StatusLoginModal";
+import StatusHeader from "./StatusHeader";
 import {
   Box,
   Typography,
@@ -12,10 +14,18 @@ import {
   Tab,
   Paper,
   Chip,
+  Tooltip,
+  Button,
 } from "@mui/material";
 import {
   Person,
   Circle,
+  Phone,
+  PhoneDisabled,
+  Today,
+  RateReview,
+  OpenInNew,
+  Coffee,
 } from "@mui/icons-material";
 import {
   doc,
@@ -32,10 +42,16 @@ import { useAgentStatus, AGENT_STATUS } from "../hooks/useAgentStatus";
 // Status color mapping
 const getStatusColor = (status) => {
   switch (status) {
+    case AGENT_STATUS.LOGIN:
     case AGENT_STATUS.AVAILABLE:
+    case "Idle": // Legacy status - treat as active
+    case "Available": // Legacy status
       return "#22c55e"; // Green
     case AGENT_STATUS.ON_CALL:
       return "#f59e0b"; // Orange/Amber
+    case AGENT_STATUS.BREAK:
+      return "#f97316"; // Orange for break
+    case AGENT_STATUS.LOGOUT:
     case AGENT_STATUS.UNAVAILABLE:
     default:
       return "#ef4444"; // Red
@@ -69,18 +85,28 @@ const AgentView = ({ currentUser, onStatusChange }) => {
     return currentUser?.email?.split("@")[0] || "";
   }, [currentUser]);
 
-  // Use the new status management hook
+  // Use the enhanced status management hook with new features
   const {
     status: agentStatus,
+    isLoggedInToday,
+    isStatusLoading, // NEW: tracks if initial status check is in progress
+    workingDuration,
+    breakTimeRemaining,
     setOnCall,
     setAvailableAfterCall,
-    setUnavailable,
     recordActivity,
+    startDay,
+    endDay,
+    startBreak,
+    endBreak,
   } = useAgentStatus(
     currentUser?.uid,
     getCollectionName(),
     true // isLoggedIn - hook auto-sets to Available on mount
   );
+
+  // Check if agent is on break
+  const isOnBreak = agentStatus === AGENT_STATUS.BREAK;
 
   useEffect(() => {
     let mounted = true;
@@ -106,26 +132,23 @@ const AgentView = ({ currentUser, onStatusChange }) => {
               ...userData,
               id: currentUser.uid,  // Keep Firebase UID as id (overwrites userData.id)
               customId: userData.id,  // Store custom ID separately
-              status: "Idle",
+              // Note: Don't override status here - let useAgentStatus hook manage it
             });
-
-            await updateDoc(userDocRef, { status: "Idle" });
-            onStatusChange(currentUser.uid, "Idle");
+            // Don't update status to "Idle" here - the new status system handles this
+            // Status is now managed by useAgentStatus hook with Login/Logout/Break/On Call states
           } else {
             await setDoc(userDocRef, {
               name: currentUser.displayName || "Agent",
               email: currentUser.email,
-              status: "Logged Out",
+              status: AGENT_STATUS.LOGOUT, // Use new status system
             });
 
-            await updateDoc(userDocRef, { status: "Idle" });
             setAgent({
               id: currentUser.uid,
               name: currentUser.displayName || "Agent",
               email: currentUser.email,
-              status: "Idle",
             });
-            onStatusChange(currentUser.uid, "Idle");
+            // Don't call onStatusChange here - useAgentStatus hook handles status
           }
         }
       } catch (error) {
@@ -182,7 +205,7 @@ const AgentView = ({ currentUser, onStatusChange }) => {
             docSnap.exists() &&
             !isRevertingToIdle.current
           ) {
-            const newStatus = docSnap.data().status || "Idle";
+            const newStatus = docSnap.data().status || AGENT_STATUS.LOGOUT;
             setAgent((prev) => {
               if (prev && prev.status !== newStatus) {
                 return { ...prev, status: newStatus };
@@ -238,13 +261,43 @@ const AgentView = ({ currentUser, onStatusChange }) => {
     recordActivity();
   };
 
-  // Set status to unavailable when component unmounts (logout)
-  useEffect(() => {
-    return () => {
-      // This will run when the agent logs out / component unmounts
-      setUnavailable();
+  // Note: Status logout is now handled manually via StatusHeader's "End Day" button
+  // or automatically via inactivity timeout (10 min) or 6 PM auto-logout
+
+  // Calculate today's call counts (connected vs not connected)
+  const todayCallStats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todayCalls = callLog.filter((log) => {
+      const logDate = log.timestamp?.toDate?.() || new Date(log.timestamp);
+      logDate.setHours(0, 0, 0, 0);
+      return logDate.getTime() === today.getTime();
+    });
+
+    const connected = todayCalls.filter(
+      (log) => log.status === "Connected" || log.status === "connected" || log.callStatus === "Connected"
+    ).length;
+
+    const notConnected = todayCalls.filter(
+      (log) => log.status === "Not Connected" || log.status === "not connected" || log.callStatus === "Not Connected"
+    ).length;
+
+    return {
+      total: todayCalls.length,
+      connected,
+      notConnected,
     };
-  }, [setUnavailable]);
+  }, [callLog]);
+
+  // Check if user is a Health Agent
+  const isHealthAgent = useMemo(() => {
+    return (
+      currentUser?.role === "Health Agent" ||
+      currentUser?.role === "healthAgent" ||
+      currentUser?.collection === "healthAgents"
+    );
+  }, [currentUser]);
 
   if (loading) {
     return <Typography>Loading agent data...</Typography>;
@@ -262,6 +315,85 @@ const AgentView = ({ currentUser, onStatusChange }) => {
         padding: "24px",
       }}
     >
+      {/* Loading overlay while checking login status */}
+      {isStatusLoading && (
+        <Box
+          sx={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            bgcolor: "rgba(0, 0, 0, 0.7)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              border: "4px solid rgba(255,255,255,0.3)",
+              borderTop: "4px solid #fff",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+              "@keyframes spin": {
+                "0%": { transform: "rotate(0deg)" },
+                "100%": { transform: "rotate(360deg)" },
+              },
+            }}
+          />
+          <Typography sx={{ color: "#fff", mt: 2 }}>
+            Checking status...
+          </Typography>
+        </Box>
+      )}
+
+      {/* Status Login Modal - Blocks dashboard until agent starts their day */}
+      {/* Only show modal AFTER status check is complete to prevent flash/delay issues */}
+      <StatusLoginModal
+        open={!isStatusLoading && !isLoggedInToday}
+        agentName={agent?.name}
+        onStartDay={startDay}
+      />
+
+      {/* Status Header with controls - Only shown when logged in */}
+      {isLoggedInToday && (
+        <StatusHeader
+          status={agentStatus}
+          workingDuration={workingDuration}
+          breakTimeRemaining={breakTimeRemaining}
+          onStartBreak={startBreak}
+          onEndBreak={endBreak}
+          onLogout={() => endDay("manual")}
+        />
+      )}
+
+      {/* Break Message Overlay */}
+      {isOnBreak && (
+        <Paper
+          elevation={3}
+          sx={{
+            bgcolor: "warning.light",
+            color: "warning.contrastText",
+            p: 3,
+            mb: 2,
+            borderRadius: 2,
+            textAlign: "center",
+          }}
+        >
+          <Coffee sx={{ fontSize: 48, mb: 1 }} />
+          <Typography variant="h6" fontWeight="bold">
+            You are currently on break
+          </Typography>
+          <Typography variant="body2">
+            Dashboard features are disabled during break. Click "End Break" to resume work.
+          </Typography>
+        </Paper>
+      )}
       {/* Modern Header Section */}
       <Paper
         elevation={0}
@@ -317,30 +449,90 @@ const AgentView = ({ currentUser, onStatusChange }) => {
           </Box>
         </Box>
 
-        {/* Real-time Status Indicator */}
-        <Chip
-          icon={<Circle sx={{ fontSize: "12px !important", color: getStatusColor(agentStatus) }} />}
-          label={agentStatus}
-          sx={{
-            bgcolor: "rgba(255, 255, 255, 0.15)",
-            backdropFilter: "blur(10px)",
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: "14px",
-            padding: "8px 4px",
-            height: "auto",
-            border: `2px solid ${getStatusColor(agentStatus)}`,
-            "& .MuiChip-icon": {
-              color: getStatusColor(agentStatus),
-              animation: agentStatus === AGENT_STATUS.ON_CALL ? "pulse 1.5s infinite" : "none",
-            },
-            "@keyframes pulse": {
-              "0%": { opacity: 1 },
-              "50%": { opacity: 0.4 },
-              "100%": { opacity: 1 },
-            },
-          }}
-        />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          {/* Today's Call Stats - Only for Health Agents */}
+          {isHealthAgent && (
+            <Tooltip title="Today's Calls" arrow>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  bgcolor: "rgba(255, 255, 255, 0.15)",
+                  backdropFilter: "blur(10px)",
+                  borderRadius: "12px",
+                  padding: "8px 16px",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                }}
+              >
+                <Today sx={{ color: "#fff", fontSize: 20 }} />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Tooltip title="Connected Calls" arrow>
+                    <Chip
+                      icon={<Phone sx={{ fontSize: "16px !important" }} />}
+                      label={todayCallStats.connected}
+                      size="small"
+                      sx={{
+                        bgcolor: "rgba(34, 197, 94, 0.3)",
+                        color: "#fff",
+                        fontWeight: 700,
+                        "& .MuiChip-icon": { color: "#22c55e" },
+                      }}
+                    />
+                  </Tooltip>
+                  <Tooltip title="Not Connected Calls" arrow>
+                    <Chip
+                      icon={<PhoneDisabled sx={{ fontSize: "16px !important" }} />}
+                      label={todayCallStats.notConnected}
+                      size="small"
+                      sx={{
+                        bgcolor: "rgba(239, 68, 68, 0.3)",
+                        color: "#fff",
+                        fontWeight: 700,
+                        "& .MuiChip-icon": { color: "#ef4444" },
+                      }}
+                    />
+                  </Tooltip>
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "rgba(255, 255, 255, 0.8)",
+                    fontWeight: 500,
+                    ml: 0.5,
+                  }}
+                >
+                  Total: {todayCallStats.total}
+                </Typography>
+              </Box>
+            </Tooltip>
+          )}
+
+          {/* Real-time Status Indicator */}
+          <Chip
+            icon={<Circle sx={{ fontSize: "12px !important", color: getStatusColor(agentStatus) }} />}
+            label={agentStatus}
+            sx={{
+              bgcolor: "rgba(255, 255, 255, 0.15)",
+              backdropFilter: "blur(10px)",
+              color: "#fff",
+              fontWeight: 600,
+              fontSize: "14px",
+              padding: "8px 4px",
+              height: "auto",
+              border: `2px solid ${getStatusColor(agentStatus)}`,
+              "& .MuiChip-icon": {
+                color: getStatusColor(agentStatus),
+                animation: agentStatus === AGENT_STATUS.ON_CALL ? "pulse 1.5s infinite" : "none",
+              },
+              "@keyframes pulse": {
+                "0%": { opacity: 1 },
+                "50%": { opacity: 0.4 },
+                "100%": { opacity: 1 },
+              },
+            }}
+          />
+        </Box>
       </Paper>
 
       {/* Modern Tabs */}
@@ -352,6 +544,8 @@ const AgentView = ({ currentUser, onStatusChange }) => {
           marginBottom: "24px",
           border: `1px solid ${THEME.primary}20`,
           overflow: "hidden",
+          opacity: isOnBreak ? 0.5 : 1,
+          pointerEvents: isOnBreak ? "none" : "auto",
         }}
       >
         <Tabs
@@ -383,26 +577,32 @@ const AgentView = ({ currentUser, onStatusChange }) => {
             },
           }}
         >
-          <Tab label="Call History" />
-          <Tab label="ExoPhones" />
-          <Tab label="Manual Leads" />
-          <Tab label="Inbound Calls" />
+          <Tab label="Call History" disabled={isOnBreak} />
+          <Tab label="ExoPhones" disabled={isOnBreak} />
+          <Tab label="Manual Leads" disabled={isOnBreak} />
+          <Tab label="Inbound Calls" disabled={isOnBreak} />
           {/* Daily Task tab - Only for Health Agents */}
           {(currentUser?.role === "Health Agent" ||
             currentUser?.role === "healthAgent" ||
             currentUser?.collection === "healthAgents") && (
-            <Tab label="Daily Task" />
+            <Tab label="Daily Task" disabled={isOnBreak} />
+          )}
+          {/* BM Review tab - Only for Health Agents */}
+          {(currentUser?.role === "Health Agent" ||
+            currentUser?.role === "healthAgent" ||
+            currentUser?.collection === "healthAgents") && (
+            <Tab label="BM Review" icon={<RateReview />} iconPosition="start" disabled={isOnBreak} />
           )}
         </Tabs>
       </Paper>
 
-      {/* Tab Content */}
-      <Box sx={{ marginTop: "24px" }}>
-        {tabValue === 0 && (
+      {/* Tab Content - Disabled when on break */}
+      <Box sx={{ marginTop: "24px", opacity: isOnBreak ? 0.5 : 1, pointerEvents: isOnBreak ? "none" : "auto" }}>
+        {tabValue === 0 && !isOnBreak && (
           <CallHistory callLogs={callLog} agentName={agent.name} />
         )}
 
-        {tabValue === 1 && agent && currentUser && (
+        {tabValue === 1 && agent && currentUser && !isOnBreak && (
           <ExoPhones
             agentId={agent.id}
             agentCollection={getCollectionName()}
@@ -411,7 +611,7 @@ const AgentView = ({ currentUser, onStatusChange }) => {
           />
         )}
 
-        {tabValue === 2 && agent && currentUser && (
+        {tabValue === 2 && agent && currentUser && !isOnBreak && (
           <ManualLeads
             agentId={agent.id}
             agentCollection={getCollectionName()}
@@ -420,7 +620,7 @@ const AgentView = ({ currentUser, onStatusChange }) => {
           />
         )}
 
-        {tabValue === 3 && agent && currentUser && (
+        {tabValue === 3 && agent && currentUser && !isOnBreak && (
           <InboundCalls
             agentId={agent.id}
             agentCollection={getCollectionName()}
@@ -432,6 +632,7 @@ const AgentView = ({ currentUser, onStatusChange }) => {
         {tabValue === 4 &&
           agent &&
           currentUser &&
+          !isOnBreak &&
           (currentUser?.role === "Health Agent" ||
             currentUser?.role === "healthAgent" ||
             currentUser?.collection === "healthAgents") && (
@@ -441,6 +642,61 @@ const AgentView = ({ currentUser, onStatusChange }) => {
               agentCollection={getCollectionName()}
               currentUser={currentUser}
             />
+          )}
+
+        {/* BM Review tab content - Only for Health Agents */}
+        {tabValue === 5 &&
+          agent &&
+          currentUser &&
+          !isOnBreak &&
+          (currentUser?.role === "Health Agent" ||
+            currentUser?.role === "healthAgent" ||
+            currentUser?.collection === "healthAgents") && (
+            <Paper
+              elevation={0}
+              sx={{
+                bgcolor: "white",
+                borderRadius: "16px",
+                p: 4,
+                border: `1px solid ${THEME.primary}20`,
+                boxShadow: `0 4px 20px ${THEME.primary}10`,
+              }}
+            >
+              <Box sx={{ textAlign: "center", py: 6 }}>
+                <RateReview sx={{ fontSize: 80, color: THEME.primary, mb: 3 }} />
+                <Typography variant="h4" fontWeight={700} color={THEME.primary} gutterBottom>
+                  BM Review Portal
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 600, mx: "auto" }}>
+                  Access the Brand Manager Review system to track your performance, review metrics, and view evaluations.
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="large"
+                  endIcon={<OpenInNew />}
+                  onClick={() => window.open("https://bm-review-agentstatus.web.app", "_blank")}
+                  sx={{
+                    bgcolor: THEME.primary,
+                    color: "white",
+                    px: 4,
+                    py: 1.5,
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    borderRadius: "12px",
+                    textTransform: "none",
+                    boxShadow: `0 4px 12px ${THEME.primary}40`,
+                    "&:hover": {
+                      bgcolor: THEME.primaryDark,
+                      boxShadow: `0 6px 16px ${THEME.primary}60`,
+                      transform: "translateY(-2px)",
+                    },
+                    transition: "all 0.3s ease",
+                  }}
+                >
+                  Open BM Review Portal
+                </Button>
+              </Box>
+            </Paper>
           )}
       </Box>
     </Box>

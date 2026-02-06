@@ -101,7 +101,7 @@ const CallLogForm = ({ onSubmit }) => {
     }
 
     if (!formData.callType) {
-      alert("Please select a Call Type (Client/Branch Manager/Nurse)");
+      alert("Please select a Call Coordinator (Client/Branch Manager/Nurse)");
       return;
     }
 
@@ -168,6 +168,8 @@ const CallLogForm = ({ onSubmit }) => {
     "Negotiation Call",
     "Intimation Call",
     "Product Information",
+    "Paid Call",
+    "Rejection Call",
   ];
 
   const callStatuses = [
@@ -249,7 +251,7 @@ const CallLogForm = ({ onSubmit }) => {
           />
         </Grid>
 
-        {/* Call Type Dropdown */}
+        {/* Call Coordinator Dropdown */}
         <Grid item xs={12} sm={6}>
           <FormControl fullWidth variant="outlined" required>
             <InputLabel
@@ -264,13 +266,13 @@ const CallLogForm = ({ onSubmit }) => {
                 },
               }}
             >
-              Call Type *
+              Call Coordinator *
             </InputLabel>
             <Select
               labelId="call-type-label"
               value={formData.callType}
               onChange={(e) => handleInputChange("callType", e.target.value)}
-              label="Call Type *"
+              label="Call Coordinator *"
               required
               sx={{
                 borderRadius: "6px",
@@ -312,7 +314,7 @@ const CallLogForm = ({ onSubmit }) => {
               displayEmpty
             >
               <MenuItem value="" disabled>
-                Select Call Type
+                Select Call Coordinator
               </MenuItem>
               {callTypes.map((type) => (
                 <MenuItem key={type} value={type}>

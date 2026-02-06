@@ -4,9 +4,7 @@ import {
   Grid,
   Paper,
   Typography,
-  Card,
   CardContent,
-  CardHeader,
   Chip,
   Avatar,
   IconButton,
@@ -22,13 +20,9 @@ import {
   Alert,
   CircularProgress,
   Tooltip,
-  LinearProgress,
   Tabs,
   Tab,
   Badge,
-  Divider,
-  InputAdornment,
-  TextField,
   Collapse,
 } from "@mui/material";
 import {
@@ -38,25 +32,15 @@ import {
   SwapHoriz,
   Groups,
   Person,
-  TrendingUp,
-  Search,
-  FilterList,
   ExpandMore,
   ExpandLess,
   LocalHospital,
   Shield,
-  SupervisorAccount,
-  CheckCircle,
   Warning,
-  EmojiEvents,
-  Star,
 } from "@mui/icons-material";
 import { collection, getDocs, doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import {
-  PieChart,
-  Pie,
-  Cell,
   ResponsiveContainer,
   BarChart,
   Bar,
@@ -64,67 +48,24 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
-  Legend,
 } from "recharts";
+import { colors, transitions } from "../theme/adminTheme";
+import { fadeInDown, fadeInUp } from "../styles/adminStyles";
+import { GlassCard, StatCard } from "./admin";
+import { keyframes } from "@mui/system";
 
-// Team Stats Card Component
-const TeamStatsCard = ({ title, value, icon, gradient, subtitle }) => (
-  <Card
-    elevation={0}
-    sx={{
-      background: gradient,
-      color: "white",
-      borderRadius: 3,
-      overflow: "hidden",
-      position: "relative",
-      transition: "all 0.3s ease",
-      "&:hover": {
-        transform: "translateY(-4px)",
-        boxShadow: "0 12px 24px rgba(0,0,0,0.15)",
-      },
-    }}
-  >
-    <CardContent sx={{ p: 2.5, position: "relative", zIndex: 1 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Box>
-          <Typography variant="body2" sx={{ opacity: 0.9, mb: 0.5 }}>
-            {title}
-          </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            {value}
-          </Typography>
-          {subtitle && (
-            <Typography variant="caption" sx={{ opacity: 0.8 }}>
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
-        <Box
-          sx={{
-            bgcolor: "rgba(255,255,255,0.2)",
-            borderRadius: 2,
-            p: 1.5,
-          }}
-        >
-          {icon}
-        </Box>
-      </Box>
-    </CardContent>
-    <Box
-      sx={{
-        position: "absolute",
-        top: -20,
-        right: -20,
-        width: 80,
-        height: 80,
-        borderRadius: "50%",
-        bgcolor: "rgba(255,255,255,0.1)",
-      }}
-    />
-  </Card>
-);
+// Pulse animation for loading
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`;
 
-// Team Card Component with Enhanced Design
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+
+// Team Card Component with Dark Glassmorphism Design
 const TeamCard = ({
   team,
   agents,
@@ -135,227 +76,245 @@ const TeamCard = ({
   department,
   expanded,
   onToggleExpand,
+  animationDelay = 0,
 }) => {
   const teamAgents = agents;
   const avgPerformance = teamAgents.length > 0
     ? Math.floor(teamAgents.reduce((acc, a) => acc + (a.callsToday || Math.floor(Math.random() * 20)), 0) / teamAgents.length)
     : 0;
 
-  const departmentColor = department === "Health" ? "success" : "error";
+  const departmentColor = department === "Health" ? colors.accent.primary : colors.accent.purple;
   const departmentGradient = department === "Health"
-    ? "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
-    : "linear-gradient(135deg, #eb3349 0%, #f45c43 100%)";
+    ? `linear-gradient(135deg, ${colors.accent.primary} 0%, ${colors.accent.secondary} 100%)`
+    : `linear-gradient(135deg, ${colors.accent.purple} 0%, #ec4899 100%)`;
 
   return (
-    <Card
-      elevation={0}
+    <Box
       sx={{
-        height: "100%",
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 3,
-        overflow: "hidden",
-        transition: "all 0.3s ease",
-        "&:hover": {
-          boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
-        },
+        animation: `${fadeInUp} 0.5s ease-out`,
+        animationDelay: `${animationDelay}ms`,
+        animationFillMode: "backwards",
       }}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
     >
-      {/* Team Header */}
-      <Box
+      <GlassCard
+        variant="elevated"
         sx={{
-          background: departmentGradient,
-          p: 2,
-          color: "white",
+          height: "100%",
+          overflow: "hidden",
+          transition: `all ${transitions.base}`,
+          "&:hover": {
+            transform: "translateY(-4px)",
+          },
         }}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
       >
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Avatar
-              sx={{
-                bgcolor: "rgba(255,255,255,0.2)",
-                width: 48,
-                height: 48,
-                mr: 2,
-                fontSize: "1.2rem",
-                fontWeight: "bold",
-              }}
-            >
-              {team.tlName.charAt(0)}
-            </Avatar>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                {team.tlName}
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                Team Lead • {team.tlEmpId}
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            size="small"
-            sx={{ color: "white" }}
-            onClick={onToggleExpand}
-          >
-            {expanded ? <ExpandLess /> : <ExpandMore />}
-          </IconButton>
-        </Box>
-      </Box>
-
-      {/* Team Stats */}
-      <Box sx={{ p: 2, bgcolor: "grey.50" }}>
-        <Grid container spacing={2}>
-          <Grid item xs={4}>
-            <Box sx={{ textAlign: "center" }}>
-              <Typography variant="h5" fontWeight="bold" color={`${departmentColor}.main`}>
-                {teamAgents.length}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Members
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={4}>
-            <Box sx={{ textAlign: "center" }}>
-              <Typography variant="h5" fontWeight="bold" color="primary.main">
-                {avgPerformance}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Avg Calls
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={4}>
-            <Box sx={{ textAlign: "center" }}>
-              <Typography variant="h5" fontWeight="bold" color="warning.main">
-                {teamAgents.filter(a => a.status === "active").length || teamAgents.length}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Active
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Box>
-
-      {/* Team Members List */}
-      <Collapse in={expanded}>
-        <CardContent sx={{ p: 2, maxHeight: 350, overflowY: "auto" }}>
-          {teamAgents.length > 0 ? (
-            teamAgents.map((agent, index) => (
-              <Paper
-                key={agent.id}
-                draggable
-                onDragStart={() => onDragStart(agent)}
-                elevation={0}
+        {/* Team Header */}
+        <Box
+          sx={{
+            background: departmentGradient,
+            p: 2,
+            color: "white",
+            borderRadius: "12px 12px 0 0",
+            margin: "-20px -20px 0 -20px",
+            marginBottom: "16px",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Avatar
                 sx={{
-                  p: 1.5,
-                  mb: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  cursor: "grab",
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 2,
-                  transition: "all 0.2s ease",
-                  "&:active": { cursor: "grabbing" },
-                  "&:hover": {
-                    bgcolor: "action.hover",
-                    borderColor: `${departmentColor}.main`,
-                    transform: "translateX(4px)",
-                  },
+                  bgcolor: "rgba(255,255,255,0.2)",
+                  width: 48,
+                  height: 48,
+                  mr: 2,
+                  fontSize: "1.2rem",
+                  fontWeight: "bold",
+                  backdropFilter: "blur(8px)",
                 }}
               >
-                <DragIndicator sx={{ mr: 1.5, color: "text.disabled", fontSize: 20 }} />
-                <Avatar
+                {team.tlName.charAt(0)}
+              </Avatar>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  {team.tlName}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  Team Lead - {team.tlEmpId}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton
+              size="small"
+              sx={{ color: "white" }}
+              onClick={onToggleExpand}
+            >
+              {expanded ? <ExpandLess /> : <ExpandMore />}
+            </IconButton>
+          </Box>
+        </Box>
+
+        {/* Team Stats */}
+        <Box sx={{ mb: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={4}>
+              <Box sx={{ textAlign: "center" }}>
+                <Typography variant="h5" fontWeight="bold" sx={{ color: departmentColor }}>
+                  {teamAgents.length}
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.text.muted }}>
+                  Members
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={4}>
+              <Box sx={{ textAlign: "center" }}>
+                <Typography variant="h5" fontWeight="bold" sx={{ color: colors.accent.cyan }}>
+                  {avgPerformance}
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.text.muted }}>
+                  Avg Calls
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={4}>
+              <Box sx={{ textAlign: "center" }}>
+                <Typography variant="h5" fontWeight="bold" sx={{ color: colors.accent.warning }}>
+                  {teamAgents.filter(a => a.status === "active").length || teamAgents.length}
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.text.muted }}>
+                  Active
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Team Members List */}
+        <Collapse in={expanded}>
+          <Box sx={{ maxHeight: 350, overflowY: "auto" }}>
+            {teamAgents.length > 0 ? (
+              teamAgents.map((agent, index) => (
+                <Paper
+                  key={agent.id}
+                  draggable
+                  onDragStart={() => onDragStart(agent)}
+                  elevation={0}
                   sx={{
-                    width: 36,
-                    height: 36,
-                    mr: 1.5,
-                    bgcolor: `${departmentColor}.light`,
-                    color: `${departmentColor}.main`,
-                    fontSize: "0.875rem",
+                    p: 1.5,
+                    mb: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    cursor: "grab",
+                    backgroundColor: colors.background.secondary,
+                    border: `1px solid ${colors.border.card}`,
+                    borderRadius: "10px",
+                    transition: `all ${transitions.fast}`,
+                    "&:active": { cursor: "grabbing" },
+                    "&:hover": {
+                      backgroundColor: "rgba(255,255,255,0.05)",
+                      borderColor: departmentColor,
+                      transform: "translateX(4px)",
+                    },
                   }}
                 >
-                  {agent.name?.charAt(0) || "A"}
-                </Avatar>
-                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <Typography variant="body2" fontWeight={600} noWrap>
-                    {agent.name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" noWrap>
-                    {agent.empId || agent.id}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Chip
-                    label={agent.status === "active" ? "Active" : "Active"}
-                    size="small"
-                    color="success"
-                    sx={{ height: 22, fontSize: "0.7rem" }}
-                  />
-                  <Tooltip title="Reassign Agent">
-                    <IconButton
+                  <DragIndicator sx={{ mr: 1.5, color: colors.text.muted, fontSize: 20 }} />
+                  <Avatar
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      mr: 1.5,
+                      bgcolor: `${departmentColor}30`,
+                      color: departmentColor,
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    {agent.name?.charAt(0) || "A"}
+                  </Avatar>
+                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={600} noWrap sx={{ color: colors.text.primary }}>
+                      {agent.name}
+                    </Typography>
+                    <Typography variant="caption" noWrap sx={{ color: colors.text.muted }}>
+                      {agent.empId || agent.id}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Chip
+                      label="Active"
                       size="small"
-                      onClick={() => onReassign(agent)}
-                      sx={{ ml: 0.5 }}
-                    >
-                      <SwapHoriz fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Paper>
-            ))
-          ) : (
-            <Box
-              sx={{
-                py: 4,
-                textAlign: "center",
-                border: "2px dashed",
-                borderColor: "divider",
-                borderRadius: 2,
-              }}
-            >
-              <PersonAdd sx={{ fontSize: 40, color: "text.disabled", mb: 1 }} />
-              <Typography variant="body2" color="text.secondary">
-                Drop agents here to assign
-              </Typography>
-            </Box>
-          )}
-        </CardContent>
-      </Collapse>
-    </Card>
+                      sx={{
+                        height: 22,
+                        fontSize: "0.7rem",
+                        backgroundColor: `${colors.accent.success}20`,
+                        color: colors.accent.success,
+                        border: `1px solid ${colors.accent.success}40`,
+                      }}
+                    />
+                    <Tooltip title="Reassign Agent">
+                      <IconButton
+                        size="small"
+                        onClick={() => onReassign(agent)}
+                        sx={{
+                          ml: 0.5,
+                          color: colors.text.muted,
+                          "&:hover": { color: colors.accent.primary },
+                        }}
+                      >
+                        <SwapHoriz fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Paper>
+              ))
+            ) : (
+              <Box
+                sx={{
+                  py: 4,
+                  textAlign: "center",
+                  border: `2px dashed ${colors.border.card}`,
+                  borderRadius: "12px",
+                }}
+              >
+                <PersonAdd sx={{ fontSize: 40, color: colors.text.muted, mb: 1 }} />
+                <Typography variant="body2" sx={{ color: colors.text.muted }}>
+                  Drop agents here to assign
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Collapse>
+      </GlassCard>
+    </Box>
   );
 };
 
-// Unassigned Agents Pool Component
+// Unassigned Agents Pool Component with Dark Theme
 const UnassignedAgentsPool = ({ agents, onDragStart, department }) => {
-  const departmentColor = department === "Health" ? "success" : "error";
-  const departmentIcon = department === "Health" ? <LocalHospital /> : <Shield />;
+  const departmentColor = department === "Health" ? colors.accent.primary : colors.accent.purple;
 
   if (agents.length === 0) return null;
 
   return (
-    <Card
-      elevation={0}
+    <Box
       sx={{
-        border: "2px dashed",
-        borderColor: "warning.main",
-        borderRadius: 3,
-        bgcolor: "warning.light",
+        animation: `${fadeInUp} 0.5s ease-out`,
         mb: 3,
       }}
     >
-      <CardContent sx={{ p: 2 }}>
+      <GlassCard
+        variant="warning"
+        sx={{
+          border: `2px dashed ${colors.accent.warning}`,
+        }}
+      >
         <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-          <Warning sx={{ color: "warning.main", mr: 1 }} />
-          <Typography variant="h6" fontWeight="bold" color="warning.dark">
+          <Warning sx={{ color: colors.accent.warning, mr: 1 }} />
+          <Typography variant="h6" fontWeight="bold" sx={{ color: colors.accent.warning }}>
             Unassigned {department} Agents ({agents.length})
           </Typography>
         </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2" sx={{ color: colors.text.secondary, mb: 2 }}>
           Drag these agents to a team to assign them
         </Typography>
         <Grid container spacing={1.5}>
@@ -370,36 +329,36 @@ const UnassignedAgentsPool = ({ agents, onDragStart, department }) => {
                   display: "flex",
                   alignItems: "center",
                   cursor: "grab",
-                  border: "1px solid",
-                  borderColor: "warning.main",
-                  borderRadius: 2,
-                  bgcolor: "white",
-                  transition: "all 0.2s ease",
+                  backgroundColor: colors.background.secondary,
+                  border: `1px solid ${colors.accent.warning}40`,
+                  borderRadius: "10px",
+                  transition: `all ${transitions.fast}`,
                   "&:active": { cursor: "grabbing" },
                   "&:hover": {
                     transform: "translateY(-2px)",
-                    boxShadow: 2,
+                    borderColor: colors.accent.warning,
+                    boxShadow: `0 4px 20px ${colors.accent.warning}20`,
                   },
                 }}
               >
-                <DragIndicator sx={{ mr: 1, color: "warning.main", fontSize: 18 }} />
+                <DragIndicator sx={{ mr: 1, color: colors.accent.warning, fontSize: 18 }} />
                 <Avatar
                   sx={{
                     width: 32,
                     height: 32,
                     mr: 1,
-                    bgcolor: `${departmentColor}.light`,
-                    color: `${departmentColor}.main`,
+                    bgcolor: `${departmentColor}30`,
+                    color: departmentColor,
                     fontSize: "0.75rem",
                   }}
                 >
                   {agent.name?.charAt(0) || "A"}
                 </Avatar>
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <Typography variant="body2" fontWeight={600} noWrap>
+                  <Typography variant="body2" fontWeight={600} noWrap sx={{ color: colors.text.primary }}>
                     {agent.name}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" noWrap>
+                  <Typography variant="caption" noWrap sx={{ color: colors.text.muted }}>
                     {agent.empId || agent.id}
                   </Typography>
                 </Box>
@@ -407,8 +366,8 @@ const UnassignedAgentsPool = ({ agents, onDragStart, department }) => {
             </Grid>
           ))}
         </Grid>
-      </CardContent>
-    </Card>
+      </GlassCard>
+    </Box>
   );
 };
 
@@ -424,7 +383,6 @@ function TeamManagement() {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [targetTeamLead, setTargetTeamLead] = useState("");
   const [activeTab, setActiveTab] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
   const [expandedTeams, setExpandedTeams] = useState({});
 
   // Stats
@@ -716,8 +674,24 @@ function TeamManagement() {
           minHeight: 400,
         }}
       >
-        <CircularProgress size={60} sx={{ color: "#667eea" }} />
-        <Typography variant="body1" sx={{ mt: 2, color: "text.secondary" }}>
+        <Box
+          sx={{
+            width: 60,
+            height: 60,
+            borderRadius: "50%",
+            border: `3px solid ${colors.border.card}`,
+            borderTopColor: colors.accent.primary,
+            animation: `${spin} 1s linear infinite`,
+          }}
+        />
+        <Typography
+          variant="body1"
+          sx={{
+            mt: 2,
+            color: colors.text.muted,
+            animation: `${pulse} 1.5s ease-in-out infinite`,
+          }}
+        >
           Loading team data...
         </Typography>
       </Box>
@@ -727,12 +701,27 @@ function TeamManagement() {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+          animation: `${fadeInDown} 0.5s ease-out`,
+        }}
+      >
         <Box>
-          <Typography variant="h4" fontWeight="bold">
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              color: colors.text.primary,
+              letterSpacing: "-0.02em",
+            }}
+          >
             Team Management
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: colors.text.muted, mt: 0.5 }}>
             Organize and manage teams across departments
           </Typography>
         </Box>
@@ -741,10 +730,19 @@ function TeamManagement() {
           startIcon={<Refresh />}
           onClick={fetchTeamsData}
           sx={{
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            background: `linear-gradient(135deg, ${colors.accent.primary} 0%, ${colors.accent.secondary} 100%)`,
+            borderRadius: "10px",
+            textTransform: "none",
+            fontWeight: 600,
+            px: 3,
+            py: 1,
+            boxShadow: `0 4px 20px ${colors.accent.primary}40`,
             "&:hover": {
-              background: "linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%)",
+              background: `linear-gradient(135deg, ${colors.accent.secondary} 0%, ${colors.accent.primary} 100%)`,
+              transform: "translateY(-2px)",
+              boxShadow: `0 6px 25px ${colors.accent.primary}50`,
             },
+            transition: `all ${transitions.base}`,
           }}
         >
           Refresh Teams
@@ -756,7 +754,14 @@ function TeamManagement() {
         <Alert
           severity="success"
           onClose={() => setSuccessMessage("")}
-          sx={{ mb: 2, borderRadius: 2 }}
+          sx={{
+            mb: 2,
+            borderRadius: "12px",
+            backgroundColor: `${colors.accent.success}15`,
+            color: colors.accent.success,
+            border: `1px solid ${colors.accent.success}40`,
+            "& .MuiAlert-icon": { color: colors.accent.success },
+          }}
         >
           {successMessage}
         </Alert>
@@ -765,7 +770,14 @@ function TeamManagement() {
         <Alert
           severity="error"
           onClose={() => setErrorMessage("")}
-          sx={{ mb: 2, borderRadius: 2 }}
+          sx={{
+            mb: 2,
+            borderRadius: "12px",
+            backgroundColor: `${colors.accent.error}15`,
+            color: colors.accent.error,
+            border: `1px solid ${colors.accent.error}40`,
+            "& .MuiAlert-icon": { color: colors.accent.error },
+          }}
         >
           {errorMessage}
         </Alert>
@@ -774,61 +786,81 @@ function TeamManagement() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <TeamStatsCard
-            title="Total Teams"
+          <StatCard
+            label="Total Teams"
             value={stats.totalTeams}
-            icon={<Groups sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+            icon={Groups}
+            iconColor={colors.accent.primary}
+            accentColor={colors.accent.primary}
+            animationDelay={0}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <TeamStatsCard
-            title="Health Teams"
+          <StatCard
+            label="Health Teams"
             value={stats.healthTeams}
-            icon={<LocalHospital sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
-            subtitle={`${stats.unassignedHealth} unassigned`}
+            icon={LocalHospital}
+            iconColor={colors.accent.secondary}
+            accentColor={colors.accent.secondary}
+            animationDelay={100}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <TeamStatsCard
-            title="Insurance Teams"
+          <StatCard
+            label="Insurance Teams"
             value={stats.insuranceTeams}
-            icon={<Shield sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #eb3349 0%, #f45c43 100%)"
-            subtitle={`${stats.unassignedInsurance} unassigned`}
+            icon={Shield}
+            iconColor={colors.accent.purple}
+            accentColor={colors.accent.purple}
+            animationDelay={200}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <TeamStatsCard
-            title="Total Agents"
+          <StatCard
+            label="Total Agents"
             value={stats.totalAgents}
-            icon={<Person sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+            icon={Person}
+            iconColor={colors.accent.cyan}
+            accentColor={colors.accent.cyan}
+            animationDelay={300}
           />
         </Grid>
       </Grid>
 
       {/* Team Size Chart */}
-      <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 3, mb: 4 }}>
-        <CardContent sx={{ p: 3 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
+      <Box sx={{ mb: 4, animation: `${fadeInUp} 0.5s ease-out`, animationDelay: "0.2s", animationFillMode: "backwards" }}>
+        <GlassCard>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 700, color: colors.text.primary, mb: 0.5 }}
+          >
             Team Size Distribution
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ color: colors.text.muted, mb: 3 }}>
             Number of agents per team
           </Typography>
           <Box sx={{ height: 250 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={teamSizeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.border.card} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fill: colors.text.muted }}
+                  axisLine={{ stroke: colors.border.card }}
+                  tickLine={{ stroke: colors.border.card }}
+                />
+                <YAxis
+                  tick={{ fill: colors.text.muted }}
+                  axisLine={{ stroke: colors.border.card }}
+                  tickLine={{ stroke: colors.border.card }}
+                />
                 <RechartsTooltip
                   contentStyle={{
-                    borderRadius: 8,
-                    border: "none",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    borderRadius: 12,
+                    border: `1px solid ${colors.border.card}`,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                    backgroundColor: colors.background.secondary,
+                    color: colors.text.primary,
                   }}
                   formatter={(value, name, props) => [
                     `${value} members`,
@@ -837,20 +869,27 @@ function TeamManagement() {
                 />
                 <Bar
                   dataKey="members"
-                  fill="#667eea"
+                  fill={colors.accent.primary}
                   radius={[4, 4, 0, 0]}
                   animationDuration={1500}
                 />
               </BarChart>
             </ResponsiveContainer>
           </Box>
-        </CardContent>
-      </Card>
+        </GlassCard>
+      </Box>
 
       {/* Instructions */}
       <Alert
         severity="info"
-        sx={{ mb: 3, borderRadius: 2 }}
+        sx={{
+          mb: 3,
+          borderRadius: "12px",
+          backgroundColor: `${colors.accent.cyan}15`,
+          color: colors.accent.cyan,
+          border: `1px solid ${colors.accent.cyan}40`,
+          "& .MuiAlert-icon": { color: colors.accent.cyan },
+        }}
         icon={<DragIndicator />}
       >
         <Typography variant="body2">
@@ -863,13 +902,38 @@ function TeamManagement() {
       <Tabs
         value={activeTab}
         onChange={(e, v) => setActiveTab(v)}
-        sx={{ mb: 3 }}
+        sx={{
+          mb: 3,
+          "& .MuiTabs-indicator": {
+            backgroundColor: colors.accent.primary,
+            height: 3,
+            borderRadius: "3px 3px 0 0",
+          },
+          "& .MuiTab-root": {
+            color: colors.text.muted,
+            textTransform: "none",
+            fontWeight: 600,
+            minHeight: 48,
+            "&.Mui-selected": {
+              color: colors.accent.primary,
+            },
+          },
+        }}
       >
         <Tab
           icon={<LocalHospital />}
           iconPosition="start"
           label={
-            <Badge badgeContent={stats.unassignedHealth} color="warning" max={99}>
+            <Badge
+              badgeContent={stats.unassignedHealth}
+              sx={{
+                "& .MuiBadge-badge": {
+                  backgroundColor: colors.accent.warning,
+                  color: "#000",
+                },
+              }}
+              max={99}
+            >
               <Typography sx={{ mr: stats.unassignedHealth > 0 ? 2 : 0 }}>
                 Health Department
               </Typography>
@@ -880,7 +944,16 @@ function TeamManagement() {
           icon={<Shield />}
           iconPosition="start"
           label={
-            <Badge badgeContent={stats.unassignedInsurance} color="warning" max={99}>
+            <Badge
+              badgeContent={stats.unassignedInsurance}
+              sx={{
+                "& .MuiBadge-badge": {
+                  backgroundColor: colors.accent.warning,
+                  color: "#000",
+                },
+              }}
+              max={99}
+            >
               <Typography sx={{ mr: stats.unassignedInsurance > 0 ? 2 : 0 }}>
                 Insurance Department
               </Typography>
@@ -900,7 +973,7 @@ function TeamManagement() {
           <Grid container spacing={3}>
             {teams
               .filter((team) => team.department === "Health")
-              .map((team) => (
+              .map((team, index) => (
                 <Grid item xs={12} md={6} lg={4} key={team.tlId}>
                   <TeamCard
                     team={team}
@@ -912,6 +985,7 @@ function TeamManagement() {
                     department="Health"
                     expanded={expandedTeams[team.tlId]}
                     onToggleExpand={() => toggleTeamExpand(team.tlId)}
+                    animationDelay={index * 100}
                   />
                 </Grid>
               ))}
@@ -930,7 +1004,7 @@ function TeamManagement() {
           <Grid container spacing={3}>
             {teams
               .filter((team) => team.department === "Insurance")
-              .map((team) => (
+              .map((team, index) => (
                 <Grid item xs={12} md={6} lg={4} key={team.tlId}>
                   <TeamCard
                     team={team}
@@ -942,6 +1016,7 @@ function TeamManagement() {
                     department="Insurance"
                     expanded={expandedTeams[team.tlId]}
                     onToggleExpand={() => toggleTeamExpand(team.tlId)}
+                    animationDelay={index * 100}
                   />
                 </Grid>
               ))}
@@ -956,13 +1031,18 @@ function TeamManagement() {
         maxWidth="sm"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: 3 }
+          sx: {
+            borderRadius: "16px",
+            backgroundColor: colors.background.secondary,
+            backgroundImage: "none",
+            border: `1px solid ${colors.border.card}`,
+          }
         }}
       >
         <DialogTitle sx={{ pb: 1 }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
-            <SwapHoriz sx={{ mr: 1, color: "primary.main" }} />
-            <Typography variant="h6" fontWeight="bold">
+            <SwapHoriz sx={{ mr: 1, color: colors.accent.primary }} />
+            <Typography variant="h6" fontWeight="bold" sx={{ color: colors.text.primary }}>
               Reassign Agent
             </Typography>
           </Box>
@@ -975,10 +1055,11 @@ function TeamManagement() {
                 sx={{
                   p: 2,
                   mb: 3,
-                  bgcolor: "grey.50",
-                  borderRadius: 2,
+                  backgroundColor: colors.background.card,
+                  borderRadius: "12px",
                   display: "flex",
                   alignItems: "center",
+                  border: `1px solid ${colors.border.card}`,
                 }}
               >
                 <Avatar
@@ -986,33 +1067,87 @@ function TeamManagement() {
                     width: 48,
                     height: 48,
                     mr: 2,
-                    bgcolor: selectedAgent.department === "Health" ? "success.light" : "error.light",
-                    color: selectedAgent.department === "Health" ? "success.main" : "error.main",
+                    bgcolor: selectedAgent.department === "Health"
+                      ? `${colors.accent.primary}30`
+                      : `${colors.accent.purple}30`,
+                    color: selectedAgent.department === "Health"
+                      ? colors.accent.primary
+                      : colors.accent.purple,
                   }}
                 >
                   {selectedAgent.name?.charAt(0)}
                 </Avatar>
                 <Box>
-                  <Typography variant="subtitle1" fontWeight="bold">
+                  <Typography variant="subtitle1" fontWeight="bold" sx={{ color: colors.text.primary }}>
                     {selectedAgent.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedAgent.empId || selectedAgent.id} • {selectedAgent.department} Department
+                  <Typography variant="body2" sx={{ color: colors.text.muted }}>
+                    {selectedAgent.empId || selectedAgent.id} - {selectedAgent.department} Department
                   </Typography>
                 </Box>
               </Paper>
 
               <FormControl fullWidth>
-                <InputLabel>Select Target Team Lead</InputLabel>
+                <InputLabel
+                  sx={{
+                    color: colors.text.muted,
+                    "&.Mui-focused": { color: colors.accent.primary },
+                  }}
+                >
+                  Select Target Team Lead
+                </InputLabel>
                 <Select
                   value={targetTeamLead}
                   label="Select Target Team Lead"
                   onChange={(e) => setTargetTeamLead(e.target.value)}
+                  sx={{
+                    borderRadius: "10px",
+                    backgroundColor: colors.background.card,
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: colors.border.card,
+                    },
+                    "&:hover .MuiOutlinedInput-notchedOutline": {
+                      borderColor: colors.accent.primary,
+                    },
+                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                      borderColor: colors.accent.primary,
+                    },
+                    "& .MuiSelect-select": {
+                      color: colors.text.primary,
+                    },
+                    "& .MuiSvgIcon-root": {
+                      color: colors.text.muted,
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        backgroundColor: colors.background.secondary,
+                        border: `1px solid ${colors.border.card}`,
+                        borderRadius: "10px",
+                      },
+                    },
+                  }}
                 >
                   {teamLeads
                     .filter((tl) => tl.department === selectedAgent.department)
                     .map((tl) => (
-                      <MenuItem key={tl.id} value={tl.id}>
+                      <MenuItem
+                        key={tl.id}
+                        value={tl.id}
+                        sx={{
+                          color: colors.text.primary,
+                          "&:hover": {
+                            backgroundColor: `${colors.accent.primary}20`,
+                          },
+                          "&.Mui-selected": {
+                            backgroundColor: `${colors.accent.primary}30`,
+                            "&:hover": {
+                              backgroundColor: `${colors.accent.primary}40`,
+                            },
+                          },
+                        }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                           <Avatar
                             sx={{
@@ -1020,8 +1155,8 @@ function TeamManagement() {
                               height: 28,
                               mr: 1.5,
                               fontSize: "0.75rem",
-                              bgcolor: "primary.light",
-                              color: "primary.main",
+                              bgcolor: `${colors.accent.primary}30`,
+                              color: colors.accent.primary,
                             }}
                           >
                             {tl.name?.charAt(0)}
@@ -1036,7 +1171,16 @@ function TeamManagement() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2.5, pt: 1 }}>
-          <Button onClick={() => setOpenReassignDialog(false)} sx={{ borderRadius: 2 }}>
+          <Button
+            onClick={() => setOpenReassignDialog(false)}
+            sx={{
+              borderRadius: "10px",
+              color: colors.text.secondary,
+              "&:hover": {
+                backgroundColor: `${colors.text.muted}20`,
+              },
+            }}
+          >
             Cancel
           </Button>
           <Button
@@ -1044,10 +1188,15 @@ function TeamManagement() {
             onClick={handleReassignAgent}
             disabled={!targetTeamLead}
             sx={{
-              borderRadius: 2,
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              borderRadius: "10px",
+              background: `linear-gradient(135deg, ${colors.accent.primary} 0%, ${colors.accent.secondary} 100%)`,
+              boxShadow: `0 4px 15px ${colors.accent.primary}40`,
               "&:hover": {
-                background: "linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%)",
+                background: `linear-gradient(135deg, ${colors.accent.secondary} 0%, ${colors.accent.primary} 100%)`,
+              },
+              "&.Mui-disabled": {
+                backgroundColor: colors.border.card,
+                color: colors.text.muted,
               },
             }}
           >

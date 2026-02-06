@@ -1,5 +1,6 @@
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onRequest} = require("firebase-functions/v2/https");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 const axios = require("axios");
 const cors = require("cors")({ origin: true });
@@ -76,6 +77,7 @@ exports.createUser = onCall(async (request) => {
       "managers",              // For Department Managers
       "offlineVisits",         // For DC Agents and Offline Visits users
       "offlineVisitsManagers", // For Offline Visits Managers
+      "opsManagers",           // For Ops Managers
     ];
 
     if (!validCollections.includes(data.collection)) {
@@ -106,6 +108,7 @@ exports.createUser = onCall(async (request) => {
       "Department Manager": "Manager",
       "Offline Visits": "offlineVisits",
       "Offline Visits Manager": "offlineVisitsManager",
+      "Ops Manager": "opsManager",
     };
 
     // Get the system role from the display role
@@ -134,18 +137,15 @@ exports.createUser = onCall(async (request) => {
     if (data.manager) userData.manager = data.manager;
     if (data.teamMembers) userData.teamMembers = data.teamMembers;
 
-    // Create Firestore document
-    const docRef = data.empId ?
-      admin.firestore().collection(data.collection).doc(data.empId) :
-      admin.firestore().collection(data.collection).doc(userRecord.uid);
-
+    // Create Firestore document - ALWAYS use UID as document ID
+    const docRef = admin.firestore().collection(data.collection).doc(userRecord.uid);
     await docRef.set(userData);
 
     // Create mapping in userCollections for login to work
-    // This helps the login page find users stored with empId as document ID
     await admin.firestore().collection("userCollections").doc(userRecord.uid).set({
       collection: data.collection,
-      documentId: data.empId || userRecord.uid,
+      documentId: userRecord.uid, // Always use UID for consistency
+      empId: data.empId || "",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -390,4 +390,177 @@ exports.exotelProxy = onRequest((req, res) => {
       }
     }
   });
+});
+
+/**
+ * ⏰ Scheduled Auto-Logout at 6 PM IST
+ * Runs every day at 6:00 PM IST (12:30 PM UTC)
+ * Automatically logs out all agents and TLs who are still showing as active
+ */
+exports.autoLogoutAt6PM = onSchedule({
+  schedule: "0 18 * * *", // 6:00 PM IST (18:00 in Asia/Kolkata timezone)
+  timeZone: "Asia/Kolkata",
+}, async (event) => {
+  console.log("Running scheduled 6 PM auto-logout...");
+
+  const db = admin.firestore();
+  let totalUpdated = 0;
+
+  // Collections containing agents and TLs that need auto-logout
+  // Note: offlineVisits (DC Agents) are excluded from auto-logout
+  const agentCollections = [
+    "healthAgents",
+    "insuranceAgents",
+    "healthTeamLeads",
+    "insuranceTeamLeads",
+  ];
+
+  // Status values that indicate agent/TL is still "logged in"
+  const activeStatuses = ["Available", "On Call", "Login", "Break", "Idle", "Busy"];
+
+  try {
+    // Collect all documents that need to be updated
+    const docsToUpdate = [];
+
+    for (const collectionName of agentCollections) {
+      console.log(`Processing collection: ${collectionName}`);
+
+      const snapshot = await db.collection(collectionName)
+          .where("status", "in", activeStatuses)
+          .get();
+
+      console.log(`Found ${snapshot.size} active users in ${collectionName}`);
+
+      snapshot.docs.forEach((doc) => {
+        const userData = doc.data();
+        console.log(`Auto-logging out: ${userData.name || doc.id} (${userData.status})`);
+        docsToUpdate.push(doc.ref);
+      });
+    }
+
+    // Process in batches of 450 (leaving room for safety, max is 500)
+    const BATCH_SIZE = 450;
+    for (let i = 0; i < docsToUpdate.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      const chunk = docsToUpdate.slice(i, i + BATCH_SIZE);
+
+      chunk.forEach((docRef) => {
+        batch.update(docRef, {
+          status: "Logout",
+          logoutReason: "auto_6pm",
+          lastActivityTime: admin.firestore.FieldValue.serverTimestamp(),
+          autoLogoutAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      await batch.commit();
+      totalUpdated += chunk.length;
+      console.log(`Batch committed: ${chunk.length} users (total: ${totalUpdated})`);
+    }
+
+    if (totalUpdated > 0) {
+      console.log(`Successfully auto-logged out ${totalUpdated} users at 6 PM`);
+    } else {
+      console.log("No users needed auto-logout");
+    }
+
+    // Log this event for audit purposes
+    await db.collection("systemLogs").add({
+      type: "auto_logout_6pm",
+      agentsLoggedOut: totalUpdated,
+      executedAt: admin.firestore.FieldValue.serverTimestamp(),
+      collections: agentCollections,
+    });
+
+    return {success: true, agentsLoggedOut: totalUpdated};
+  } catch (error) {
+    console.error("Error in auto-logout function:", error);
+
+    await db.collection("systemLogs").add({
+      type: "auto_logout_6pm_error",
+      error: error.message,
+      executedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    throw error;
+  }
+});
+
+/**
+ * 🔧 Manual Auto-Logout Trigger (Admin Only)
+ * Allows admin to manually trigger the 6 PM logout for testing or emergency
+ */
+exports.manualAutoLogout = onCall(async (request) => {
+  checkRole(request, ["admin"]);
+
+  console.log("Manual auto-logout triggered by admin:", request.auth.uid);
+
+  const db = admin.firestore();
+  let totalUpdated = 0;
+
+  // Collections containing agents and TLs that need auto-logout
+  // Note: offlineVisits (DC Agents) are excluded from auto-logout
+  const agentCollections = [
+    "healthAgents",
+    "insuranceAgents",
+    "healthTeamLeads",
+    "insuranceTeamLeads",
+  ];
+
+  // Status values that indicate agent/TL is still "logged in"
+  // Note: "Idle" is displayed as "Available" in the UI, "Busy" as "On Call"
+  const activeStatuses = ["Available", "On Call", "Login", "Break", "Idle", "Busy"];
+
+  try {
+    // Collect all documents that need to be updated
+    const docsToUpdate = [];
+
+    for (const collectionName of agentCollections) {
+      const snapshot = await db.collection(collectionName)
+          .where("status", "in", activeStatuses)
+          .get();
+
+      console.log(`Found ${snapshot.size} active users in ${collectionName}`);
+
+      snapshot.docs.forEach((doc) => {
+        docsToUpdate.push(doc.ref);
+      });
+    }
+
+    // Process in batches of 450 (leaving room for safety, max is 500)
+    const BATCH_SIZE = 450;
+    for (let i = 0; i < docsToUpdate.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      const chunk = docsToUpdate.slice(i, i + BATCH_SIZE);
+
+      chunk.forEach((docRef) => {
+        batch.update(docRef, {
+          status: "Logout",
+          logoutReason: "manual_admin",
+          lastActivityTime: admin.firestore.FieldValue.serverTimestamp(),
+          autoLogoutAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      await batch.commit();
+      totalUpdated += chunk.length;
+    }
+
+    // Log this event
+    await db.collection("systemLogs").add({
+      type: "manual_auto_logout",
+      triggeredBy: request.auth.uid,
+      agentsLoggedOut: totalUpdated,
+      executedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      agentsLoggedOut: totalUpdated,
+      message: `Successfully logged out ${totalUpdated} agents`,
+    };
+  } catch (error) {
+    console.error("Error in manual auto-logout:", error);
+    throw new HttpsError("internal", error.message);
+  }
 });

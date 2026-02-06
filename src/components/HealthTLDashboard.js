@@ -75,6 +75,14 @@ import {
   TableChart,
   Download,
   FilterList,
+  Assignment,
+  ExpandMore,
+  ExpandLess,
+  Star,
+  StarHalf,
+  StarBorder,
+  OpenInNew,
+  RateReview,
 } from "@mui/icons-material";
 import {
   AreaChart,
@@ -251,6 +259,40 @@ const HEALTH_TL_THEME = {
   gradient: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
 };
 
+// Check if agent logged in today - shared helper
+const isAgentLoggedInToday = (agentData) => {
+  if (!agentData.todayLoginTime) return false;
+  const loginTime = agentData.todayLoginTime?.toDate ?
+    agentData.todayLoginTime.toDate() :
+    new Date(agentData.todayLoginTime);
+  const today = new Date();
+  return loginTime.toDateString() === today.toDateString();
+};
+
+// Get effective status - if not logged in today, show as Unavailable - shared helper
+const getAgentEffectiveStatus = (agentData) => {
+  const rawStatus = agentData.status;
+
+  // If explicitly logged out, show as unavailable
+  if (rawStatus === "Logout" || rawStatus === "Logged Out" || rawStatus === "Unavailable") {
+    return "Unavailable";
+  }
+
+  // If status looks active but not logged in today, show as unavailable
+  if (rawStatus === "Idle" || rawStatus === "Available" || rawStatus === "Login") {
+    if (!isAgentLoggedInToday(agentData)) {
+      return "Unavailable";
+    }
+    return "Available";
+  }
+
+  // On Call and Break statuses
+  if (rawStatus === "On Call" || rawStatus === "Busy") return "On Call";
+  if (rawStatus === "Break") return "On Break";
+
+  return rawStatus || "Unavailable";
+};
+
 // Export to CSV helper
 const exportToCSV = (data, filename, columns) => {
   if (!data || data.length === 0) {
@@ -316,6 +358,7 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
         borderColor: "divider",
         borderRadius: 3,
         position: "relative",
+        overflow: "visible",
         transition: "all 0.3s ease",
         "&:hover": {
           boxShadow: `0 12px 40px ${HEALTH_TL_THEME.primary}15`,
@@ -323,7 +366,7 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
         },
       }}
     >
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: 3, overflow: "visible" }}>
         {/* Header with Title and Actions */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
           <Typography variant="h6" fontWeight={700} color={HEALTH_TL_THEME.primary}>
@@ -362,7 +405,7 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
         </Box>
 
         {/* Chart Content */}
-        <Box sx={{ height }}>{children}</Box>
+        <Box sx={{ height, overflow: "visible" }}>{children}</Box>
       </CardContent>
 
       {/* More Options Menu */}
@@ -515,7 +558,7 @@ const AgentCard = ({ agent, onCardClick, onDownloadCSV, callLogs, isGridView }) 
 
   const getStatusConfig = (status) => {
     const configs = {
-      // New status values
+      // Effective status values (from getAgentEffectiveStatus)
       Available: {
         color: "#10b981",
         bgColor: "rgba(16, 185, 129, 0.1)",
@@ -529,39 +572,13 @@ const AgentCard = ({ agent, onCardClick, onDownloadCSV, callLogs, isGridView }) 
         icon: <PhoneInTalk sx={{ fontSize: 14 }} />,
         animate: true,
       },
-      Unavailable: {
-        color: "#ef4444",
-        bgColor: "rgba(239, 68, 68, 0.1)",
-        label: "Unavailable",
-        icon: <Cancel sx={{ fontSize: 14 }} />,
-      },
-      // Legacy status values (for backwards compatibility)
-      Idle: {
-        color: "#10b981",
-        bgColor: "rgba(16, 185, 129, 0.1)",
-        label: "Available",
-        icon: <CheckCircle sx={{ fontSize: 14 }} />,
-      },
-      Busy: {
-        color: "#f59e0b",
-        bgColor: "rgba(245, 158, 11, 0.1)",
-        label: "On Call",
-        icon: <PhoneInTalk sx={{ fontSize: 14 }} />,
-        animate: true,
-      },
-      Break: {
-        color: "#6b7280",
-        bgColor: "rgba(107, 114, 128, 0.1)",
+      "On Break": {
+        color: "#f97316",
+        bgColor: "rgba(249, 115, 22, 0.1)",
         label: "On Break",
         icon: <AccessTime sx={{ fontSize: 14 }} />,
       },
-      Logout: {
-        color: "#ef4444",
-        bgColor: "rgba(239, 68, 68, 0.1)",
-        label: "Unavailable",
-        icon: <Cancel sx={{ fontSize: 14 }} />,
-      },
-      "Logged Out": {
+      Unavailable: {
         color: "#ef4444",
         bgColor: "rgba(239, 68, 68, 0.1)",
         label: "Unavailable",
@@ -571,7 +588,8 @@ const AgentCard = ({ agent, onCardClick, onDownloadCSV, callLogs, isGridView }) 
     return configs[status] || configs.Unavailable;
   };
 
-  const statusConfig = getStatusConfig(agent.status);
+  const effectiveStatus = getAgentEffectiveStatus(agent);
+  const statusConfig = getStatusConfig(effectiveStatus);
 
   if (!isGridView) {
     // List View
@@ -874,11 +892,17 @@ function HealthTLDashboard({ currentUser }) {
   const [isGridView, setIsGridView] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [statusFilter, setStatusFilter] = useState("all"); // Filter by agent status: all, Available, Unavailable, On Call, On Break
   // Analytics filters and sub-tabs
   const [analyticsSubTab, setAnalyticsSubTab] = useState(0);
   const [dateRangeFilter, setDateRangeFilter] = useState("last7");
   const [directionFilter, setDirectionFilter] = useState("all");
   const [agentFilter, setAgentFilter] = useState("all");
+  // Daily Tasks Review state
+  const [dailyTasksData, setDailyTasksData] = useState([]);
+  const [dailyTasksLoading, setDailyTasksLoading] = useState(false);
+  const [dailyTasksDateFilter, setDailyTasksDateFilter] = useState(new Date().toISOString().split("T")[0]);
+  const [expandedTaskRow, setExpandedTaskRow] = useState(null);
   const navigate = useNavigate();
 
   // Theme colors for Health TL (Teal/Emerald theme)
@@ -951,6 +975,7 @@ function HealthTLDashboard({ currentUser }) {
                     empId: agentData.empId || "",
                     mobile: agentData.mobile || agentData.phoneNumber || "",
                     status: agentData.status || "Logout",
+                    todayLoginTime: agentData.todayLoginTime || null,
                     department: "Health",
                     avatar: agentData.avatar || agentData.name?.charAt(0) || "H",
                   });
@@ -1099,13 +1124,60 @@ function HealthTLDashboard({ currentUser }) {
     };
   }, [currentUser]);
 
-  // Calculate statistics (supports both new and legacy status values)
+  // Fetch daily tasks for team agents
+  const fetchDailyTasksForTeam = async () => {
+    if (!teamAgents || teamAgents.length === 0) return;
+
+    setDailyTasksLoading(true);
+    try {
+      const tasksPromises = teamAgents.map(async (agent) => {
+        const taskDocRef = doc(db, "healthAgents", agent.uid, "dailyTasks", dailyTasksDateFilter);
+        const taskDoc = await getDoc(taskDocRef);
+
+        if (taskDoc.exists()) {
+          return {
+            agentId: agent.uid,
+            agentName: agent.name,
+            agentEmail: agent.email,
+            agentStatus: agent.status,
+            ...taskDoc.data(),
+          };
+        }
+        return {
+          agentId: agent.uid,
+          agentName: agent.name,
+          agentEmail: agent.email,
+          agentStatus: agent.status,
+          status: "not_submitted",
+          tasks: [],
+          totalDuration: 0,
+          percentage: 0,
+        };
+      });
+
+      const results = await Promise.all(tasksPromises);
+      setDailyTasksData(results);
+    } catch (error) {
+      console.error("Error fetching daily tasks:", error);
+    } finally {
+      setDailyTasksLoading(false);
+    }
+  };
+
+  // Fetch daily tasks when tab changes to Daily Tasks or date changes
+  useEffect(() => {
+    if (activeTab === 3 && teamAgents.length > 0) {
+      fetchDailyTasksForTeam();
+    }
+  }, [activeTab, dailyTasksDateFilter, teamAgents]);
+
+  // Calculate statistics (uses effective status based on todayLoginTime)
   const stats = {
     totalAgents: teamAgents.length,
-    available: teamAgents.filter((a) => a.status === "Idle" || a.status === "Available" || a.status === "Login").length,
-    onCall: teamAgents.filter((a) => a.status === "Busy" || a.status === "On Call").length,
-    onBreak: teamAgents.filter((a) => a.status === "Break").length,
-    loggedOut: teamAgents.filter((a) => a.status === "Logout" || a.status === "Unavailable" || a.status === "Logged Out" || !a.status).length,
+    available: teamAgents.filter((a) => getAgentEffectiveStatus(a) === "Available").length,
+    onCall: teamAgents.filter((a) => getAgentEffectiveStatus(a) === "On Call").length,
+    onBreak: teamAgents.filter((a) => getAgentEffectiveStatus(a) === "On Break").length,
+    loggedOut: teamAgents.filter((a) => getAgentEffectiveStatus(a) === "Unavailable").length,
     totalCalls: callLogs.length,
     connectedCalls: callLogs.filter((log) => log.callConnected).length,
     connectionRate: callLogs.length > 0 ? Math.round((callLogs.filter((log) => log.callConnected).length / callLogs.length) * 100) : 0,
@@ -1405,28 +1477,34 @@ function HealthTLDashboard({ currentUser }) {
       return Array.from(dayMap.values());
     })(),
 
-    // Calls by Agent Type (Nurse, Branch Manager, Client, etc.) - Uses filtered data
+    // Call Coordinator Distribution (Client, Branch Manager, Nurse) - Uses filtered data
     callsByAgentType: (() => {
       const types = {};
       filteredLogsForStats.forEach(log => {
         // Handle different data structures:
-        // - Regular calls: callType = "Client"/"Branch Manager"/"Nurse"
-        // - Manual Leads: callType = "Manual Lead", agentType = "Client"/"Branch Manager"/"Nurse"
-        // - Inbound: callType = "Inbound", agentType = "Insurance"/"Health"
-        let typeValue = 'Unknown';
+        // - New calls: coordinatorType = "Client"/"Branch Manager"/"Nurse"
+        // - Regular outbound calls: callType = "Client"/"Branch Manager"/"Nurse"
+        // - Manual Leads: callType = "Manual Lead", coordinatorType or agentType = "Client"/"Branch Manager"/"Nurse"
+        // - Inbound: callType = "Inbound", coordinatorType = "Client"/"Branch Manager"/"Nurse"
+        let typeValue = null;
 
-        if (log.callType === 'Manual Lead' && log.agentType) {
-          // For Manual Leads, use agentType field
-          typeValue = log.agentType;
-        } else if (log.callType && ['Client', 'Branch Manager', 'Nurse'].includes(log.callType)) {
-          // For regular calls, use callType field
+        // Priority 1: Use coordinatorType field (new format)
+        if (log.coordinatorType && ['Client', 'Branch Manager', 'Nurse'].includes(log.coordinatorType)) {
+          typeValue = log.coordinatorType;
+        }
+        // Priority 2: For regular outbound calls, callType contains the coordinator
+        else if (log.callType && ['Client', 'Branch Manager', 'Nurse'].includes(log.callType)) {
           typeValue = log.callType;
-        } else if (log.agentType && ['Client', 'Branch Manager', 'Nurse'].includes(log.agentType)) {
-          // Fallback: use agentType if it has the right values
+        }
+        // Priority 3: Fallback to agentType if it has coordinator values
+        else if (log.agentType && ['Client', 'Branch Manager', 'Nurse'].includes(log.agentType)) {
           typeValue = log.agentType;
         }
 
-        types[typeValue] = (types[typeValue] || 0) + 1;
+        // Only count if we found a valid coordinator type
+        if (typeValue) {
+          types[typeValue] = (types[typeValue] || 0) + 1;
+        }
       });
       return Object.entries(types)
         .map(([name, value]) => ({
@@ -1470,6 +1548,13 @@ function HealthTLDashboard({ currentUser }) {
   });
 
   const filteredTeamAgents = teamAgents.filter((agent) => {
+    // First filter by status
+    if (statusFilter !== "all") {
+      const effectiveStatus = getAgentEffectiveStatus(agent);
+      if (effectiveStatus !== statusFilter) return false;
+    }
+
+    // Then filter by search query
     if (!searchQuery.trim()) return true;
 
     const q = searchQuery.toLowerCase();
@@ -1502,6 +1587,11 @@ function HealthTLDashboard({ currentUser }) {
     });
 
     return agentMatches || callLogMatches;
+  }).sort((a, b) => {
+    // Sort by total calls (most calls first)
+    const aCallCount = callLogs.filter((log) => log.agentId === a.uid).length;
+    const bCallCount = callLogs.filter((log) => log.agentId === b.uid).length;
+    return bCallCount - aCallCount; // Descending order (most calls first)
   });
 
   const handleCardClick = (agent) => {
@@ -1789,6 +1879,8 @@ function HealthTLDashboard({ currentUser }) {
           <Tab icon={<Group />} iconPosition="start" label="My Team" />
           <Tab icon={<Analytics />} iconPosition="start" label="Analytics" />
           <Tab icon={<Phone />} iconPosition="start" label="Log Calls" />
+          <Tab icon={<Assignment />} iconPosition="start" label="Daily Tasks Review" />
+          <Tab icon={<RateReview />} iconPosition="start" label="BM Review" />
         </Tabs>
       </Paper>
 
@@ -1879,45 +1971,156 @@ function HealthTLDashboard({ currentUser }) {
             </Box>
           </Paper>
 
-          {/* Stats Cards */}
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={6} sm={6} md={3}>
-              <AnimatedStatCard
-                value={stats.available}
-                label="Available"
-                icon={<CheckCircle sx={{ fontSize: 24, color: "#fff" }} />}
-                gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                delay={0}
-              />
+          {/* Team Status Scorecard - Clickable cards to filter agents */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                onClick={() => setStatusFilter(statusFilter === "Available" ? "all" : "Available")}
+                sx={{
+                  bgcolor: statusFilter === "Available" ? "#10b981" : "#fff",
+                  borderRadius: "16px",
+                  p: 2,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: "2px solid",
+                  borderColor: statusFilter === "Available" ? "#10b981" : "rgba(16, 185, 129, 0.3)",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#10b981",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
+                  },
+                }}
+              >
+                <CheckCircle sx={{ fontSize: 28, color: statusFilter === "Available" ? "#fff" : "#10b981", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 800, color: statusFilter === "Available" ? "#fff" : "#10b981" }}>
+                  {stats.available}
+                </Typography>
+                <Typography variant="caption" sx={{ color: statusFilter === "Available" ? "rgba(255,255,255,0.9)" : "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
+                  Available
+                </Typography>
+              </Paper>
             </Grid>
-            <Grid item xs={6} sm={6} md={3}>
-              <AnimatedStatCard
-                value={stats.onCall}
-                label="On Call"
-                icon={<PhoneInTalk sx={{ fontSize: 24, color: "#fff" }} />}
-                gradient="linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
-                delay={100}
-              />
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                onClick={() => setStatusFilter(statusFilter === "On Call" ? "all" : "On Call")}
+                sx={{
+                  bgcolor: statusFilter === "On Call" ? "#3b82f6" : "#fff",
+                  borderRadius: "16px",
+                  p: 2,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: "2px solid",
+                  borderColor: statusFilter === "On Call" ? "#3b82f6" : "rgba(59, 130, 246, 0.3)",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#3b82f6",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(59, 130, 246, 0.2)",
+                  },
+                }}
+              >
+                <PhoneInTalk sx={{ fontSize: 28, color: statusFilter === "On Call" ? "#fff" : "#3b82f6", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 800, color: statusFilter === "On Call" ? "#fff" : "#3b82f6" }}>
+                  {stats.onCall}
+                </Typography>
+                <Typography variant="caption" sx={{ color: statusFilter === "On Call" ? "rgba(255,255,255,0.9)" : "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
+                  On Call
+                </Typography>
+              </Paper>
             </Grid>
-            <Grid item xs={6} sm={6} md={3}>
-              <AnimatedStatCard
-                value={stats.onBreak}
-                label="On Break"
-                icon={<AccessTime sx={{ fontSize: 24, color: "#fff" }} />}
-                gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
-                delay={200}
-              />
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                onClick={() => setStatusFilter(statusFilter === "On Break" ? "all" : "On Break")}
+                sx={{
+                  bgcolor: statusFilter === "On Break" ? "#f59e0b" : "#fff",
+                  borderRadius: "16px",
+                  p: 2,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: "2px solid",
+                  borderColor: statusFilter === "On Break" ? "#f59e0b" : "rgba(245, 158, 11, 0.3)",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#f59e0b",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(245, 158, 11, 0.2)",
+                  },
+                }}
+              >
+                <AccessTime sx={{ fontSize: 28, color: statusFilter === "On Break" ? "#fff" : "#f59e0b", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 800, color: statusFilter === "On Break" ? "#fff" : "#f59e0b" }}>
+                  {stats.onBreak}
+                </Typography>
+                <Typography variant="caption" sx={{ color: statusFilter === "On Break" ? "rgba(255,255,255,0.9)" : "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
+                  On Break
+                </Typography>
+              </Paper>
             </Grid>
-            <Grid item xs={6} sm={6} md={3}>
-              <AnimatedStatCard
-                value={stats.totalAgents}
-                label="Total Team"
-                icon={<Group sx={{ fontSize: 24, color: "#fff" }} />}
-                gradient={THEME_COLORS.gradient}
-                delay={300}
-              />
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                onClick={() => setStatusFilter(statusFilter === "Unavailable" ? "all" : "Unavailable")}
+                sx={{
+                  bgcolor: statusFilter === "Unavailable" ? "#6b7280" : "#fff",
+                  borderRadius: "16px",
+                  p: 2,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: "2px solid",
+                  borderColor: statusFilter === "Unavailable" ? "#6b7280" : "rgba(107, 114, 128, 0.3)",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#6b7280",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(107, 114, 128, 0.2)",
+                  },
+                }}
+              >
+                <Cancel sx={{ fontSize: 28, color: statusFilter === "Unavailable" ? "#fff" : "#6b7280", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 800, color: statusFilter === "Unavailable" ? "#fff" : "#6b7280" }}>
+                  {stats.loggedOut}
+                </Typography>
+                <Typography variant="caption" sx={{ color: statusFilter === "Unavailable" ? "rgba(255,255,255,0.9)" : "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
+                  Unavailable
+                </Typography>
+              </Paper>
             </Grid>
           </Grid>
+
+          {/* Active Status Filter Indicator */}
+          {statusFilter !== "all" && (
+            <Paper
+              elevation={0}
+              sx={{
+                bgcolor: "rgba(20, 184, 166, 0.05)",
+                borderRadius: "12px",
+                p: 1.5,
+                mb: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Typography variant="body2" sx={{ color: THEME_COLORS.textSecondary }}>
+                Showing agents with status: <strong style={{ color: THEME_COLORS.primary }}>{statusFilter}</strong>
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => setStatusFilter("all")}
+                sx={{
+                  color: THEME_COLORS.primary,
+                  textTransform: "none",
+                  fontWeight: 600,
+                }}
+              >
+                Clear Filter
+              </Button>
+            </Paper>
+          )}
 
           {/* Controls */}
           <Paper
@@ -2932,6 +3135,407 @@ function HealthTLDashboard({ currentUser }) {
             currentUser={currentUser}
             onStatusChange={(agentId, newStatus) => {}}
           />
+        </Paper>
+      )}
+
+      {/* Tab 3: Daily Tasks Review */}
+      {activeTab === 3 && (
+        <Paper
+          elevation={0}
+          sx={{
+            bgcolor: "#fff",
+            borderRadius: "20px",
+            p: 3,
+          }}
+        >
+          {/* Header */}
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
+            <Box>
+              <Typography variant="h5" fontWeight="bold" color={THEME_COLORS.textPrimary}>
+                Daily Tasks Review
+              </Typography>
+              <Typography variant="body2" color={THEME_COLORS.textSecondary}>
+                Review daily task submissions from your team agents
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+              <TextField
+                type="date"
+                size="small"
+                value={dailyTasksDateFilter}
+                onChange={(e) => setDailyTasksDateFilter(e.target.value)}
+                sx={{
+                  minWidth: 180,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "12px",
+                  },
+                }}
+              />
+              <Button
+                variant="outlined"
+                startIcon={<Refresh />}
+                onClick={fetchDailyTasksForTeam}
+                sx={{
+                  borderRadius: "12px",
+                  borderColor: THEME_COLORS.primary,
+                  color: THEME_COLORS.primary,
+                  "&:hover": {
+                    borderColor: THEME_COLORS.primaryDark,
+                    bgcolor: "rgba(20, 184, 166, 0.05)",
+                  },
+                }}
+              >
+                Refresh
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Summary Cards */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: "16px",
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  color: "#fff",
+                }}
+              >
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>Submitted</Typography>
+                <Typography variant="h4" fontWeight="bold">
+                  {dailyTasksData.filter((t) => t.status === "submitted").length}
+                </Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: "16px",
+                  background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                  color: "#fff",
+                }}
+              >
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>Draft</Typography>
+                <Typography variant="h4" fontWeight="bold">
+                  {dailyTasksData.filter((t) => t.status === "draft").length}
+                </Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: "16px",
+                  background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                  color: "#fff",
+                }}
+              >
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>Not Submitted</Typography>
+                <Typography variant="h4" fontWeight="bold">
+                  {dailyTasksData.filter((t) => t.status === "not_submitted").length}
+                </Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: "16px",
+                  background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                  color: "#fff",
+                }}
+              >
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>Avg. Productivity</Typography>
+                <Typography variant="h4" fontWeight="bold">
+                  {dailyTasksData.length > 0
+                    ? Math.round(
+                        dailyTasksData.reduce((sum, t) => sum + (t.percentage || 0), 0) /
+                          dailyTasksData.filter((t) => t.status !== "not_submitted").length || 1
+                      )
+                    : 0}%
+                </Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {/* Tasks Table */}
+          {dailyTasksLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress sx={{ color: THEME_COLORS.primary }} />
+            </Box>
+          ) : (
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "rgba(20, 184, 166, 0.05)" }}>
+                    <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Tasks</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Productivity</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Rating</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {dailyTasksData.map((task) => (
+                    <>
+                      <TableRow
+                        key={task.agentId}
+                        sx={{
+                          "&:hover": { bgcolor: "rgba(20, 184, 166, 0.03)" },
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setExpandedTaskRow(expandedTaskRow === task.agentId ? null : task.agentId)}
+                      >
+                        <TableCell>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                            <Avatar
+                              sx={{
+                                width: 36,
+                                height: 36,
+                                bgcolor: THEME_COLORS.primary,
+                                fontSize: "0.875rem",
+                              }}
+                            >
+                              {task.agentName?.charAt(0) || "?"}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" fontWeight={600}>
+                                {task.agentName}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {task.agentEmail}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={
+                              task.status === "submitted"
+                                ? "Submitted"
+                                : task.status === "draft"
+                                ? "Draft"
+                                : "Not Submitted"
+                            }
+                            size="small"
+                            sx={{
+                              bgcolor:
+                                task.status === "submitted"
+                                  ? "rgba(16, 185, 129, 0.1)"
+                                  : task.status === "draft"
+                                  ? "rgba(245, 158, 11, 0.1)"
+                                  : "rgba(239, 68, 68, 0.1)",
+                              color:
+                                task.status === "submitted"
+                                  ? "#10b981"
+                                  : task.status === "draft"
+                                  ? "#f59e0b"
+                                  : "#ef4444",
+                              fontWeight: 600,
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {task.tasks?.length || 0} tasks
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {task.totalDuration
+                              ? `${Math.floor(task.totalDuration / 60)}h ${task.totalDuration % 60}m`
+                              : "-"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={task.percentage || 0}
+                              sx={{
+                                width: 60,
+                                height: 6,
+                                borderRadius: 3,
+                                bgcolor: "rgba(20, 184, 166, 0.1)",
+                                "& .MuiLinearProgress-bar": {
+                                  bgcolor:
+                                    (task.percentage || 0) >= 80
+                                      ? "#10b981"
+                                      : (task.percentage || 0) >= 50
+                                      ? "#f59e0b"
+                                      : "#ef4444",
+                                  borderRadius: 3,
+                                },
+                              }}
+                            />
+                            <Typography variant="body2" fontWeight={600}>
+                              {task.percentage || 0}%
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            color={
+                              task.rating === "Excellent"
+                                ? "#10b981"
+                                : task.rating === "Good"
+                                ? "#3b82f6"
+                                : task.rating === "Average"
+                                ? "#f59e0b"
+                                : "#ef4444"
+                            }
+                          >
+                            {task.rating || "-"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedTaskRow(expandedTaskRow === task.agentId ? null : task.agentId);
+                            }}
+                          >
+                            {expandedTaskRow === task.agentId ? <ExpandLess /> : <ExpandMore />}
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                      {/* Expanded Task Details */}
+                      {expandedTaskRow === task.agentId && task.tasks && task.tasks.length > 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} sx={{ bgcolor: "rgba(20, 184, 166, 0.02)", py: 0 }}>
+                            <Box sx={{ p: 2 }}>
+                              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+                                Task Breakdown
+                              </Typography>
+                              <Grid container spacing={1}>
+                                {task.tasks.map((t, idx) => (
+                                  <Grid item xs={12} sm={6} md={4} key={idx}>
+                                    <Paper
+                                      elevation={0}
+                                      sx={{
+                                        p: 1.5,
+                                        borderRadius: "10px",
+                                        border: "1px solid rgba(20, 184, 166, 0.2)",
+                                        bgcolor: "#fff",
+                                      }}
+                                    >
+                                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <Typography variant="body2" fontWeight={600}>
+                                          {t.type}
+                                        </Typography>
+                                        <Chip
+                                          label={`${t.duration} min`}
+                                          size="small"
+                                          sx={{
+                                            bgcolor: "rgba(20, 184, 166, 0.1)",
+                                            color: THEME_COLORS.primary,
+                                            fontWeight: 600,
+                                            fontSize: "0.7rem",
+                                          }}
+                                        />
+                                      </Box>
+                                      {t.callCount && (
+                                        <Typography variant="caption" color="text.secondary">
+                                          Calls: {t.callCount}
+                                        </Typography>
+                                      )}
+                                      {t.consultationCount && (
+                                        <Typography variant="caption" color="text.secondary">
+                                          Consultations: {t.consultationCount}
+                                        </Typography>
+                                      )}
+                                      {t.description && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                                          {t.description}
+                                        </Typography>
+                                      )}
+                                    </Paper>
+                                  </Grid>
+                                ))}
+                              </Grid>
+                              {task.shiftDuration && (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: "block" }}>
+                                  Shift Duration: {Math.floor(task.shiftDuration / 60)}h {task.shiftDuration % 60}m
+                                </Typography>
+                              )}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  ))}
+                  {dailyTasksData.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ textAlign: "center", py: 4 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          No daily tasks data found for the selected date
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
+      )}
+
+      {/* Tab 4: BM Review */}
+      {activeTab === 4 && (
+        <Paper
+          elevation={0}
+          sx={{
+            bgcolor: "white",
+            borderRadius: "16px",
+            p: 4,
+            border: "1px solid rgba(20, 184, 166, 0.1)",
+            boxShadow: "0 4px 20px rgba(20, 184, 166, 0.05)",
+          }}
+        >
+          <Box sx={{ textAlign: "center", py: 6 }}>
+            <RateReview sx={{ fontSize: 80, color: THEME_COLORS.primary, mb: 3 }} />
+            <Typography variant="h4" fontWeight={700} color={THEME_COLORS.primary} gutterBottom>
+              BM Review Portal
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 600, mx: "auto" }}>
+              Access the Brand Manager Review system to track agent performance, review metrics, and manage evaluations.
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              endIcon={<OpenInNew />}
+              onClick={() => window.open("https://bm-review-agentstatus.web.app", "_blank")}
+              sx={{
+                bgcolor: THEME_COLORS.primary,
+                color: "white",
+                px: 4,
+                py: 1.5,
+                fontSize: "16px",
+                fontWeight: 600,
+                borderRadius: "12px",
+                textTransform: "none",
+                boxShadow: "0 4px 12px rgba(20, 184, 166, 0.3)",
+                "&:hover": {
+                  bgcolor: THEME_COLORS.primaryDark,
+                  boxShadow: "0 6px 16px rgba(20, 184, 166, 0.4)",
+                  transform: "translateY(-2px)",
+                },
+                transition: "all 0.3s ease",
+              }}
+            >
+              Open BM Review Portal
+            </Button>
+          </Box>
         </Paper>
       )}
     </Box>

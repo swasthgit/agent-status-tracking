@@ -12,27 +12,66 @@ import {
   LocationOn,
   CheckCircle,
 } from "@mui/icons-material";
-import { collection, addDoc, doc, updateDoc, serverTimestamp, query, where, onSnapshot, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, serverTimestamp, query, where, onSnapshot, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { savePunchData, getSavedPunchData, clearPunchData, isPunchSubmitted } from "../utils/visitFormPersistence";
 
 /**
  * Punch In/Out Component - NEW VERSION
  * Saves punch data to Firestore for persistence across page refresh
  * Real-time listener maintains state from database
  */
-function PunchInOutNew({ onPunchData, initialPunchData, agentId, agentCollection }) {
+function PunchInOutNew({ onPunchData, initialPunchData, agentId, agentCollection, shouldReset }) {
   const [punchInData, setPunchInData] = useState(initialPunchData || null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [locationError, setLocationError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activePunchId, setActivePunchId] = useState(null);
 
-  // Listen to active punch from Firestore (if agentId and agentCollection are provided)
+  // Reset state when shouldReset changes to true
+  useEffect(() => {
+    if (shouldReset) {
+      console.log("🔄 Resetting punch data state");
+      setPunchInData(null);
+      setActivePunchId(null);
+      setElapsedTime(0);
+      // Clear localStorage
+      if (agentId) {
+        clearPunchData(agentId);
+      }
+    }
+  }, [shouldReset, agentId]);
+
+  // Listen to active punch AND check for today's completed punch from Firestore
   useEffect(() => {
     if (!agentId || !agentCollection) return;
 
+    // Skip if we're in reset mode
+    if (shouldReset) return;
+
     const punchesRef = collection(db, agentCollection, agentId, "activePunch");
-    // Only get ACTIVE punch records (not completed ones)
+
+    // First, check localStorage for saved punch data
+    const savedPunchData = getSavedPunchData(agentId);
+    // Only restore if it's completed but NOT yet submitted
+    if (savedPunchData && savedPunchData.status === "completed" && !savedPunchData.visitSubmitted) {
+      // Also check if this specific punch was marked as submitted
+      if (savedPunchData.punchDocId && isPunchSubmitted(agentId, savedPunchData.punchDocId)) {
+        console.log("⏭️ Skipping localStorage punch - already submitted");
+        clearPunchData(agentId);
+      } else {
+        console.log("📍 Restored completed punch data from localStorage");
+        setPunchInData(savedPunchData);
+        if (savedPunchData.punchDocId) {
+          setActivePunchId(savedPunchData.punchDocId);
+        }
+        if (onPunchData) {
+          onPunchData(savedPunchData);
+        }
+      }
+    }
+
+    // Listen for ACTIVE punch records
     const activePunchQuery = query(
       punchesRef,
       where("status", "==", "active"),
@@ -40,7 +79,7 @@ function PunchInOutNew({ onPunchData, initialPunchData, agentId, agentCollection
       limit(1)
     );
 
-    const unsubscribe = onSnapshot(activePunchQuery, (snapshot) => {
+    const unsubscribe = onSnapshot(activePunchQuery, async (snapshot) => {
       if (!snapshot.empty) {
         const punchDoc = snapshot.docs[0];
         const data = punchDoc.data();
@@ -58,19 +97,89 @@ function PunchInOutNew({ onPunchData, initialPunchData, agentId, agentCollection
         };
 
         setPunchInData(punchData);
+        // Save to localStorage for recovery
+        savePunchData(agentId, punchData);
       } else {
-        // No active punch found
-        // Only clear state if parent has also cleared (initialPunchData is null)
-        // This allows completed punch data to persist until parent resets
-        if (!initialPunchData) {
-          setPunchInData(null);
-          setActivePunchId(null);
+        // No active punch found - check for today's completed punch in Firestore
+        if (!initialPunchData && !savedPunchData) {
+          // Check for completed punch from today
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          try {
+            const completedQuery = query(
+              punchesRef,
+              where("status", "==", "completed"),
+              orderBy("punchInTime", "desc"),
+              limit(5) // Get a few recent ones to check for unsubmitted
+            );
+
+            const completedSnapshot = await getDocs(completedQuery);
+            if (!completedSnapshot.empty) {
+              // Find the first punch that is from today AND not yet submitted
+              let foundValidPunch = false;
+              for (const completedDoc of completedSnapshot.docs) {
+                const data = completedDoc.data();
+                const punchDocId = completedDoc.id;
+
+                // Skip if this punch has already been used for a visit submission (Firestore flag)
+                if (data.visitSubmitted === true) {
+                  console.log("⏭️ Skipping already submitted punch (Firestore flag)");
+                  continue;
+                }
+
+                // Also check localStorage to see if this punch was submitted
+                if (isPunchSubmitted(agentId, punchDocId)) {
+                  console.log("⏭️ Skipping already submitted punch (localStorage)");
+                  continue;
+                }
+
+                // Check if punch is from today
+                const punchDate = data.punchInTime?.toDate?.() || new Date(data.punchInTime);
+                if (punchDate >= today) {
+                  const punchData = {
+                    punchInTime: data.punchInTime?.toDate?.()?.toISOString() || data.punchInTime,
+                    punchInLocation: data.punchInLocation,
+                    punchOutTime: data.punchOutTime?.toDate?.()?.toISOString() || data.punchOutTime,
+                    punchOutLocation: data.punchOutLocation,
+                    totalDuration: data.totalDuration,
+                    durationFormatted: data.durationFormatted,
+                    status: data.status,
+                    punchDocId: punchDocId, // Include the document ID for tracking
+                  };
+
+                  console.log("📍 Found today's unsubmitted completed punch data from Firestore");
+                  setPunchInData(punchData);
+                  setActivePunchId(punchDocId);
+                  // Save to localStorage
+                  savePunchData(agentId, punchData);
+                  // Notify parent
+                  if (onPunchData) {
+                    onPunchData(punchData);
+                  }
+                  foundValidPunch = true;
+                  break;
+                }
+              }
+
+              if (!foundValidPunch) {
+                // No valid punch found, clear state
+                setPunchInData(null);
+                setActivePunchId(null);
+              }
+            } else {
+              setPunchInData(null);
+              setActivePunchId(null);
+            }
+          } catch (error) {
+            console.error("Error checking for completed punch:", error);
+          }
         }
       }
     });
 
     return () => unsubscribe();
-  }, [agentId, agentCollection, initialPunchData]); // Removed onPunchData from dependencies to prevent infinite loop
+  }, [agentId, agentCollection, shouldReset]); // Added shouldReset to re-run when reset is triggered
 
   // Calculate elapsed time from punch in timestamp
   useEffect(() => {
@@ -223,10 +332,14 @@ function PunchInOutNew({ onPunchData, initialPunchData, agentId, agentCollection
           totalDuration: totalDuration,
           durationFormatted: formatTime(totalDuration),
           status: "completed",
+          punchDocId: activePunchId, // Include the document ID for tracking submission
         };
 
         // Update local state with completed data
         setPunchInData(completePunchData);
+
+        // Save to localStorage for recovery on refresh
+        savePunchData(agentId, completePunchData);
 
         // Send to parent component
         if (onPunchData) {

@@ -5,6 +5,7 @@ import ManualCallLogForm from "./ManualCallLogForm";
 import { db } from "../firebaseConfig";
 import { collection, addDoc, serverTimestamp, getDoc, doc, getDocs, query, where } from "firebase/firestore";
 import API_BASE_URL from "../config/api";
+import { getAgentDefaultPartner } from "../config/agentPartnerMapping";
 
 const ACCOUNT_SID = process.env.REACT_APP_ACCOUNT_SID;
 
@@ -31,6 +32,7 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
   const [currentAgentType, setCurrentAgentType] = useState("");
   const [searchTerms, setSearchTerms] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState({});
+  const [agentDefaultPartner, setAgentDefaultPartner] = useState("");
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -113,6 +115,13 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
         setAgentName(agentData.name || "Agent");
         setAgentPhoneNumber(agentData.mobile || agentData.phoneNumber || "");
         console.log(`[ManualLeads] Set agentPhoneNumber to:`, agentData.mobile || agentData.phoneNumber || "");
+
+        // Set default partner based on agent mapping
+        const defaultPartner = getAgentDefaultPartner(agentData.name, agentData.email);
+        if (defaultPartner) {
+          console.log(`[ManualLeads] Setting default partner for ${agentData.name}: ${defaultPartner}`);
+          setAgentDefaultPartner(defaultPartner);
+        }
       } else {
         console.log(`[ManualLeads] No agent document found in ${agentCollection}`);
       }
@@ -298,6 +307,7 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
         sid: currentCallSid,
         callerId: currentCallerId,
         agentType: currentAgentType,
+        coordinatorType: logEntry.callType || "Unknown", // Preserve coordinator (Client/Branch Manager/Nurse)
         callType: "Manual Lead",
         timestamp: serverTimestamp(),
         startTime: callStartTime ? callStartTime.toISOString() : null,
@@ -716,6 +726,7 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
           onSubmit={handleFormSubmit}
           initialClientNumber={currentLeadNumber}
           agentType={currentAgentType}
+          defaultPartner={agentDefaultPartner}
         />
       )}
     </div>

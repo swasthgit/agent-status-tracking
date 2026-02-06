@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   collection,
-  onSnapshot,
   getDocs,
+  query,
+  orderBy,
+  limit,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
@@ -43,6 +45,8 @@ import {
   Divider,
   Badge,
   Menu,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import {
   Person,
@@ -73,6 +77,8 @@ import {
   MoreVert,
   TableChart,
   Download,
+  LocalPharmacy,
+  SupportAgent,
 } from "@mui/icons-material";
 import {
   BarChart,
@@ -132,12 +138,13 @@ const useAnimatedCounter = (end, duration = 1500) => {
 };
 
 // Animated Stat Card
-const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue }) => {
+const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue, onClick, isActive }) => {
   const animatedValue = useAnimatedCounter(value);
 
   return (
     <Card
       elevation={0}
+      onClick={onClick}
       sx={{
         background: gradient,
         color: "white",
@@ -145,9 +152,12 @@ const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trend
         overflow: "hidden",
         position: "relative",
         transition: "all 0.3s ease",
+        cursor: onClick ? "pointer" : "default",
+        border: isActive ? "3px solid #fff" : "3px solid transparent",
+        boxShadow: isActive ? "0 0 20px rgba(255,255,255,0.4)" : "none",
         "&:hover": {
           transform: "translateY(-8px)",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+          boxShadow: isActive ? "0 0 25px rgba(255,255,255,0.5)" : "0 20px 40px rgba(0,0,0,0.15)",
         },
       }}
     >
@@ -670,6 +680,20 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
  * Health Manager Dashboard - Revamped
  * Modern UI with animations, charts, and enhanced visualizations
  */
+// Helper function to check if agent is PE (Pharmacist Executive)
+const isPEAgent = (designation) => {
+  if (!designation) return false;
+  const d = designation.toLowerCase();
+  return d === 'pe' || d === 'pharmacist executive';
+};
+
+// Helper function to check if agent is RE (Relationship Executive)
+const isREAgent = (designation) => {
+  if (!designation) return false;
+  const d = designation.toLowerCase();
+  return d === 're' || d === 'relationship executive';
+};
+
 function HealthManagerDashboard({ currentUser }) {
   const [healthAgents, setHealthAgents] = useState([]);
   const [healthTLs, setHealthTLs] = useState([]);
@@ -682,6 +706,8 @@ function HealthManagerDashboard({ currentUser }) {
   const [viewMode, setViewMode] = useState("grid");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [agentTypeFilter, setAgentTypeFilter] = useState("all"); // "all", "pe", "re"
+  const [scorecardFilter, setScorecardFilter] = useState(null); // "totalAgents", "online", "totalCalls", "successRate"
   const [filters, setFilters] = useState({
     dateFrom: "",
     dateTo: "",
@@ -692,153 +718,206 @@ function HealthManagerDashboard({ currentUser }) {
   });
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!currentUser) return;
+  // Optimized data fetching - batch queries instead of nested listeners
+  const fetchHealthData = useCallback(async () => {
+    try {
+      setLoading(true);
 
-    let mounted = true;
-    const unsubscribes = [];
+      // Fetch Health TLs (single query)
+      const healthTLsSnap = await getDocs(collection(db, "healthTeamLeads"));
+      const tls = healthTLsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setHealthTLs(tls);
 
-    const fetchHealthData = async () => {
-      try {
-        setLoading(true);
+      // Fetch Health Agents (single query)
+      const healthAgentsSnap = await getDocs(collection(db, "healthAgents"));
+      const agentsData = healthAgentsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-        // Fetch Health TLs from healthTeamLeads collection
-        const healthTLsRef = collection(db, "healthTeamLeads");
-        const tlUnsubscribe = onSnapshot(healthTLsRef, (snapshot) => {
-          if (!mounted) return;
-          const tls = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-          setHealthTLs(tls);
-        });
-        unsubscribes.push(tlUnsubscribe);
+      // Batch fetch call logs for all agents with Promise.all
+      const agentsWithLogs = await Promise.all(
+        agentsData.map(async (agentData) => {
+          const agentId = agentData.id;
 
-        // Fetch Health Agents from healthAgents collection
-        const healthAgentsRef = collection(db, "healthAgents");
-        const agentsUnsubscribe = onSnapshot(healthAgentsRef, (snapshot) => {
-          if (!mounted) return;
+          // Fetch call logs with limit (max 100 per agent)
+          const logsSnap = await getDocs(
+            query(
+              collection(db, "healthAgents", agentId, "callLogs"),
+              orderBy("timestamp", "desc"),
+              limit(100)
+            )
+          );
 
-          snapshot.docs.forEach((agentDoc) => {
-            const agentData = agentDoc.data();
-            const agentId = agentDoc.id;
-
-            // Listen to call logs for this agent
-            const callLogsRef = collection(db, "healthAgents", agentId, "callLogs");
-            const logsUnsubscribe = onSnapshot(callLogsRef, (logsSnapshot) => {
-              if (!mounted) return;
-
-              const logs = logsSnapshot.docs.map((log) => {
-                const data = log.data();
-                return {
-                  id: log.id,
-                  ...data,
-                  timestamp: data.timestamp instanceof Timestamp
-                    ? data.timestamp.toDate()
-                    : data.timestamp
-                    ? new Date(data.timestamp)
-                    : null,
-                  startTime: data.startTime instanceof Timestamp
-                    ? data.startTime.toDate()
-                    : data.startTime
-                    ? new Date(data.startTime)
-                    : null,
-                  endTime: data.endTime instanceof Timestamp
-                    ? data.endTime.toDate()
-                    : data.endTime
-                    ? new Date(data.endTime)
-                    : null,
-                  agentId,
-                  agentName: agentData.name,
-                  collectionName: "healthAgents",
-                };
-              });
-
-              logs.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
-
-              const totalCalls = logs.length;
-              const connectedCalls = logs.filter((log) => log.callConnected === true).length;
-
-              setHealthAgents((prevAgents) => {
-                const updatedAgents = prevAgents.filter((a) => a.uid !== agentId);
-                updatedAgents.push({
-                  uid: agentId,
-                  collection: "healthAgents",
-                  name: agentData.name || "Unknown Agent",
-                  email: agentData.email || "",
-                  empId: agentData.empId || "",
-                  mobile: agentData.mobile || agentData.phoneNumber || "",
-                  status: agentData.status || "Logout",
-                  department: "Health",
-                  teamLeadId: agentData.teamLeadId || "",
-                  avatar: agentData.name?.charAt(0) || "H",
-                  totalCalls,
-                  connectedCalls,
-                  callLogs: logs,
-                });
-                return updatedAgents.sort((a, b) => a.name.localeCompare(b.name));
-              });
-
-              setCallLogs((prevLogs) => [
-                ...prevLogs.filter((log) => log.agentId !== agentId),
-                ...logs.map(log => ({
-                  ...log,
-                  agentName: agentData.name || "Unknown Agent",
-                  agentEmpId: agentData.empId || "",
-                })),
-              ]);
-            });
-            unsubscribes.push(logsUnsubscribe);
+          const logs = logsSnap.docs.map((log) => {
+            const data = log.data();
+            return {
+              id: log.id,
+              ...data,
+              timestamp: data.timestamp instanceof Timestamp
+                ? data.timestamp.toDate()
+                : data.timestamp
+                ? new Date(data.timestamp)
+                : null,
+              startTime: data.startTime instanceof Timestamp
+                ? data.startTime.toDate()
+                : data.startTime
+                ? new Date(data.startTime)
+                : null,
+              endTime: data.endTime instanceof Timestamp
+                ? data.endTime.toDate()
+                : data.endTime
+                ? new Date(data.endTime)
+                : null,
+              agentId,
+              agentName: agentData.name,
+              agentEmpId: agentData.empId || "",
+              agentDesignation: agentData.designation || "",
+              collectionName: "healthAgents",
+            };
           });
 
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-        unsubscribes.push(agentsUnsubscribe);
-      } catch (error) {
-        console.error("Error in fetchHealthData:", error);
-        if (mounted) setLoading(false);
-      }
-    };
+          const totalCalls = logs.length;
+          const connectedCalls = logs.filter((log) => log.callConnected === true).length;
 
+          return {
+            uid: agentId,
+            collection: "healthAgents",
+            name: agentData.name || "Unknown Agent",
+            email: agentData.email || "",
+            empId: agentData.empId || "",
+            mobile: agentData.mobile || agentData.phoneNumber || "",
+            status: agentData.status || "Logout",
+            department: "Health",
+            designation: agentData.designation || "",
+            teamLeadId: agentData.teamLeadId || "",
+            avatar: agentData.name?.charAt(0) || "H",
+            totalCalls,
+            connectedCalls,
+            callLogs: logs,
+          };
+        })
+      );
+
+      // Sort agents by name
+      agentsWithLogs.sort((a, b) => a.name.localeCompare(b.name));
+      setHealthAgents(agentsWithLogs);
+
+      // Aggregate all call logs (deduplicated)
+      const allLogs = agentsWithLogs.flatMap(agent => agent.callLogs);
+      setCallLogs(allLogs);
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error in fetchHealthData:", error);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
     fetchHealthData();
+  }, [currentUser, fetchHealthData]);
 
-    return () => {
-      mounted = false;
-      unsubscribes.forEach((unsub) => unsub());
-    };
-  }, [currentUser]);
+  // Filter agents by designation type first - memoized
+  const agentsByType = useMemo(() => {
+    return healthAgents.filter((agent) => {
+      if (agentTypeFilter === "all") return true;
+      if (agentTypeFilter === "pe") return isPEAgent(agent.designation);
+      if (agentTypeFilter === "re") return isREAgent(agent.designation);
+      return true;
+    });
+  }, [healthAgents, agentTypeFilter]);
 
-  // Filter agents
-  const filteredAgents = healthAgents.filter((agent) => {
+  // Filter agents by search query and scorecard filter - memoized
+  const filteredAgents = useMemo(() => {
+    let filtered = agentsByType;
+
+    // Apply scorecard filter first
+    if (scorecardFilter) {
+      switch (scorecardFilter) {
+        case "online":
+          // Show only online/active agents
+          filtered = filtered.filter(agent => isAgentActive(agent.status));
+          break;
+        case "totalCalls":
+          // Show agents with at least 1 call
+          filtered = filtered.filter(agent => (agent.totalCalls || 0) > 0);
+          break;
+        case "successRate":
+          // Show agents with calls, will sort by success rate
+          filtered = filtered.filter(agent => (agent.totalCalls || 0) > 0);
+          break;
+        // "totalAgents" shows all agents (no additional filter)
+        default:
+          break;
+      }
+    }
+
     const query = searchQuery.toLowerCase();
-    const basicMatch =
-      agent.name?.toLowerCase().includes(query) ||
-      agent.email?.toLowerCase().includes(query) ||
-      agent.empId?.toLowerCase().includes(query) ||
-      agent.mobile?.includes(query);
+    return filtered.filter((agent) => {
+      const basicMatch =
+        agent.name?.toLowerCase().includes(query) ||
+        agent.email?.toLowerCase().includes(query) ||
+        agent.empId?.toLowerCase().includes(query) ||
+        agent.mobile?.includes(query);
 
-    const callLogMatch = agent.callLogs?.some(log =>
-      log.sid?.toLowerCase().includes(query) ||
-      log.callId?.toLowerCase().includes(query) ||
-      log.clientNumber?.includes(query)
-    );
+      const callLogMatch = agent.callLogs?.some(log =>
+        log.sid?.toLowerCase().includes(query) ||
+        log.callId?.toLowerCase().includes(query) ||
+        log.clientNumber?.includes(query)
+      );
 
-    return basicMatch || callLogMatch;
-  });
+      return basicMatch || callLogMatch;
+    }).sort((a, b) => {
+      if (scorecardFilter === "successRate") {
+        // Sort by success rate (highest first)
+        const aRate = a.totalCalls > 0 ? (a.connectedCalls / a.totalCalls) : 0;
+        const bRate = b.totalCalls > 0 ? (b.connectedCalls / b.totalCalls) : 0;
+        return bRate - aRate;
+      }
+      // Default: sort by total calls (most calls first)
+      const aCallCount = a.totalCalls || 0;
+      const bCallCount = b.totalCalls || 0;
+      return bCallCount - aCallCount;
+    });
+  }, [agentsByType, searchQuery, scorecardFilter]);
 
-  // Calculate stats
-  const totalHealthAgents = healthAgents.length;
-  const onlineHealthAgents = healthAgents.filter((a) => isAgentActive(a.status)).length;
-  const totalCallsAllAgents = healthAgents.reduce((sum, agent) => sum + (agent.totalCalls || 0), 0);
-  const totalConnectedCalls = healthAgents.reduce((sum, agent) => sum + (agent.connectedCalls || 0), 0);
-  const overallSuccessRate = totalCallsAllAgents > 0
-    ? Math.round((totalConnectedCalls / totalCallsAllAgents) * 100)
-    : 0;
+  // Filter call logs by agent type - memoized
+  const filteredCallLogs = useMemo(() => {
+    return callLogs.filter((log) => {
+      if (agentTypeFilter === "all") return true;
+      if (agentTypeFilter === "pe") return isPEAgent(log.agentDesignation);
+      if (agentTypeFilter === "re") return isREAgent(log.agentDesignation);
+      return true;
+    });
+  }, [callLogs, agentTypeFilter]);
 
-  // Analytics Data
-  const analyticsData = {
+  // Calculate stats based on filtered agents - memoized
+  const stats = useMemo(() => {
+    const totalHealthAgents = agentsByType.length;
+    const onlineHealthAgents = agentsByType.filter((a) => isAgentActive(a.status)).length;
+    const totalCallsAllAgents = agentsByType.reduce((sum, agent) => sum + (agent.totalCalls || 0), 0);
+    const totalConnectedCalls = agentsByType.reduce((sum, agent) => sum + (agent.connectedCalls || 0), 0);
+    const overallSuccessRate = totalCallsAllAgents > 0
+      ? Math.round((totalConnectedCalls / totalCallsAllAgents) * 100)
+      : 0;
+    return { totalHealthAgents, onlineHealthAgents, totalCallsAllAgents, totalConnectedCalls, overallSuccessRate };
+  }, [agentsByType]);
+
+  const { totalHealthAgents, onlineHealthAgents, totalCallsAllAgents, totalConnectedCalls, overallSuccessRate } = stats;
+
+  // Count agents by designation for display - memoized
+  const { peAgentCount, reAgentCount } = useMemo(() => ({
+    peAgentCount: healthAgents.filter(a => isPEAgent(a.designation)).length,
+    reAgentCount: healthAgents.filter(a => isREAgent(a.designation)).length,
+  }), [healthAgents]);
+
+  // Analytics Data - uses filtered data based on agent type - memoized
+  const analyticsData = useMemo(() => ({
     callsByDate: (() => {
       const last7Days = Array.from({ length: 7 }, (_, i) => {
         const date = new Date();
@@ -847,7 +926,7 @@ function HealthManagerDashboard({ currentUser }) {
       });
 
       return last7Days.map(date => {
-        const logsOnDate = callLogs.filter(log => {
+        const logsOnDate = filteredCallLogs.filter(log => {
           if (!log.timestamp) return false;
           const logDate = new Date(log.timestamp).toISOString().split('T')[0];
           return logDate === date;
@@ -869,17 +948,18 @@ function HealthManagerDashboard({ currentUser }) {
 
     callsByType: (() => {
       const types = {};
-      callLogs.forEach(log => {
+      filteredCallLogs.forEach(log => {
         const type = log.callType || 'Unknown';
         types[type] = (types[type] || 0) + 1;
       });
       return Object.entries(types).map(([name, value]) => ({ name, value }));
     })(),
 
-    topAgents: healthAgents
+    topAgents: agentsByType
       .map(agent => ({
         name: agent.name?.split(' ')[0] || 'Unknown',
         fullName: agent.name,
+        designation: agent.designation || '',
         totalCalls: agent.totalCalls || 0,
         connectedCalls: agent.connectedCalls || 0,
         successRate: agent.totalCalls > 0
@@ -891,7 +971,7 @@ function HealthManagerDashboard({ currentUser }) {
 
     hourlyDistribution: (() => {
       const hours = Array.from({ length: 24 }, (_, i) => ({ hour: `${i.toString().padStart(2, "0")}:00`, calls: 0, connected: 0 }));
-      callLogs.forEach(log => {
+      filteredCallLogs.forEach(log => {
         if (log.timestamp) {
           const hour = new Date(log.timestamp).getHours();
           hours[hour].calls++;
@@ -910,7 +990,7 @@ function HealthManagerDashboard({ currentUser }) {
       });
 
       return last7Days.map(date => {
-        const logsOnDate = callLogs.filter(log => {
+        const logsOnDate = filteredCallLogs.filter(log => {
           if (!log.timestamp) return false;
           const logDate = new Date(log.timestamp).toISOString().split('T')[0];
           return logDate === date;
@@ -938,7 +1018,7 @@ function HealthManagerDashboard({ currentUser }) {
         { name: "> 10 min", min: 600, max: Infinity, count: 0 },
       ];
 
-      callLogs.forEach(log => {
+      filteredCallLogs.forEach(log => {
         if (log.callConnected && log.startTime && log.endTime) {
           const start = log.startTime instanceof Date ? log.startTime : new Date(log.startTime);
           const end = log.endTime instanceof Date ? log.endTime : new Date(log.endTime);
@@ -970,7 +1050,7 @@ function HealthManagerDashboard({ currentUser }) {
         dayMap.set(index, { day, calls: 0, connected: 0 });
       });
 
-      callLogs.forEach(log => {
+      filteredCallLogs.forEach(log => {
         if (log.timestamp) {
           const date = new Date(log.timestamp);
           const dayIndex = date.getDay();
@@ -987,7 +1067,7 @@ function HealthManagerDashboard({ currentUser }) {
     weeklyComparison: (() => {
       const weekMap = new Map();
 
-      callLogs.forEach(log => {
+      filteredCallLogs.forEach(log => {
         if (!log.timestamp) return;
 
         const date = new Date(log.timestamp);
@@ -1015,7 +1095,7 @@ function HealthManagerDashboard({ currentUser }) {
         }))
         .sort((a, b) => new Date(a.week) - new Date(b.week));
     })(),
-  };
+  }), [filteredCallLogs, agentsByType, totalConnectedCalls, totalCallsAllAgents]);
 
   // Format helpers
   const formatTimestamp = (timestamp) => {
@@ -1087,6 +1167,7 @@ function HealthManagerDashboard({ currentUser }) {
       callConnected: "all",
       agentType: "all",
     });
+    setAgentTypeFilter("all");
   };
 
   // Refresh data
@@ -1098,15 +1179,16 @@ function HealthManagerDashboard({ currentUser }) {
   // Export CSV
   const handleExportCSV = () => {
     const headers = [
-      "Agent Name", "MSID", "SID", "Call ID", "Client Number", "Call Type",
+      "Agent Name", "MSID", "Designation", "SID", "Call ID", "Client Number", "Call Type",
       "Agent Type", "Escalation", "Call Category", "Partner", "Timestamp",
       "Manual Duration", "Actual Duration", "Connected", "Status", "Reason", "Remarks",
     ];
 
-    const filteredLogs = applyFilters(callLogs);
+    const filteredLogs = applyFilters(filteredCallLogs);
     const rows = filteredLogs.map((log) => [
       log.agentName || "N/A",
       log.agentEmpId || "N/A",
+      log.agentDesignation || "N/A",
       log.sid || "N/A",
       log.callId || log.id || "N/A",
       log.clientNumber || "N/A",
@@ -1125,8 +1207,8 @@ function HealthManagerDashboard({ currentUser }) {
     ]);
 
     if (rows.length === 0) {
-      healthAgents.forEach((agent) => {
-        rows.push([agent.name || "N/A", agent.empId || "N/A", ...Array(15).fill("N/A")]);
+      agentsByType.forEach((agent) => {
+        rows.push([agent.name || "N/A", agent.empId || "N/A", agent.designation || "N/A", ...Array(15).fill("N/A")]);
       });
     }
 
@@ -1294,7 +1376,113 @@ function HealthManagerDashboard({ currentUser }) {
             </Button>
           </Box>
         </Box>
+
+        {/* Agent Type Filter Toggle */}
+        <Box
+          sx={{
+            mt: 3,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            p: 2,
+            bgcolor: "#f8fafc",
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#64748b", mr: 1 }}>
+            Filter by Agent Type:
+          </Typography>
+          <ToggleButtonGroup
+            value={agentTypeFilter}
+            exclusive
+            onChange={(e, newValue) => {
+              if (newValue !== null) {
+                setAgentTypeFilter(newValue);
+                setPage(0);
+              }
+            }}
+            size="small"
+            sx={{
+              "& .MuiToggleButton-root": {
+                textTransform: "none",
+                fontWeight: 600,
+                px: 3,
+                py: 1,
+                borderRadius: "12px !important",
+                border: "1px solid #e2e8f0 !important",
+                mx: 0.5,
+                "&.Mui-selected": {
+                  bgcolor: "#11998e",
+                  color: "white",
+                  "&:hover": {
+                    bgcolor: "#0d7d71",
+                  },
+                },
+              },
+            }}
+          >
+            <ToggleButton value="all">
+              <Group sx={{ mr: 1, fontSize: 18 }} />
+              All Agents ({healthAgents.length})
+            </ToggleButton>
+            <ToggleButton value="pe">
+              <LocalPharmacy sx={{ mr: 1, fontSize: 18 }} />
+              PE - Pharmacist ({peAgentCount})
+            </ToggleButton>
+            <ToggleButton value="re">
+              <SupportAgent sx={{ mr: 1, fontSize: 18 }} />
+              RE - Relationship ({reAgentCount})
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          {agentTypeFilter !== "all" && (
+            <Chip
+              label={`Showing: ${agentTypeFilter === "pe" ? "Pharmacist Executive" : "Relationship Executive"}`}
+              onDelete={() => setAgentTypeFilter("all")}
+              sx={{
+                bgcolor: agentTypeFilter === "pe" ? "#fef3c7" : "#dbeafe",
+                color: agentTypeFilter === "pe" ? "#d97706" : "#2563eb",
+                fontWeight: 600,
+                "& .MuiChip-deleteIcon": {
+                  color: agentTypeFilter === "pe" ? "#d97706" : "#2563eb",
+                },
+              }}
+            />
+          )}
+        </Box>
       </Box>
+
+      {/* Active Filter Indicator */}
+      {scorecardFilter && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 2,
+            bgcolor: "#e0e7ff",
+            borderRadius: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600, color: "#4338ca" }}>
+            Filtering by: {scorecardFilter === "totalAgents" ? "All Agents" :
+                         scorecardFilter === "online" ? "Online Agents" :
+                         scorecardFilter === "totalCalls" ? "Agents with Calls" :
+                         scorecardFilter === "successRate" ? "Success Rate (High to Low)" : scorecardFilter}
+          </Typography>
+          <Button
+            size="small"
+            onClick={() => setScorecardFilter(null)}
+            sx={{ color: "#4338ca", fontWeight: 600 }}
+          >
+            Clear Filter
+          </Button>
+        </Paper>
+      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -1305,6 +1493,11 @@ function HealthManagerDashboard({ currentUser }) {
             icon={<Group sx={{ fontSize: 28 }} />}
             gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
             subtitle={`${healthTLs.length} TLs`}
+            onClick={() => {
+              setScorecardFilter(scorecardFilter === "totalAgents" ? null : "totalAgents");
+              setActiveTab(0); // Switch to Agents tab
+            }}
+            isActive={scorecardFilter === "totalAgents"}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -1315,6 +1508,11 @@ function HealthManagerDashboard({ currentUser }) {
             gradient="linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
             trend="up"
             trendValue={`${Math.round((onlineHealthAgents / totalHealthAgents) * 100) || 0}% Active`}
+            onClick={() => {
+              setScorecardFilter(scorecardFilter === "online" ? null : "online");
+              setActiveTab(0); // Switch to Agents tab
+            }}
+            isActive={scorecardFilter === "online"}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -1324,6 +1522,11 @@ function HealthManagerDashboard({ currentUser }) {
             icon={<Phone sx={{ fontSize: 28 }} />}
             gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
             subtitle={`${totalConnectedCalls} Connected`}
+            onClick={() => {
+              setScorecardFilter(scorecardFilter === "totalCalls" ? null : "totalCalls");
+              setActiveTab(0); // Switch to Agents tab
+            }}
+            isActive={scorecardFilter === "totalCalls"}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -1333,6 +1536,11 @@ function HealthManagerDashboard({ currentUser }) {
             icon={<TrendingUp sx={{ fontSize: 28 }} />}
             gradient="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
             subtitle={`${overallSuccessRate}% Conversion`}
+            onClick={() => {
+              setScorecardFilter(scorecardFilter === "successRate" ? null : "successRate");
+              setActiveTab(0); // Switch to Agents tab
+            }}
+            isActive={scorecardFilter === "successRate"}
           />
         </Grid>
       </Grid>
@@ -1421,6 +1629,7 @@ function HealthManagerDashboard({ currentUser }) {
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#f8fafc" }}>
                     <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 600 }} align="center">Total Calls</TableCell>
                     <TableCell sx={{ fontWeight: 600 }} align="center">Connected</TableCell>
@@ -1444,6 +1653,17 @@ function HealthManagerDashboard({ currentUser }) {
                             <Typography variant="caption" color="text.secondary">{agent.empId}</Typography>
                           </Box>
                         </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={agent.designation || "N/A"}
+                          size="small"
+                          sx={{
+                            bgcolor: isPEAgent(agent.designation) ? "#fef3c7" : isREAgent(agent.designation) ? "#dbeafe" : "#f1f5f9",
+                            color: isPEAgent(agent.designation) ? "#d97706" : isREAgent(agent.designation) ? "#2563eb" : "#64748b",
+                            fontWeight: 500,
+                          }}
+                        />
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -1994,6 +2214,7 @@ function HealthManagerDashboard({ currentUser }) {
             <TableHead>
               <TableRow sx={{ bgcolor: "#f8fafc" }}>
                 <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Client Number</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Call Type</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Timestamp</TableCell>
@@ -2002,10 +2223,21 @@ function HealthManagerDashboard({ currentUser }) {
               </TableRow>
             </TableHead>
             <TableBody>
-              {applyFilters(callLogs).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((log) => (
+              {applyFilters(filteredCallLogs).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((log) => (
                 <TableRow key={log.id} hover>
                   <TableCell>
                     <Typography variant="body2" fontWeight={500}>{log.agentName}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={log.agentDesignation || "N/A"}
+                      size="small"
+                      sx={{
+                        bgcolor: isPEAgent(log.agentDesignation) ? "#fef3c7" : isREAgent(log.agentDesignation) ? "#dbeafe" : "#f1f5f9",
+                        color: isPEAgent(log.agentDesignation) ? "#d97706" : isREAgent(log.agentDesignation) ? "#2563eb" : "#64748b",
+                        fontWeight: 500,
+                      }}
+                    />
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">{log.clientNumber || "N/A"}</Typography>
@@ -2039,7 +2271,7 @@ function HealthManagerDashboard({ currentUser }) {
           <TablePagination
             rowsPerPageOptions={[5, 10, 25, 50]}
             component="div"
-            count={applyFilters(callLogs).length}
+            count={applyFilters(filteredCallLogs).length}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={(e, newPage) => setPage(newPage)}

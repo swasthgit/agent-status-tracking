@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
   Typography,
@@ -10,23 +10,46 @@ import {
   ImageList,
   ImageListItem,
   ImageListItemBar,
+  LinearProgress,
+  Chip,
 } from "@mui/material";
 import {
   CloudUpload,
   Delete,
   CheckCircle,
+  Restore,
+  Save,
+  CloudOff,
+  CloudDone,
+  Compress,
+  Upload,
 } from "@mui/icons-material";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../firebaseConfig";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import { db } from "../firebaseConfig";
 import PunchInOutNew from "./PunchInOutNew";
 import ClinicCodeAutocomplete from "./ClinicCodeAutocomplete";
+import ErrorPopup from "./ErrorPopup";
+import { uploadImagesWithFallback } from "../utils/imageUploadService";
+import {
+  saveFormData,
+  getSavedFormData,
+  clearAllVisitData,
+  getLastSavedTime,
+  clearPunchData,
+  saveSubmittedPunchId,
+} from "../utils/visitFormPersistence";
 
 /**
  * DCOfflineVisitRecord Component
  * Simplified visit recording for DC agents
+ *
+ * Features:
+ * - Auto-save form data to localStorage
+ * - Recovery of data on page refresh
+ * - Optimized image uploads with compression
+ * - Progress tracking
  */
-const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
+const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId, assignedClinics }) => {
   // Punch In/Out data
   const [punchData, setPunchData] = useState(null);
 
@@ -51,14 +74,124 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState({
+    progress: 0,
+    message: "",
+    completed: 0,
+    total: 0,
+    failed: 0,
+    phase: "idle", // idle, compressing, uploading, done
+  });
+
+  // Submit progress
+  const [submitPhase, setSubmitPhase] = useState("idle"); // idle, uploading, saving, done
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // UI state
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [lastSaved, setLastSaved] = useState(null);
+  const [hasRecoveredData, setHasRecoveredData] = useState(false);
+  const [shouldResetPunch, setShouldResetPunch] = useState(false);
+
+  // Error popup state
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [popupErrorMessage, setPopupErrorMessage] = useState("");
+
+  // Auto-save timer ref
+  const autoSaveTimerRef = useRef(null);
 
   const MAX_IMAGES = 5;
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+  // Monitor online status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Recovery: Load saved form data on mount
+  useEffect(() => {
+    if (!userId) return;
+
+    const savedFormData = getSavedFormData(userId);
+    if (savedFormData) {
+      console.log("📋 Recovering saved form data...");
+      setHasRecoveredData(true);
+
+      // Restore form fields
+      if (savedFormData.clinicCode) setClinicCode(savedFormData.clinicCode);
+      if (savedFormData.partnerName) setPartnerName(savedFormData.partnerName);
+      if (savedFormData.branchName) setBranchName(savedFormData.branchName);
+      if (savedFormData.state) setState(savedFormData.state);
+      if (savedFormData.region) setRegion(savedFormData.region);
+      if (savedFormData.opsManager) setOpsManager(savedFormData.opsManager);
+      if (savedFormData.opsManagerContact) setOpsManagerContact(savedFormData.opsManagerContact);
+      if (savedFormData.bmName) setBmName(savedFormData.bmName);
+      if (savedFormData.bmContact) setBmContact(savedFormData.bmContact);
+      if (savedFormData.remarks) setRemarks(savedFormData.remarks);
+      if (savedFormData.selectedClinic) setSelectedClinic(savedFormData.selectedClinic);
+
+      // Update last saved time
+      const lastSavedTime = getLastSavedTime(userId);
+      if (lastSavedTime) {
+        setLastSaved(new Date(lastSavedTime));
+      }
+    }
+  }, [userId]);
+
+  // Auto-save form data whenever fields change
+  const autoSaveFormData = useCallback(() => {
+    if (!userId) return;
+
+    // Clear previous timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    // Debounce save (wait 1 second after last change)
+    autoSaveTimerRef.current = setTimeout(() => {
+      const formData = {
+        clinicCode,
+        partnerName,
+        branchName,
+        state,
+        region,
+        opsManager,
+        opsManagerContact,
+        bmName,
+        bmContact,
+        remarks,
+        selectedClinic,
+      };
+
+      saveFormData(userId, formData);
+      setLastSaved(new Date());
+      console.log("💾 Form data auto-saved");
+    }, 1000);
+  }, [userId, clinicCode, partnerName, branchName, state, region, opsManager, opsManagerContact, bmName, bmContact, remarks, selectedClinic]);
+
+  // Trigger auto-save when form fields change
+  useEffect(() => {
+    autoSaveFormData();
+
+    // Cleanup timer on unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [autoSaveFormData]);
 
   // Handle clinic selection from autocomplete
   const handleClinicSelect = (clinic) => {
@@ -80,7 +213,7 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
     setErrorMessage("");
 
     if (images.length + files.length > MAX_IMAGES) {
-      setErrorMessage(`Maximum ${MAX_IMAGES} images allowed`);
+      showError("Maximum 5 images allowed");
       return;
     }
 
@@ -89,12 +222,12 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
 
     files.forEach((file) => {
       if (!file.type.startsWith("image/")) {
-        setErrorMessage("Only image files are allowed");
+        showError("Only image files are allowed");
         return;
       }
 
       if (file.size > MAX_FILE_SIZE) {
-        setErrorMessage(`Image ${file.name} exceeds 20MB limit`);
+        showError(`Image ${file.name} exceeds 20MB limit`);
         return;
       }
 
@@ -113,58 +246,99 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
     setImagePreviews(imagePreviews.filter((_, i) => i !== index));
   };
 
-  // Upload images to Firebase Storage
+  // Upload images to Firebase Storage (optimized with compression & parallel uploads)
   const uploadImages = async () => {
     if (images.length === 0) return [];
 
+    // Check if online before starting upload
+    if (!navigator.onLine) {
+      throw new Error("No internet connection. Please check your network and try again.");
+    }
+
     setUploadingImages(true);
-    const imageUrls = [];
+    setUploadProgress(0);
+    setUploadStatus({
+      progress: 0,
+      message: "Preparing images...",
+      completed: 0,
+      total: images.length,
+      failed: 0,
+      phase: "compressing",
+    });
 
     try {
-      for (const image of images) {
-        const imageRef = ref(
-          storage,
-          `offline_visits_dc/${userId}/${Date.now()}_${image.name}`
-        );
-        await uploadBytes(imageRef, image);
-        const url = await getDownloadURL(imageRef);
-        imageUrls.push(url);
-      }
+      // Use optimized upload service with compression and parallel uploads
+      const imageUrls = await uploadImagesWithFallback(
+        images,
+        userId,
+        "offline_visits_dc",
+        (status) => {
+          // Handle both old (number) and new (object) progress format
+          if (typeof status === "number") {
+            setUploadProgress(status);
+            setUploadStatus(prev => ({ ...prev, progress: status }));
+          } else {
+            setUploadProgress(status.progress);
+            setUploadStatus(status);
+          }
+        }
+      );
+
+      setUploadStatus(prev => ({
+        ...prev,
+        phase: "done",
+        message: "All images uploaded successfully!",
+        completed: imageUrls.length,
+      }));
+
+      return imageUrls;
     } catch (error) {
       console.error("Error uploading images:", error);
+      setUploadStatus(prev => ({
+        ...prev,
+        phase: "idle",
+        message: error.message,
+      }));
       throw error;
     } finally {
       setUploadingImages(false);
+      setUploadProgress(0);
     }
-
-    return imageUrls;
   };
 
   // Validate form
+  // Helper function to show error with popup
+  const showError = (message) => {
+    setErrorMessage(message);
+    setPopupErrorMessage(message);
+    setShowErrorPopup(true);
+    console.error("❌ Validation Error:", message);
+  };
+
   const validateForm = () => {
     if (!punchData || punchData.status !== "completed") {
-      setErrorMessage("Please complete punch out before submitting");
+      showError("Please complete punch in and punch out first");
       return false;
     }
 
     if (!selectedClinic) {
-      setErrorMessage("Please select a clinic code");
+      showError("Please select a clinic");
       return false;
     }
 
     if (!bmName.trim()) {
-      setErrorMessage("BM Name is required");
+      showError("BM Name is required");
       return false;
     }
 
     if (!bmContact.trim()) {
-      setErrorMessage("BM Contact Number is required");
+      showError("BM Contact Number is required");
       return false;
     }
 
     const contactRegex = /^[0-9]{10}$/;
     if (!contactRegex.test(bmContact.trim())) {
-      setErrorMessage("BM Contact Number must be 10 digits");
+      showError("BM Contact Number must be 10 digits");
       return false;
     }
 
@@ -178,11 +352,20 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
 
     if (!validateForm()) return;
 
+    // Check if online
+    if (!navigator.onLine) {
+      showError("No internet connection. Please check your network and try again.");
+      return;
+    }
+
     try {
       setSubmitting(true);
+      setSubmitPhase("uploading");
 
       // Upload images
       const imageUrls = await uploadImages();
+
+      setSubmitPhase("saving");
 
       // Get current date and time for consistency with regular offline visits
       const now = new Date();
@@ -246,7 +429,62 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
         visitData
       );
 
+      setSubmitPhase("done");
       setSuccessMessage("Visit record submitted successfully!");
+
+      // Mark the Firestore punch record as submitted so it won't be recovered
+      try {
+        // First try to use the punchDocId if available in punchData
+        if (punchData.punchDocId) {
+          await updateDoc(doc(db, "offlineVisits", userId, "activePunch", punchData.punchDocId), {
+            visitSubmitted: true,
+            submittedAt: serverTimestamp(),
+          });
+          saveSubmittedPunchId(userId, punchData.punchDocId);
+          console.log("✅ Marked punch as submitted (from punchData):", punchData.punchDocId);
+        } else {
+          // Fallback: query for recent completed punches
+          const punchesRef = collection(db, "offlineVisits", userId, "activePunch");
+          const completedQuery = query(
+            punchesRef,
+            where("status", "==", "completed"),
+            orderBy("punchInTime", "desc"),
+            limit(5)
+          );
+          const completedSnapshot = await getDocs(completedQuery);
+
+          // Mark the first unsubmitted punch from today
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          for (const punchDoc of completedSnapshot.docs) {
+            const data = punchDoc.data();
+            const punchDate = data.punchInTime?.toDate?.() || new Date(data.punchInTime);
+
+            // Only mark today's punches that haven't been submitted yet
+            if (punchDate >= today && !data.visitSubmitted) {
+              await updateDoc(doc(db, "offlineVisits", userId, "activePunch", punchDoc.id), {
+                visitSubmitted: true,
+                submittedAt: serverTimestamp(),
+              });
+              // Also save to localStorage for immediate effect (before Firestore syncs)
+              saveSubmittedPunchId(userId, punchDoc.id);
+              console.log("✅ Marked punch as submitted (from query):", punchDoc.id);
+              break; // Only mark the one we just used
+            }
+          }
+        }
+      } catch (markError) {
+        console.error("Error marking punch as submitted:", markError);
+        // Don't fail the submission for this
+      }
+
+      // Clear all saved data from localStorage after successful submission
+      clearAllVisitData(userId);
+      clearPunchData(userId);
+
+      // Trigger reset on PunchInOutNew component
+      setShouldResetPunch(true);
 
       // Reset form
       setTimeout(() => {
@@ -267,20 +505,48 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
         setImages([]);
         setImagePreviews([]);
         setSuccessMessage("");
+        setHasRecoveredData(false);
+        setLastSaved(null);
+        // Reset the shouldResetPunch after a short delay to allow for new punches
+        setShouldResetPunch(false);
       }, 2000);
     } catch (error) {
       console.error("Error submitting visit:", error);
-      setErrorMessage("Failed to submit visit: " + error.message);
+      showError("Failed to submit visit: " + error.message);
     } finally {
       setSubmitting(false);
+      setSubmitPhase("idle");
     }
   };
 
   return (
     <Box>
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: "#1e293b" }}>
-        Record Clinic Visit
-      </Typography>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600, color: "#1e293b" }}>
+          Record Clinic Visit
+        </Typography>
+        {/* Auto-save indicator */}
+        {lastSaved && (
+          <Chip
+            icon={<Save sx={{ fontSize: 16 }} />}
+            label={`Saved ${lastSaved.toLocaleTimeString()}`}
+            size="small"
+            sx={{ bgcolor: "#e8f5e9", color: "#2e7d32" }}
+          />
+        )}
+      </Box>
+
+      {/* Recovery alert */}
+      {hasRecoveredData && (
+        <Alert
+          severity="info"
+          icon={<Restore />}
+          sx={{ mb: 3 }}
+          onClose={() => setHasRecoveredData(false)}
+        >
+          Your previous form data has been recovered. You can continue where you left off.
+        </Alert>
+      )}
 
       {errorMessage && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setErrorMessage("")}>
@@ -294,6 +560,167 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
         </Alert>
       )}
 
+      {/* Network status warning */}
+      {!isOnline && (
+        <Alert
+          severity="warning"
+          icon={<CloudOff />}
+          sx={{ mb: 3 }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            No Internet Connection
+          </Typography>
+          <Typography variant="caption">
+            You're currently offline. Please connect to the internet to upload images and submit the form.
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Detailed upload/submit progress indicator */}
+      {(uploadingImages || submitting) && (
+        <Box
+          sx={{
+            mb: 3,
+            p: 2,
+            bgcolor: "#f8fafc",
+            borderRadius: 2,
+            border: "1px solid #e2e8f0",
+          }}
+        >
+          {/* Phase indicator */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              {submitPhase === "uploading" || uploadingImages ? (
+                <>
+                  {uploadStatus.phase === "compressing" ? (
+                    <Compress sx={{ color: "#f59e0b", animation: "pulse 1s infinite" }} />
+                  ) : (
+                    <Upload sx={{ color: "#3b82f6", animation: "pulse 1s infinite" }} />
+                  )}
+                </>
+              ) : submitPhase === "saving" ? (
+                <CloudDone sx={{ color: "#10b981", animation: "pulse 1s infinite" }} />
+              ) : (
+                <CheckCircle sx={{ color: "#10b981" }} />
+              )}
+            </Box>
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b" }}>
+                {submitPhase === "uploading" || uploadingImages
+                  ? uploadStatus.message || "Uploading images..."
+                  : submitPhase === "saving"
+                  ? "Saving visit record to database..."
+                  : submitPhase === "done"
+                  ? "Submission complete!"
+                  : "Processing..."}
+              </Typography>
+              {uploadingImages && uploadStatus.total > 0 && (
+                <Typography variant="caption" sx={{ color: "#64748b" }}>
+                  {uploadStatus.completed} of {uploadStatus.total} images
+                  {uploadStatus.failed > 0 && ` (${uploadStatus.failed} failed)`}
+                </Typography>
+              )}
+            </Box>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: "#3b82f6" }}>
+              {uploadingImages ? `${uploadProgress}%` : submitPhase === "saving" ? "..." : ""}
+            </Typography>
+          </Box>
+
+          {/* Progress bar */}
+          <LinearProgress
+            variant={submitPhase === "saving" ? "indeterminate" : "determinate"}
+            value={uploadProgress}
+            sx={{
+              height: 8,
+              borderRadius: 4,
+              bgcolor: "#e2e8f0",
+              "& .MuiLinearProgress-bar": {
+                borderRadius: 4,
+                bgcolor: uploadStatus.phase === "compressing" ? "#f59e0b" : "#3b82f6",
+              },
+            }}
+          />
+
+          {/* Step indicators */}
+          <Box sx={{ display: "flex", justifyContent: "space-between", mt: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <CheckCircle
+                sx={{
+                  fontSize: 16,
+                  color: uploadStatus.phase !== "idle" ? "#10b981" : "#cbd5e1",
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  color: uploadStatus.phase !== "idle" ? "#10b981" : "#94a3b8",
+                  fontWeight: uploadStatus.phase === "compressing" ? 600 : 400,
+                }}
+              >
+                Compress
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <CheckCircle
+                sx={{
+                  fontSize: 16,
+                  color:
+                    uploadStatus.phase === "uploading" || uploadStatus.phase === "done" || submitPhase === "saving" || submitPhase === "done"
+                      ? "#10b981"
+                      : "#cbd5e1",
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  color:
+                    uploadStatus.phase === "uploading" || uploadStatus.phase === "done"
+                      ? "#10b981"
+                      : "#94a3b8",
+                  fontWeight: uploadStatus.phase === "uploading" ? 600 : 400,
+                }}
+              >
+                Upload
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <CheckCircle
+                sx={{
+                  fontSize: 16,
+                  color: submitPhase === "saving" || submitPhase === "done" ? "#10b981" : "#cbd5e1",
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  color: submitPhase === "saving" || submitPhase === "done" ? "#10b981" : "#94a3b8",
+                  fontWeight: submitPhase === "saving" ? 600 : 400,
+                }}
+              >
+                Save
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <CheckCircle
+                sx={{
+                  fontSize: 16,
+                  color: submitPhase === "done" ? "#10b981" : "#cbd5e1",
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  color: submitPhase === "done" ? "#10b981" : "#94a3b8",
+                  fontWeight: submitPhase === "done" ? 600 : 400,
+                }}
+              >
+                Done
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      )}
+
       {/* Punch In/Out Section */}
       <Box sx={{ mb: 4 }}>
         <PunchInOutNew
@@ -301,6 +728,7 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
           agentCollection="offlineVisits"
           initialPunchData={punchData}
           onPunchData={setPunchData}
+          shouldReset={shouldResetPunch}
         />
       </Box>
 
@@ -311,6 +739,7 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
         </Typography>
         <ClinicCodeAutocomplete
           agentId={userEmpId}
+          assignedClinics={assignedClinics}
           onClinicSelect={handleClinicSelect}
           disabled={!punchData || punchData.status !== "completed"}
         />
@@ -479,7 +908,6 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
               hidden
               multiple
               accept="image/*"
-              capture="environment"
               onChange={handleImageSelect}
             />
           </Button>
@@ -539,6 +967,14 @@ const DCOfflineVisitRecord = ({ userId, userRole, userName, userEmpId }) => {
           {submitting || uploadingImages ? "Submitting..." : "Submit Visit"}
         </Button>
       )}
+
+      {/* Error Popup - Full screen error display in English and Hindi */}
+      <ErrorPopup
+        open={showErrorPopup}
+        onClose={() => setShowErrorPopup(false)}
+        errorMessage={popupErrorMessage}
+        errorType="error"
+      />
     </Box>
   );
 };

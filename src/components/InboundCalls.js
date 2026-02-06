@@ -3,8 +3,11 @@ import "./ManualLeads.css"; // Reuse same styling
 import InboundCallLogForm from "./InboundCallLogForm";
 import { db } from "../firebaseConfig";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getAgentDefaultPartner } from "../config/agentPartnerMapping";
 
-function InboundCalls({ agentId, agentCollection, agentName }) {
+function InboundCalls({ agentId, agentCollection, agentName, agentEmail }) {
+  // Get agent's default partner based on mapping
+  const defaultPartner = getAgentDefaultPartner(agentName, agentEmail);
   const [showCallForm, setShowCallForm] = useState(false);
   const [callStartTime, setCallStartTime] = useState(null);
   const [currentClientNumber, setCurrentClientNumber] = useState("");
@@ -35,6 +38,7 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
         agentId,
         agentName: agentName || "Agent",
         agentType: agentType || "N/A",
+        coordinatorType: logEntry.callType || "Unknown", // Preserve coordinator (Client/Branch Manager/Nurse)
         callType: "Inbound",
         callDirection: "Inbound",
         timestamp: serverTimestamp(),
@@ -277,6 +281,7 @@ function InboundCalls({ agentId, agentCollection, agentName }) {
           <InboundCallLogForm
             onSubmit={handleFormSubmit}
             initialClientNumber={currentClientNumber}
+            defaultPartner={defaultPartner}
           />
         </div>
       )}

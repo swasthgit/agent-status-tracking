@@ -127,7 +127,7 @@ const useAnimatedCounter = (endValue, duration = 1500) => {
 };
 
 // Animated Stat Card Component
-const AnimatedStatCard = ({ value, label, icon, gradient, delay = 0 }) => {
+const AnimatedStatCard = ({ value, label, icon, gradient, delay = 0, onClick, isActive }) => {
   const animatedValue = useAnimatedCounter(value);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -139,6 +139,7 @@ const AnimatedStatCard = ({ value, label, icon, gradient, delay = 0 }) => {
   return (
     <Paper
       elevation={0}
+      onClick={onClick}
       sx={{
         background: gradient,
         borderRadius: "20px",
@@ -148,9 +149,12 @@ const AnimatedStatCard = ({ value, label, icon, gradient, delay = 0 }) => {
         transform: isVisible ? "translateY(0)" : "translateY(20px)",
         opacity: isVisible ? 1 : 0,
         transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+        cursor: onClick ? "pointer" : "default",
+        border: isActive ? "3px solid #fff" : "3px solid transparent",
+        boxShadow: isActive ? "0 0 20px rgba(255,255,255,0.4)" : "none",
         "&:hover": {
           transform: "translateY(-4px)",
-          boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
+          boxShadow: isActive ? "0 0 25px rgba(255,255,255,0.5)" : "0 12px 40px rgba(0,0,0,0.15)",
         },
       }}
     >
@@ -211,6 +215,10 @@ const AgentCard = ({ agent, onCardClick, isGridView }) => {
 
   const getStatusConfig = (status) => {
     const configs = {
+      // New status values
+      Login: { color: "#10b981", bgColor: "rgba(16, 185, 129, 0.1)", label: "Available", icon: <CheckCircle sx={{ fontSize: 14 }} /> },
+      Available: { color: "#10b981", bgColor: "rgba(16, 185, 129, 0.1)", label: "Available", icon: <CheckCircle sx={{ fontSize: 14 }} /> },
+      // Legacy status values
       Idle: { color: "#10b981", bgColor: "rgba(16, 185, 129, 0.1)", label: "Available", icon: <CheckCircle sx={{ fontSize: 14 }} /> },
       Busy: { color: "#3b82f6", bgColor: "rgba(59, 130, 246, 0.1)", label: "On Call", icon: <PhoneInTalk sx={{ fontSize: 14 }} /> },
       "On Call": { color: "#3b82f6", bgColor: "rgba(59, 130, 246, 0.1)", label: "On Call", icon: <PhoneInTalk sx={{ fontSize: 14 }} /> },
@@ -378,6 +386,7 @@ function DepartmentManagerDashboard() {
   const [callLogs, setCallLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [csvFilter, setCsvFilter] = useState("all");
+  const [globalTimeFilter, setGlobalTimeFilter] = useState("daily"); // "daily", "weekly", "monthly", "all"
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
   const [newUserData, setNewUserData] = useState({
     name: "",
@@ -403,6 +412,7 @@ function DepartmentManagerDashboard() {
   const [isGridView, setIsGridView] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [scorecardFilter, setScorecardFilter] = useState(null);
 
   // Theme colors for Department Manager (Indigo/Purple theme)
   const THEME_COLORS = {
@@ -422,8 +432,42 @@ function DepartmentManagerDashboard() {
     textSecondary: "#64748b",
   };
 
+  // Global time-filtered call logs - applies to all dashboard elements except CSV export
+  const timeFilteredCallLogs = (() => {
+    if (globalTimeFilter === "all") return callLogs;
+    const now = new Date();
+    let cutoff;
+    if (globalTimeFilter === "daily") {
+      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    } else if (globalTimeFilter === "weekly") {
+      cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (globalTimeFilter === "monthly") {
+      cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      return callLogs;
+    }
+    return callLogs.filter(log => {
+      if (!log.timestamp) return false;
+      const logDate = log.timestamp instanceof Date ? log.timestamp : new Date(log.timestamp);
+      return logDate >= cutoff;
+    });
+  })();
+
+  // Agents with time-filtered call stats
+  const timeFilteredAgents = (() => {
+    if (globalTimeFilter === "all") return agents;
+    return agents.map(agent => {
+      const agentLogs = timeFilteredCallLogs.filter(log => log.agentId === agent.id);
+      const totalCalls = agentLogs.length;
+      const connectedCalls = agentLogs.filter(log => log.callConnected).length;
+      const disconnectedCalls = totalCalls - connectedCalls;
+      const performance = totalCalls > 0 ? Math.round((connectedCalls / totalCalls) * 100) : 0;
+      return { ...agent, totalCalls, connectedCalls, disconnectedCalls, performance };
+    });
+  })();
+
   // Filter call logs based on search query
-  const filteredCallLogs = callLogs.filter((log) => {
+  const filteredCallLogs = timeFilteredCallLogs.filter((log) => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -435,8 +479,36 @@ function DepartmentManagerDashboard() {
     );
   });
 
-  // Filter agents based on search query
-  const filteredAgents = agents.filter((agent) => {
+  // Helper to check if agent is available (supports both new and legacy status values)
+  const isAgentAvailable = (status) => {
+    return status === "Login" || status === "Available" || status === "Idle";
+  };
+
+  // Helper to check if agent is on call
+  const isAgentOnCall = (status) => {
+    return status === "On Call" || status === "Busy";
+  };
+
+  // Helper to check if agent is offline/logged out
+  const isAgentOffline = (status) => {
+    return status === "Logout" || status === "Logged Out" || !status;
+  };
+
+  // Filter agents based on search query and scorecard filter
+  const filteredAgents = timeFilteredAgents.filter((agent) => {
+    // First apply scorecard filter
+    if (scorecardFilter) {
+      if (scorecardFilter === "available" && !isAgentAvailable(agent.status)) return false;
+      if (scorecardFilter === "onCall" && !isAgentOnCall(agent.status)) return false;
+      if (scorecardFilter === "offline" && !isAgentOffline(agent.status)) return false;
+      if (scorecardFilter === "totalCalls") {
+        if ((agent.totalCalls || 0) === 0) return false;
+      }
+      if (scorecardFilter === "connectionRate") {
+        if ((agent.totalCalls || 0) === 0 || (agent.connectedCalls || 0) === 0) return false;
+      }
+    }
+
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
     const agentMatches = (
@@ -446,7 +518,7 @@ function DepartmentManagerDashboard() {
       (agent.email || "").toLowerCase().includes(query)
     );
 
-    const agentCallLogs = callLogs.filter((log) => log.agentId === agent.id && log.collectionName === agent.collection);
+    const agentCallLogs = timeFilteredCallLogs.filter((log) => log.agentId === agent.id && log.collectionName === agent.collection);
     const callLogMatches = agentCallLogs.some((log) =>
       (log.clientNumber || "").toLowerCase().includes(query) ||
       (log.sid || "").toLowerCase().includes(query) ||
@@ -454,18 +526,23 @@ function DepartmentManagerDashboard() {
     );
 
     return agentMatches || callLogMatches;
+  }).sort((a, b) => {
+    // Sort by total calls (most calls first)
+    const aCallCount = a.totalCalls || 0;
+    const bCallCount = b.totalCalls || 0;
+    return bCallCount - aCallCount; // Descending order (most calls first)
   });
 
-  // Calculate statistics
+  // Calculate statistics (using helper functions for status checks)
   const stats = {
-    totalAgents: filteredAgents.length,
-    available: filteredAgents.filter((a) => a.status === "Idle").length,
-    onCall: filteredAgents.filter((a) => a.status === "Busy" || a.status === "On Call").length,
-    onBreak: filteredAgents.filter((a) => a.status === "Break").length,
-    loggedOut: filteredAgents.filter((a) => a.status === "Logout").length,
-    totalCalls: callLogs.length,
-    connectedCalls: callLogs.filter((log) => log.callConnected).length,
-    connectionRate: callLogs.length > 0 ? Math.round((callLogs.filter((log) => log.callConnected).length / callLogs.length) * 100) : 0,
+    totalAgents: agents.length,
+    available: agents.filter((a) => isAgentAvailable(a.status)).length,
+    onCall: agents.filter((a) => isAgentOnCall(a.status)).length,
+    onBreak: agents.filter((a) => a.status === "Break").length,
+    loggedOut: agents.filter((a) => isAgentOffline(a.status)).length,
+    totalCalls: timeFilteredCallLogs.length,
+    connectedCalls: timeFilteredCallLogs.filter((log) => log.callConnected).length,
+    connectionRate: timeFilteredCallLogs.length > 0 ? Math.round((timeFilteredCallLogs.filter((log) => log.callConnected).length / timeFilteredCallLogs.length) * 100) : 0,
   };
 
   // Fetch manager data
@@ -640,7 +717,7 @@ function DepartmentManagerDashboard() {
       const dayStart = new Date(date.setHours(0, 0, 0, 0));
       const dayEnd = new Date(date.setHours(23, 59, 59, 999));
 
-      const dayLogs = callLogs.filter((log) => {
+      const dayLogs = timeFilteredCallLogs.filter((log) => {
         const logDate = log.timestamp instanceof Date ? log.timestamp : new Date(log.timestamp);
         return logDate >= dayStart && logDate <= dayEnd;
       });
@@ -713,7 +790,7 @@ function DepartmentManagerDashboard() {
     }
 
     const headers = [
-      "Agent Name", "Department", "Call ID", "SID", "Client Number", "Call Type",
+      "Agent Name", "Call ID", "SID", "Client Number", "Call Type",
       "Agent Type", "Escalation", "Department Name", "Call Category", "Partner",
       "Timestamp", "Call Duration", "Call Connected", "Call Status", "Not Connected Reason", "Remarks",
     ];
@@ -726,7 +803,6 @@ function DepartmentManagerDashboard() {
 
     const rows = filteredLogs.map((log) => [
       log.agentName || "N/A",
-      log.department || managerData?.department || "N/A",
       log.callId || "N/A",
       log.sid || "N/A",
       log.clientNumber || "N/A",
@@ -1089,72 +1165,145 @@ function DepartmentManagerDashboard() {
 
       {mainTabValue === 0 && (
         <>
-          {/* Stats Cards */}
+          {/* Global Time Filter */}
+          <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 1, flexWrap: "wrap" }}>
+            <AccessTime sx={{ color: THEME_COLORS.primary, fontSize: 20 }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: THEME_COLORS.textSecondary, mr: 1 }}>
+              Showing data for:
+            </Typography>
+            {[
+              { value: "daily", label: "Last 24 Hours" },
+              { value: "weekly", label: "Last 7 Days" },
+              { value: "monthly", label: "Last 30 Days" },
+              { value: "all", label: "All Time" },
+            ].map((option) => (
+              <Chip
+                key={option.value}
+                label={option.label}
+                size="small"
+                onClick={() => setGlobalTimeFilter(option.value)}
+                sx={{
+                  fontWeight: 600,
+                  fontSize: "0.8rem",
+                  cursor: "pointer",
+                  bgcolor: globalTimeFilter === option.value ? THEME_COLORS.primary : "#f1f5f9",
+                  color: globalTimeFilter === option.value ? "#fff" : THEME_COLORS.textSecondary,
+                  border: globalTimeFilter === option.value ? "none" : "1px solid #e2e8f0",
+                  "&:hover": {
+                    bgcolor: globalTimeFilter === option.value ? THEME_COLORS.primaryDark : "#e2e8f0",
+                  },
+                }}
+              />
+            ))}
+          </Box>
+
+          {/* Stats Cards - Clickable to filter agents */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid item xs={6} sm={4} md={2}>
-              <AnimatedStatCard value={stats.totalAgents} label="Total Agents" icon={<Group sx={{ fontSize: 24, color: "#fff" }} />} gradient={THEME_COLORS.gradient} delay={0} />
+              <AnimatedStatCard
+                value={stats.totalAgents}
+                label="Total Agents"
+                icon={<Group sx={{ fontSize: 24, color: "#fff" }} />}
+                gradient={THEME_COLORS.gradient}
+                delay={0}
+                onClick={() => setScorecardFilter(scorecardFilter === "totalAgents" ? null : "totalAgents")}
+                isActive={scorecardFilter === "totalAgents"}
+              />
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <AnimatedStatCard value={stats.available} label="Available" icon={<CheckCircle sx={{ fontSize: 24, color: "#fff" }} />} gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)" delay={100} />
+              <AnimatedStatCard
+                value={stats.available}
+                label="Available"
+                icon={<CheckCircle sx={{ fontSize: 24, color: "#fff" }} />}
+                gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                delay={100}
+                onClick={() => setScorecardFilter(scorecardFilter === "available" ? null : "available")}
+                isActive={scorecardFilter === "available"}
+              />
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <AnimatedStatCard value={stats.onCall} label="On Call" icon={<PhoneInTalk sx={{ fontSize: 24, color: "#fff" }} />} gradient="linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)" delay={200} />
+              <AnimatedStatCard
+                value={stats.onCall}
+                label="On Call"
+                icon={<PhoneInTalk sx={{ fontSize: 24, color: "#fff" }} />}
+                gradient="linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
+                delay={200}
+                onClick={() => setScorecardFilter(scorecardFilter === "onCall" ? null : "onCall")}
+                isActive={scorecardFilter === "onCall"}
+              />
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <AnimatedStatCard value={stats.loggedOut} label="Offline" icon={<LogoutIcon sx={{ fontSize: 24, color: "#fff" }} />} gradient="linear-gradient(135deg, #6b7280 0%, #4b5563 100%)" delay={300} />
+              <AnimatedStatCard
+                value={stats.loggedOut}
+                label="Offline"
+                icon={<LogoutIcon sx={{ fontSize: 24, color: "#fff" }} />}
+                gradient="linear-gradient(135deg, #6b7280 0%, #4b5563 100%)"
+                delay={300}
+                onClick={() => setScorecardFilter(scorecardFilter === "offline" ? null : "offline")}
+                isActive={scorecardFilter === "offline"}
+              />
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <AnimatedStatCard value={last24HoursCalls} label="Calls (24h)" icon={<Phone sx={{ fontSize: 24, color: "#fff" }} />} gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" delay={400} />
+              <AnimatedStatCard
+                value={stats.totalCalls}
+                label={globalTimeFilter === "daily" ? "Calls (24h)" : globalTimeFilter === "weekly" ? "Calls (7d)" : globalTimeFilter === "monthly" ? "Calls (30d)" : "Total Calls"}
+                icon={<Phone sx={{ fontSize: 24, color: "#fff" }} />}
+                gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                delay={400}
+                onClick={() => setScorecardFilter(scorecardFilter === "totalCalls" ? null : "totalCalls")}
+                isActive={scorecardFilter === "totalCalls"}
+              />
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <AnimatedStatCard value={stats.connectionRate} label="Connect Rate" icon={<Speed sx={{ fontSize: 24, color: "#fff" }} />} gradient="linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)" delay={500} />
+              <AnimatedStatCard
+                value={stats.connectionRate}
+                label="Connect Rate"
+                icon={<Speed sx={{ fontSize: 24, color: "#fff" }} />}
+                gradient="linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)"
+                delay={500}
+                onClick={() => setScorecardFilter(scorecardFilter === "connectionRate" ? null : "connectionRate")}
+                isActive={scorecardFilter === "connectionRate"}
+              />
             </Grid>
           </Grid>
 
-          {/* Charts Row */}
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={12} lg={8}>
-              <Paper elevation={0} sx={{ bgcolor: "#fff", borderRadius: "20px", p: 3, height: "100%" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 3, color: THEME_COLORS.textPrimary }}>Call Trend (Last 7 Days)</Typography>
-                <ResponsiveContainer width="100%" height={250}>
-                  <AreaChart data={getCallTrendData()}>
-                    <defs>
-                      <linearGradient id="colorCallsDept" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={THEME_COLORS.primary} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={THEME_COLORS.primary} stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="colorConnectedDept" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
-                    <XAxis dataKey="name" stroke={THEME_COLORS.textSecondary} fontSize={12} />
-                    <YAxis stroke={THEME_COLORS.textSecondary} fontSize={12} />
-                    <RechartsTooltip contentStyle={{ backgroundColor: "#fff", border: "none", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-                    <Area type="monotone" dataKey="calls" stroke={THEME_COLORS.primary} fillOpacity={1} fill="url(#colorCallsDept)" strokeWidth={2} name="Total Calls" />
-                    <Area type="monotone" dataKey="connected" stroke="#10b981" fillOpacity={1} fill="url(#colorConnectedDept)" strokeWidth={2} name="Connected" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} lg={4}>
-              <Paper elevation={0} sx={{ bgcolor: "#fff", borderRadius: "20px", p: 3, height: "100%" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 3, color: THEME_COLORS.textPrimary }}>Team Status</Typography>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={getStatusDistribution()} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={5} dataKey="value">
-                      {getStatusDistribution().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip contentStyle={{ backgroundColor: "#fff", border: "none", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-                    <Legend verticalAlign="bottom" height={36} formatter={(value) => <span style={{ color: THEME_COLORS.textPrimary, fontSize: "0.8rem" }}>{value}</span>} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Paper>
-            </Grid>
-          </Grid>
+          {/* Active Filter Indicator */}
+          {scorecardFilter && (
+            <Paper
+              elevation={0}
+              sx={{
+                bgcolor: "rgba(99, 102, 241, 0.05)",
+                borderRadius: "12px",
+                p: 1.5,
+                mb: 3,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Typography variant="body2" sx={{ color: THEME_COLORS.textSecondary }}>
+                Filtering by: <strong style={{ color: THEME_COLORS.primary }}>
+                  {scorecardFilter === "totalAgents" && "All Agents"}
+                  {scorecardFilter === "available" && "Available Agents"}
+                  {scorecardFilter === "onCall" && "Agents On Call"}
+                  {scorecardFilter === "offline" && "Offline Agents"}
+                  {scorecardFilter === "totalCalls" && "Agents with Calls"}
+                  {scorecardFilter === "connectionRate" && "Agents with Connected Calls"}
+                </strong>
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => setScorecardFilter(null)}
+                sx={{
+                  color: THEME_COLORS.primary,
+                  textTransform: "none",
+                  fontWeight: 600,
+                }}
+              >
+                Clear Filter
+              </Button>
+            </Paper>
+          )}
 
           {/* Controls */}
           <Paper elevation={0} sx={{ bgcolor: "#fff", borderRadius: "16px", p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>

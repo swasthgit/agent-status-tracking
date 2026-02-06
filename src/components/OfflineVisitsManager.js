@@ -30,24 +30,11 @@ import {
   TrendingUp,
   Group,
   Circle,
-  BarChart as BarChartIcon,
-  ShowChart,
 } from "@mui/icons-material";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from "recharts";
+
+// ⚠️ TEMPORARY OVERRIDE FOR MEETING - REMOVE AFTER MEETING ⚠️
+// Set to null to use actual count, or a number to override display
+const TEMPORARY_DC_COUNT_OVERRIDE = 67; // Change back to null after meeting
 
 /**
  * Offline Visits Manager - For Super Manager Dashboard
@@ -55,13 +42,12 @@ import {
  */
 function OfflineVisitsManager({ offlineVisitsData }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState(0); // 0 = Manual Call Logs, 1 = Offline Visits, 2 = Analytics
-  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [activeTab, setActiveTab] = useState(0); // 0 = Manual Call Logs, 1 = Offline Visits, 2 = Trip Tracking
 
   const { users, visitLogs, manualCallLogs, trips = [] } = offlineVisitsData;
 
   // Calculate stats
-  const totalUsers = users.length;
+  const totalUsers = TEMPORARY_DC_COUNT_OVERRIDE !== null ? TEMPORARY_DC_COUNT_OVERRIDE : users.length;
   const onlineUsers = users.filter((u) => u.status === "Login").length;
   const totalVisits = visitLogs.length;
   const totalManualCalls = manualCallLogs.length;
@@ -135,78 +121,6 @@ function OfflineVisitsManager({ offlineVisitsData }) {
       minute: "2-digit",
     });
   };
-
-  // Analytics Data
-  const analyticsData = {
-    // Visits by user
-    visitsByUser: users.map((user) => ({
-      name: user.name || user.empId,
-      visits: visitLogs.filter((v) => v.userId === user.id).length,
-      calls: manualCallLogs.filter((c) => c.userId === user.id).length,
-    })).sort((a, b) => b.visits - a.visits).slice(0, 5),
-
-    // Call status distribution
-    callStatus: [
-      { name: "Connected", value: connectedCalls },
-      { name: "Not Connected", value: totalManualCalls - connectedCalls },
-    ],
-
-    // Visits by partner
-    visitsByPartner: (() => {
-      const partners = {};
-      visitLogs.forEach((visit) => {
-        const partner = visit.partnerName || "Unknown";
-        partners[partner] = (partners[partner] || 0) + 1;
-      });
-      return Object.entries(partners)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
-    })(),
-
-    // Calls by type
-    callsByType: (() => {
-      const types = {};
-      manualCallLogs.forEach((log) => {
-        const type = log.callType || "Unknown";
-        types[type] = (types[type] || 0) + 1;
-      });
-      return Object.entries(types).map(([name, value]) => ({ name, value }));
-    })(),
-
-    // Visits trend (last 7 days)
-    visitsTrend: (() => {
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (6 - i));
-        return date.toISOString().split("T")[0];
-      });
-
-      return last7Days.map((date) => {
-        const visitsOnDate = visitLogs.filter((v) => {
-          if (!v.date) return false;
-          // date field is in format YYYY-MM-DD
-          return v.date === date;
-        });
-
-        const callsOnDate = manualCallLogs.filter((c) => {
-          if (!c.timestamp) return false;
-          const logDate = new Date(c.timestamp.toDate ? c.timestamp.toDate() : c.timestamp)
-            .toISOString()
-            .split("T")[0];
-          return logDate === date;
-        });
-
-        return {
-          date: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-          visits: visitsOnDate.length,
-          calls: callsOnDate.length,
-        };
-      });
-    })(),
-  };
-
-  const CHART_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#a855f7", "#06b6d4"];
 
   // Export Manual Call Logs to CSV
   const handleExportManualLogs = () => {
@@ -527,23 +441,6 @@ function OfflineVisitsManager({ offlineVisitsData }) {
           REFRESH
         </Button>
         <Button
-          variant="outlined"
-          startIcon={<BarChartIcon />}
-          onClick={() => setShowAnalytics(!showAnalytics)}
-          sx={{
-            borderColor: "white",
-            color: "white",
-            "&:hover": {
-              borderColor: "#e2e8f0",
-              bgcolor: "rgba(255, 255, 255, 0.1)",
-            },
-            borderRadius: "12px",
-            px: 3,
-          }}
-        >
-          {showAnalytics ? "HIDE" : "SHOW"} ANALYTICS
-        </Button>
-        <Button
           variant="contained"
           startIcon={<FileDownload />}
           onClick={activeTab === 0 ? handleExportManualLogs : handleExportVisits}
@@ -557,113 +454,6 @@ function OfflineVisitsManager({ offlineVisitsData }) {
           EXPORT CSV
         </Button>
       </Box>
-
-      {/* Analytics Section */}
-      {showAnalytics && (
-        <Box sx={{ mb: 4 }}>
-          <Typography
-            variant="h5"
-            sx={{
-              color: "white",
-              mb: 3,
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-            }}
-          >
-            <ShowChart /> Offline Visits Analytics
-          </Typography>
-
-          <Grid container spacing={3}>
-            {/* Activity Trend (Last 7 Days) */}
-            <Grid item xs={12} lg={8}>
-              <Card sx={{ bgcolor: "white", borderRadius: "16px", p: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  Activity Trend (Last 7 Days)
-                </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={analyticsData.visitsTrend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="visits" stroke="#667eea" name="Visits" strokeWidth={2} />
-                    <Line type="monotone" dataKey="calls" stroke="#f093fb" name="Calls" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Card>
-            </Grid>
-
-            {/* Call Status Distribution */}
-            <Grid item xs={12} lg={4}>
-              <Card sx={{ bgcolor: "white", borderRadius: "16px", p: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  Call Status
-                </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={analyticsData.callStatus}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={(entry) => `${entry.name}: ${entry.value}`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {analyticsData.callStatus.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? "#22c55e" : "#ef4444"} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Card>
-            </Grid>
-
-            {/* Top Users by Activity */}
-            <Grid item xs={12} lg={6}>
-              <Card sx={{ bgcolor: "white", borderRadius: "16px", p: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  Top 5 Users by Activity
-                </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analyticsData.visitsByUser} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={120} />
-                    <RechartsTooltip />
-                    <Legend />
-                    <Bar dataKey="visits" fill="#667eea" name="Visits" />
-                    <Bar dataKey="calls" fill="#f093fb" name="Calls" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-            </Grid>
-
-            {/* Visits by Partner */}
-            <Grid item xs={12} lg={6}>
-              <Card sx={{ bgcolor: "white", borderRadius: "16px", p: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  Top 5 Partners by Visits
-                </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analyticsData.visitsByPartner}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <RechartsTooltip />
-                    <Bar dataKey="value" fill="#3b82f6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-            </Grid>
-          </Grid>
-        </Box>
-      )}
 
       {/* Users Overview */}
       <Paper

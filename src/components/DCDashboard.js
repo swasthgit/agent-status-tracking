@@ -16,6 +16,11 @@ import {
   PhoneInTalk,
   LocalHospital,
   LocationOn,
+  TrendingUp,
+  Assessment,
+  OpenInNew,
+  BarChart,
+  Map,
 } from "@mui/icons-material";
 import { collection, doc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebaseConfig";
@@ -23,8 +28,11 @@ import DCOfflineVisitRecord from "./DCOfflineVisitRecord";
 import DCCustomVisit from "./DCCustomVisit";
 import ManualLeads from "./ManualLeads";
 import TripTrackerEnhanced from "./TripTrackerEnhanced";
+import TripTrackerSnapshot from "./TripTrackerSnapshot";
 import DCVisitHistory from "./DCVisitHistory";
 import DCClinicsView from "./DCClinicsView";
+import NetworkStatusIndicator from "./NetworkStatusIndicator";
+import { FEATURE_FLAGS } from "../config/features";
 
 /**
  * DCDashboard Component - Redesigned to match OfflineVisitsDashboardNew
@@ -165,8 +173,12 @@ const DCDashboard = ({ userId, userRole, userData: initialUserData }) => {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         p: { xs: 2, sm: 3 },
+        pt: { xs: 6, sm: 7 }, // Extra padding for network status banner
       }}
     >
+      {/* Network Status Indicator */}
+      <NetworkStatusIndicator />
+
       {/* Header Section */}
       <Box sx={{ mb: { xs: 3, sm: 4 } }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 2 }}>
@@ -346,6 +358,275 @@ const DCDashboard = ({ userId, userRole, userData: initialUserData }) => {
         </Grid>
       </Grid>
 
+      {/* Quick Links - External Dashboards */}
+      <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+        <Typography
+          variant="h6"
+          sx={{
+            color: "white",
+            fontWeight: 600,
+            mb: 2,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <OpenInNew sx={{ fontSize: 20 }} />
+          Quick Links
+        </Typography>
+        <Grid container spacing={{ xs: 2, sm: 3 }}>
+          {/* Sales Dashboard */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              elevation={0}
+              onClick={() => window.open("https://sales-dashboard-sandy.vercel.app/", "_blank")}
+              sx={{
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                borderRadius: "16px",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                border: "2px solid rgba(255,255,255,0.2)",
+                "&:hover": {
+                  transform: "translateY(-6px)",
+                  boxShadow: "0 20px 40px rgba(102, 126, 234, 0.4)",
+                  border: "2px solid rgba(255,255,255,0.5)",
+                },
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar
+                    sx={{
+                      width: 50,
+                      height: 50,
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      color: "white",
+                    }}
+                  >
+                    <TrendingUp sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: "white", fontWeight: 700, fontSize: "1.1rem" }}
+                    >
+                      Sales Dashboard
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.8rem" }}
+                    >
+                      View sales analytics
+                    </Typography>
+                  </Box>
+                  <OpenInNew sx={{ color: "rgba(255,255,255,0.7)", fontSize: 20 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Looker Studio */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              elevation={0}
+              onClick={() => window.open("https://lookerstudio.google.com/u/0/reporting/e98708e9-94ac-4e89-8a81-c4ed785655ec/page/p_yvz7x92sud", "_blank")}
+              sx={{
+                background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                borderRadius: "16px",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                border: "2px solid rgba(255,255,255,0.2)",
+                "&:hover": {
+                  transform: "translateY(-6px)",
+                  boxShadow: "0 20px 40px rgba(245, 158, 11, 0.4)",
+                  border: "2px solid rgba(255,255,255,0.5)",
+                },
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar
+                    sx={{
+                      width: 50,
+                      height: 50,
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      color: "white",
+                    }}
+                  >
+                    <Assessment sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: "white", fontWeight: 700, fontSize: "1.1rem" }}
+                    >
+                      Looker Studio
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.8rem" }}
+                    >
+                      Data reports & insights
+                    </Typography>
+                  </Box>
+                  <OpenInNew sx={{ color: "rgba(255,255,255,0.7)", fontSize: 20 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* E-Clinic Tracker */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              elevation={0}
+              onClick={() => window.open("https://nursetracking--dashboardnurse.asia-east1.hosted.app/e-clinic", "_blank")}
+              sx={{
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                borderRadius: "16px",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                border: "2px solid rgba(255,255,255,0.2)",
+                "&:hover": {
+                  transform: "translateY(-6px)",
+                  boxShadow: "0 20px 40px rgba(16, 185, 129, 0.4)",
+                  border: "2px solid rgba(255,255,255,0.5)",
+                },
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar
+                    sx={{
+                      width: 50,
+                      height: 50,
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      color: "white",
+                    }}
+                  >
+                    <LocalHospital sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: "white", fontWeight: 700, fontSize: "1.1rem" }}
+                    >
+                      E-Clinic Tracker
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.8rem" }}
+                    >
+                      Track clinic activities
+                    </Typography>
+                  </Box>
+                  <OpenInNew sx={{ color: "rgba(255,255,255,0.7)", fontSize: 20 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Consultation Data */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              elevation={0}
+              onClick={() => window.open("https://utilizationv2.web.app/", "_blank")}
+              sx={{
+                background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                borderRadius: "16px",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                border: "2px solid rgba(255,255,255,0.2)",
+                "&:hover": {
+                  transform: "translateY(-6px)",
+                  boxShadow: "0 20px 40px rgba(59, 130, 246, 0.4)",
+                  border: "2px solid rgba(255,255,255,0.5)",
+                },
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar
+                    sx={{
+                      width: 50,
+                      height: 50,
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      color: "white",
+                    }}
+                  >
+                    <BarChart sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: "white", fontWeight: 700, fontSize: "1.1rem" }}
+                    >
+                      Consultation Data
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.8rem" }}
+                    >
+                      View consultation reports
+                    </Typography>
+                  </Box>
+                  <OpenInNew sx={{ color: "rgba(255,255,255,0.7)", fontSize: 20 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Map */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
+              elevation={0}
+              onClick={() => window.open("https://clinic-maping.web.app/index.html", "_blank")}
+              sx={{
+                background: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+                borderRadius: "16px",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                border: "2px solid rgba(255,255,255,0.2)",
+                "&:hover": {
+                  transform: "translateY(-6px)",
+                  boxShadow: "0 20px 40px rgba(236, 72, 153, 0.4)",
+                  border: "2px solid rgba(255,255,255,0.5)",
+                },
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar
+                    sx={{
+                      width: 50,
+                      height: 50,
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      color: "white",
+                    }}
+                  >
+                    <Map sx={{ fontSize: 28 }} />
+                  </Avatar>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: "white", fontWeight: 700, fontSize: "1.1rem" }}
+                    >
+                      Map
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.8rem" }}
+                    >
+                      Clinic location mapping
+                    </Typography>
+                  </Box>
+                  <OpenInNew sx={{ color: "rgba(255,255,255,0.7)", fontSize: 20 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+
       {/* Tabs */}
       <Card
         elevation={0}
@@ -396,7 +677,11 @@ const DCDashboard = ({ userId, userRole, userData: initialUserData }) => {
         }}
       >
         {activeTab === 0 && (
-          <TripTrackerEnhanced agentId={userId} agentCollection="offlineVisits" />
+          FEATURE_FLAGS.USE_SNAPSHOT_TRIP_TRACKER ? (
+            <TripTrackerSnapshot agentId={userId} agentCollection="offlineVisits" />
+          ) : (
+            <TripTrackerEnhanced agentId={userId} agentCollection="offlineVisits" />
+          )
         )}
 
         {activeTab === 1 && (
@@ -405,6 +690,7 @@ const DCDashboard = ({ userId, userRole, userData: initialUserData }) => {
             userRole={userRole}
             userName={userData?.name}
             userEmpId={userData?.empId}
+            assignedClinics={userData?.assignedClinics}
           />
         )}
 

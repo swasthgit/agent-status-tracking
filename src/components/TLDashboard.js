@@ -73,6 +73,7 @@ import {
   TableChart,
   Download,
   FilterList,
+  Close,
 } from "@mui/icons-material";
 import {
   AreaChart,
@@ -249,6 +250,40 @@ const INSURANCE_TL_THEME = {
   gradient: "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
 };
 
+// Check if agent logged in today - shared helper
+const isAgentLoggedInToday = (agentData) => {
+  if (!agentData.todayLoginTime) return false;
+  const loginTime = agentData.todayLoginTime?.toDate ?
+    agentData.todayLoginTime.toDate() :
+    new Date(agentData.todayLoginTime);
+  const today = new Date();
+  return loginTime.toDateString() === today.toDateString();
+};
+
+// Get effective status - if not logged in today, show as Unavailable - shared helper
+const getAgentEffectiveStatus = (agentData) => {
+  const rawStatus = agentData.status;
+
+  // If explicitly logged out, show as unavailable
+  if (rawStatus === "Logout" || rawStatus === "Logged Out" || rawStatus === "Unavailable") {
+    return "Unavailable";
+  }
+
+  // If status looks active but not logged in today, show as unavailable
+  if (rawStatus === "Idle" || rawStatus === "Available" || rawStatus === "Login") {
+    if (!isAgentLoggedInToday(agentData)) {
+      return "Unavailable";
+    }
+    return "Available";
+  }
+
+  // On Call and Break statuses
+  if (rawStatus === "On Call" || rawStatus === "Busy") return "On Call";
+  if (rawStatus === "Break") return "On Break";
+
+  return rawStatus || "Unavailable";
+};
+
 // Export to CSV helper
 const exportToCSVInsurance = (data, filename, columns) => {
   if (!data || data.length === 0) {
@@ -314,6 +349,7 @@ const ChartCardInsurance = ({ title, children, chartData, columns, chartElement,
         borderColor: "divider",
         borderRadius: 3,
         position: "relative",
+        overflow: "visible",
         transition: "all 0.3s ease",
         "&:hover": {
           boxShadow: `0 12px 40px ${INSURANCE_TL_THEME.primary}15`,
@@ -321,7 +357,7 @@ const ChartCardInsurance = ({ title, children, chartData, columns, chartElement,
         },
       }}
     >
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: 3, overflow: "visible" }}>
         {/* Header with Title and Actions */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
           <Typography variant="h6" fontWeight={700} color={INSURANCE_TL_THEME.primary}>
@@ -360,7 +396,7 @@ const ChartCardInsurance = ({ title, children, chartData, columns, chartElement,
         </Box>
 
         {/* Chart Content */}
-        <Box sx={{ height }}>{children}</Box>
+        <Box sx={{ height, overflow: "visible" }}>{children}</Box>
       </CardContent>
 
       {/* More Options Menu */}
@@ -527,39 +563,13 @@ const AgentCard = ({ agent, onCardClick, onDownloadCSV, callLogs, isGridView }) 
         icon: <PhoneInTalk sx={{ fontSize: 14 }} />,
         animate: true,
       },
-      Unavailable: {
-        color: "#ef4444",
-        bgColor: "rgba(239, 68, 68, 0.1)",
-        label: "Unavailable",
-        icon: <Cancel sx={{ fontSize: 14 }} />,
-      },
-      // Legacy status values (for backwards compatibility)
-      Idle: {
-        color: "#10b981",
-        bgColor: "rgba(16, 185, 129, 0.1)",
-        label: "Available",
-        icon: <CheckCircle sx={{ fontSize: 14 }} />,
-      },
-      Busy: {
-        color: "#f59e0b",
-        bgColor: "rgba(245, 158, 11, 0.1)",
-        label: "On Call",
-        icon: <PhoneInTalk sx={{ fontSize: 14 }} />,
-        animate: true,
-      },
-      Break: {
-        color: "#6b7280",
-        bgColor: "rgba(107, 114, 128, 0.1)",
+      "On Break": {
+        color: "#f97316",
+        bgColor: "rgba(249, 115, 22, 0.1)",
         label: "On Break",
         icon: <AccessTime sx={{ fontSize: 14 }} />,
       },
-      Logout: {
-        color: "#ef4444",
-        bgColor: "rgba(239, 68, 68, 0.1)",
-        label: "Unavailable",
-        icon: <Cancel sx={{ fontSize: 14 }} />,
-      },
-      "Logged Out": {
+      Unavailable: {
         color: "#ef4444",
         bgColor: "rgba(239, 68, 68, 0.1)",
         label: "Unavailable",
@@ -569,7 +579,8 @@ const AgentCard = ({ agent, onCardClick, onDownloadCSV, callLogs, isGridView }) 
     return configs[status] || configs.Unavailable;
   };
 
-  const statusConfig = getStatusConfig(agent.status);
+  const effectiveStatus = getAgentEffectiveStatus(agent);
+  const statusConfig = getStatusConfig(effectiveStatus);
 
   if (!isGridView) {
     // List View
@@ -872,6 +883,7 @@ function TLDashboard({ currentUser }) {
   const [isGridView, setIsGridView] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [statusFilter, setStatusFilter] = useState("all"); // Filter by agent status: all, Available, Unavailable, On Call, On Break
   // Analytics filters and sub-tabs
   const [analyticsSubTab, setAnalyticsSubTab] = useState(0);
   const [dateRangeFilter, setDateRangeFilter] = useState("last7");
@@ -943,6 +955,7 @@ function TLDashboard({ currentUser }) {
                       name: agentData.name || "Unknown Agent",
                       email: agentData.email || "",
                       status: agentData.status || "Logout",
+                      todayLoginTime: agentData.todayLoginTime || null,
                       department: agentData.department || "",
                       avatar: agentData.avatar || agentData.name?.charAt(0) || "A",
                     });
@@ -1099,10 +1112,10 @@ function TLDashboard({ currentUser }) {
   // Calculate statistics (supports both new and legacy status values)
   const stats = {
     totalAgents: teamAgents.length,
-    available: teamAgents.filter((a) => a.status === "Idle" || a.status === "Available" || a.status === "Login").length,
-    onCall: teamAgents.filter((a) => a.status === "Busy" || a.status === "On Call").length,
-    onBreak: teamAgents.filter((a) => a.status === "Break").length,
-    loggedOut: teamAgents.filter((a) => a.status === "Logout" || a.status === "Unavailable" || a.status === "Logged Out" || !a.status).length,
+    available: teamAgents.filter((a) => getAgentEffectiveStatus(a) === "Available").length,
+    onCall: teamAgents.filter((a) => getAgentEffectiveStatus(a) === "On Call").length,
+    onBreak: teamAgents.filter((a) => getAgentEffectiveStatus(a) === "On Break").length,
+    loggedOut: teamAgents.filter((a) => getAgentEffectiveStatus(a) === "Unavailable").length,
     totalCalls: callLogs.length,
     connectedCalls: callLogs.filter((log) => log.callConnected).length,
     connectionRate: callLogs.length > 0 ? Math.round((callLogs.filter((log) => log.callConnected).length / callLogs.length) * 100) : 0,
@@ -1392,28 +1405,34 @@ function TLDashboard({ currentUser }) {
       return Array.from(dayMap.values());
     })(),
 
-    // Calls by Agent Type (Nurse, Branch Manager, Client, etc.) - Uses filtered data
+    // Call Coordinator Distribution (Client, Branch Manager, Nurse) - Uses filtered data
     callsByAgentType: (() => {
       const types = {};
       filteredLogsForStats.forEach(log => {
         // Handle different data structures:
-        // - Regular calls: callType = "Client"/"Branch Manager"/"Nurse"
-        // - Manual Leads: callType = "Manual Lead", agentType = "Client"/"Branch Manager"/"Nurse"
-        // - Inbound: callType = "Inbound", agentType = "Insurance"/"Health" (broken - should preserve callType from form)
-        let typeValue = 'Unknown';
+        // - New calls: coordinatorType = "Client"/"Branch Manager"/"Nurse"
+        // - Regular outbound calls: callType = "Client"/"Branch Manager"/"Nurse"
+        // - Manual Leads: callType = "Manual Lead", coordinatorType or agentType = "Client"/"Branch Manager"/"Nurse"
+        // - Inbound: callType = "Inbound", coordinatorType = "Client"/"Branch Manager"/"Nurse"
+        let typeValue = null;
 
-        if (log.callType === 'Manual Lead' && log.agentType) {
-          // For Manual Leads, use agentType field
-          typeValue = log.agentType;
-        } else if (log.callType && ['Client', 'Branch Manager', 'Nurse'].includes(log.callType)) {
-          // For regular calls, use callType field
+        // Priority 1: Use coordinatorType field (new format)
+        if (log.coordinatorType && ['Client', 'Branch Manager', 'Nurse'].includes(log.coordinatorType)) {
+          typeValue = log.coordinatorType;
+        }
+        // Priority 2: For regular outbound calls, callType contains the coordinator
+        else if (log.callType && ['Client', 'Branch Manager', 'Nurse'].includes(log.callType)) {
           typeValue = log.callType;
-        } else if (log.agentType && ['Client', 'Branch Manager', 'Nurse'].includes(log.agentType)) {
-          // Fallback: use agentType if it has the right values
+        }
+        // Priority 3: Fallback to agentType if it has coordinator values
+        else if (log.agentType && ['Client', 'Branch Manager', 'Nurse'].includes(log.agentType)) {
           typeValue = log.agentType;
         }
 
-        types[typeValue] = (types[typeValue] || 0) + 1;
+        // Only count if we found a valid coordinator type
+        if (typeValue) {
+          types[typeValue] = (types[typeValue] || 0) + 1;
+        }
       });
       return Object.entries(types)
         .map(([name, value]) => ({
@@ -1425,6 +1444,33 @@ function TLDashboard({ currentUser }) {
                  '#6b7280'
         }))
         .filter(item => item.value > 0);
+    })(),
+
+    // Call Category Distribution - Uses filtered data
+    callCategoryDistribution: (() => {
+      const categories = {};
+      const categoryColors = {
+        'Query Update': '#3b82f6',
+        'Claim Status': '#10b981',
+        'Negotiation Call': '#f59e0b',
+        'Intimation Call': '#8b5cf6',
+        'Product Information': '#ec4899',
+        'Paid Call': '#06b6d4',
+        'Rejection Call': '#ef4444',
+      };
+      filteredLogsForStats.forEach(log => {
+        const category = log.callCategory;
+        if (category) {
+          categories[category] = (categories[category] || 0) + 1;
+        }
+      });
+      return Object.entries(categories)
+        .map(([name, value]) => ({
+          name,
+          value,
+          color: categoryColors[name] || '#6b7280'
+        }))
+        .sort((a, b) => b.value - a.value);
     })(),
   };
 
@@ -1449,6 +1495,13 @@ function TLDashboard({ currentUser }) {
   });
 
   const filteredTeamAgents = teamAgents.filter((agent) => {
+    // First filter by status
+    if (statusFilter !== "all") {
+      const effectiveStatus = getAgentEffectiveStatus(agent);
+      if (effectiveStatus !== statusFilter) return false;
+    }
+
+    // Then filter by search query
     if (!searchQuery.trim()) return true;
 
     const query = searchQuery.toLowerCase();
@@ -1481,6 +1534,11 @@ function TLDashboard({ currentUser }) {
     });
 
     return agentMatches || callLogMatches;
+  }).sort((a, b) => {
+    // Sort by total calls (most calls first)
+    const aCallCount = callLogs.filter((log) => log.agentId === a.uid).length;
+    const bCallCount = callLogs.filter((log) => log.agentId === b.uid).length;
+    return bCallCount - aCallCount; // Descending order (most calls first)
   });
 
   const handleCardClick = (agent) => {
@@ -1624,14 +1682,13 @@ function TLDashboard({ currentUser }) {
     }
 
     const headers = [
-      "Agent Name", "Department", "Client Number", "Call Type", "Agent Type",
+      "Agent Name", "Client Number", "Call Type", "Agent Type",
       "Escalation", "Department Name", "Call Category", "Partner", "Timestamp",
       "Call Duration", "Call Connected", "Call Status", "Not Connected Reason", "Remarks",
     ];
 
     const rows = filteredLogs.map((log) => [
       log.agentName || "",
-      log.department || "",
       log.clientNumber || "",
       log.callType || "",
       log.agentType || "",
@@ -1763,6 +1820,157 @@ function TLDashboard({ currentUser }) {
       {/* Tab 0: Team View */}
       {activeTab === 0 && (
         <>
+          {/* Team Status Scorecard - Clickable cards to filter agents */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                onClick={() => setStatusFilter(statusFilter === "Available" ? "all" : "Available")}
+                sx={{
+                  bgcolor: statusFilter === "Available" ? "#10b981" : "#fff",
+                  borderRadius: "16px",
+                  p: 2,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: "2px solid",
+                  borderColor: statusFilter === "Available" ? "#10b981" : "rgba(16, 185, 129, 0.3)",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#10b981",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
+                  },
+                }}
+              >
+                <CheckCircle sx={{ fontSize: 28, color: statusFilter === "Available" ? "#fff" : "#10b981", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 800, color: statusFilter === "Available" ? "#fff" : "#10b981" }}>
+                  {stats.available}
+                </Typography>
+                <Typography variant="caption" sx={{ color: statusFilter === "Available" ? "rgba(255,255,255,0.9)" : "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
+                  Available
+                </Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                onClick={() => setStatusFilter(statusFilter === "On Call" ? "all" : "On Call")}
+                sx={{
+                  bgcolor: statusFilter === "On Call" ? "#3b82f6" : "#fff",
+                  borderRadius: "16px",
+                  p: 2,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: "2px solid",
+                  borderColor: statusFilter === "On Call" ? "#3b82f6" : "rgba(59, 130, 246, 0.3)",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#3b82f6",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(59, 130, 246, 0.2)",
+                  },
+                }}
+              >
+                <PhoneInTalk sx={{ fontSize: 28, color: statusFilter === "On Call" ? "#fff" : "#3b82f6", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 800, color: statusFilter === "On Call" ? "#fff" : "#3b82f6" }}>
+                  {stats.onCall}
+                </Typography>
+                <Typography variant="caption" sx={{ color: statusFilter === "On Call" ? "rgba(255,255,255,0.9)" : "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
+                  On Call
+                </Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                onClick={() => setStatusFilter(statusFilter === "On Break" ? "all" : "On Break")}
+                sx={{
+                  bgcolor: statusFilter === "On Break" ? "#f59e0b" : "#fff",
+                  borderRadius: "16px",
+                  p: 2,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: "2px solid",
+                  borderColor: statusFilter === "On Break" ? "#f59e0b" : "rgba(245, 158, 11, 0.3)",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#f59e0b",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(245, 158, 11, 0.2)",
+                  },
+                }}
+              >
+                <AccessTime sx={{ fontSize: 28, color: statusFilter === "On Break" ? "#fff" : "#f59e0b", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 800, color: statusFilter === "On Break" ? "#fff" : "#f59e0b" }}>
+                  {stats.onBreak}
+                </Typography>
+                <Typography variant="caption" sx={{ color: statusFilter === "On Break" ? "rgba(255,255,255,0.9)" : "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
+                  On Break
+                </Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Paper
+                elevation={0}
+                onClick={() => setStatusFilter(statusFilter === "Unavailable" ? "all" : "Unavailable")}
+                sx={{
+                  bgcolor: statusFilter === "Unavailable" ? "#6b7280" : "#fff",
+                  borderRadius: "16px",
+                  p: 2,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: "2px solid",
+                  borderColor: statusFilter === "Unavailable" ? "#6b7280" : "rgba(107, 114, 128, 0.3)",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#6b7280",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(107, 114, 128, 0.2)",
+                  },
+                }}
+              >
+                <Cancel sx={{ fontSize: 28, color: statusFilter === "Unavailable" ? "#fff" : "#6b7280", mb: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 800, color: statusFilter === "Unavailable" ? "#fff" : "#6b7280" }}>
+                  {stats.loggedOut}
+                </Typography>
+                <Typography variant="caption" sx={{ color: statusFilter === "Unavailable" ? "rgba(255,255,255,0.9)" : "#64748b", fontWeight: 600, textTransform: "uppercase" }}>
+                  Unavailable
+                </Typography>
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {/* Active Status Filter Indicator */}
+          {statusFilter !== "all" && (
+            <Paper
+              elevation={0}
+              sx={{
+                bgcolor: "rgba(220, 38, 38, 0.05)",
+                borderRadius: "12px",
+                p: 1.5,
+                mb: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Typography variant="body2" sx={{ color: THEME_COLORS.textSecondary }}>
+                Showing agents with status: <strong style={{ color: THEME_COLORS.primary }}>{statusFilter}</strong>
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => setStatusFilter("all")}
+                sx={{
+                  color: THEME_COLORS.primary,
+                  textTransform: "none",
+                  fontWeight: 600,
+                }}
+              >
+                Clear Filter
+              </Button>
+            </Paper>
+          )}
+
           {/* Controls */}
           <Paper
             elevation={0}
@@ -1854,6 +2062,42 @@ function TLDashboard({ currentUser }) {
                 <MenuItem value="all-agents">All Agents</MenuItem>
               </Select>
             </FormControl>
+
+            {/* Global Search */}
+            <TextField
+              size="small"
+              placeholder="Search agents, calls, SID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: THEME_COLORS.textSecondary, fontSize: 20 }} />
+                  </InputAdornment>
+                ),
+                endAdornment: searchQuery && (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={() => setSearchQuery("")}
+                      sx={{ p: 0.5 }}
+                    >
+                      <Close sx={{ fontSize: 16, color: THEME_COLORS.textSecondary }} />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                minWidth: 250,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                  bgcolor: "#f8fafc",
+                  "& fieldset": { borderColor: "rgba(220, 38, 38, 0.2)" },
+                  "&:hover fieldset": { borderColor: THEME_COLORS.primary },
+                  "&.Mui-focused fieldset": { borderColor: THEME_COLORS.primary },
+                },
+              }}
+            />
 
             <Button
               onClick={handleDownloadTeamCSV}
@@ -2511,6 +2755,143 @@ function TLDashboard({ currentUser }) {
                       <Bar dataKey="value" fill="#14b8a6" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                </ChartCardInsurance>
+              </Grid>
+
+              {/* Call Coordinator Distribution - Shows Client, Branch Manager, Nurse */}
+              <Grid item xs={12} md={6}>
+                <ChartCardInsurance
+                  title="Call Coordinator Distribution"
+                  chartData={analyticsData.callsByAgentType}
+                  columns={["name", "value"]}
+                  height={280}
+                  chartElement={
+                    analyticsData.callsByAgentType.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={analyticsData.callsByAgentType}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            paddingAngle={2}
+                            dataKey="value"
+                            label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                            labelLine={{ stroke: "#64748b", strokeWidth: 1 }}
+                          >
+                            {analyticsData.callsByAgentType.map((entry, index) => (
+                              <Cell key={`cell-coordinator-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip content={<CustomChartTooltipInsurance />} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                        <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                          No coordinator data available yet
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#cbd5e1", textAlign: "center", maxWidth: 200 }}>
+                          Data will appear as new calls are logged with coordinator selection
+                        </Typography>
+                      </Box>
+                    )
+                  }
+                >
+                  {analyticsData.callsByAgentType.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={analyticsData.callsByAgentType}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        >
+                          {analyticsData.callsByAgentType.map((entry, index) => (
+                            <Cell key={`cell-coordinator-small-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip content={<CustomChartTooltipInsurance />} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                        No coordinator data available yet
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#cbd5e1", textAlign: "center", maxWidth: 200 }}>
+                        Data will appear as new calls are logged with coordinator selection
+                      </Typography>
+                    </Box>
+                  )}
+                </ChartCardInsurance>
+              </Grid>
+
+              {/* Call Category Distribution - Shows Query Update, Claim Status, etc. */}
+              <Grid item xs={12} md={6}>
+                <ChartCardInsurance
+                  title="Call Category Distribution"
+                  chartData={analyticsData.callCategoryDistribution}
+                  columns={["name", "value"]}
+                  height={280}
+                  chartElement={
+                    analyticsData.callCategoryDistribution.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analyticsData.callCategoryDistribution} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis type="number" tick={{ fontSize: 11 }} />
+                          <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={100} />
+                          <RechartsTooltip content={<CustomChartTooltipInsurance />} />
+                          <Bar dataKey="value" radius={[0, 8, 8, 0]}>
+                            {analyticsData.callCategoryDistribution.map((entry, index) => (
+                              <Cell key={`cell-category-${index}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                        <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                          No category data available yet
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#cbd5e1", textAlign: "center", maxWidth: 200 }}>
+                          Data will appear as calls are logged with category selection
+                        </Typography>
+                      </Box>
+                    )
+                  }
+                >
+                  {analyticsData.callCategoryDistribution.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={analyticsData.callCategoryDistribution} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis type="number" tick={{ fontSize: 10 }} />
+                        <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={90} />
+                        <RechartsTooltip content={<CustomChartTooltipInsurance />} />
+                        <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                          {analyticsData.callCategoryDistribution.map((entry, index) => (
+                            <Cell key={`cell-category-small-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                        No category data available yet
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#cbd5e1", textAlign: "center", maxWidth: 200 }}>
+                        Data will appear as calls are logged with category selection
+                      </Typography>
+                    </Box>
+                  )}
                 </ChartCardInsurance>
               </Grid>
             </Grid>

@@ -68,6 +68,7 @@ import {
   Groups,
   CalendarToday,
   Schedule,
+  DirectionsWalk,
 } from "@mui/icons-material";
 import {
   LineChart,
@@ -87,6 +88,7 @@ import {
   ResponsiveContainer,
   RadialBarChart,
   RadialBar,
+  ComposedChart,
 } from "recharts";
 
 // Modern Analytics Theme - Cyan/Blue gradient theme
@@ -748,7 +750,7 @@ const CustomChartTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const CallAnalytics = ({ callLogs, agents, onBack }) => {
+const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => {
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState("7days");
   const [directionFilter, setDirectionFilter] = useState("all");
@@ -1611,6 +1613,7 @@ const CallAnalytics = ({ callLogs, agents, onBack }) => {
             <Tab icon={<BarChartIcon />} iconPosition="start" label="Trends" />
             <Tab icon={<Groups />} iconPosition="start" label="Agent Performance" />
             <Tab icon={<TableChart />} iconPosition="start" label="Daily Stats" />
+            <Tab icon={<DirectionsWalk />} iconPosition="start" label="Offline Visits" />
           </Tabs>
         </Paper>
 
@@ -2565,6 +2568,417 @@ const CallAnalytics = ({ callLogs, agents, onBack }) => {
             </Paper>
           </Box>
         </Fade>
+
+        {/* Offline Visits Analytics Tab */}
+        <Fade in={activeTab === 4}>
+          <Box sx={{ display: activeTab === 4 ? "block" : "none" }}>
+            <OfflineVisitsAnalyticsTab offlineVisitsData={offlineVisitsData} />
+          </Box>
+        </Fade>
+      </Box>
+    </Box>
+  );
+};
+
+// Offline Visits Analytics Tab Component
+const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
+  const { users = [], visitLogs = [], manualCallLogs = [], trips = [] } = offlineVisitsData;
+
+  // Calculate stats
+  const totalVisits = visitLogs.length;
+  const totalTrips = trips.length;
+  const totalManualCalls = manualCallLogs.length;
+  const connectedCalls = manualCallLogs.filter((log) => log.callConnected).length;
+
+  const CHART_COLORS = ["#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#0ea5e9", "#ec4899"];
+
+  // Analytics Data
+  const analyticsData = useMemo(() => ({
+    // Weekly Activity Trend (Last 7 Days)
+    weeklyTrend: (() => {
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - i));
+        return date;
+      });
+
+      return last7Days.map((date) => {
+        const dateStr = date.toISOString().split("T")[0];
+        const visitsOnDate = visitLogs.filter((v) => {
+          if (!v.date && !v.createdAt) return false;
+          const visitDate = v.date || (v.createdAt?.toDate ? v.createdAt.toDate().toISOString().split("T")[0] : new Date(v.createdAt).toISOString().split("T")[0]);
+          return visitDate === dateStr;
+        });
+        const tripsOnDate = trips.filter((t) => {
+          if (!t.startTime) return false;
+          const tripDate = t.startTime?.toDate ? t.startTime.toDate().toISOString().split("T")[0] : new Date(t.startTime).toISOString().split("T")[0];
+          return tripDate === dateStr;
+        });
+        const callsOnDate = manualCallLogs.filter((c) => {
+          if (!c.timestamp) return false;
+          const logDate = c.timestamp?.toDate ? c.timestamp.toDate().toISOString().split("T")[0] : new Date(c.timestamp).toISOString().split("T")[0];
+          return logDate === dateStr;
+        });
+
+        return {
+          day: days[date.getDay()],
+          visits: visitsOnDate.length,
+          trips: tripsOnDate.length,
+          calls: callsOnDate.length,
+        };
+      });
+    })(),
+
+    // Visit Types distribution
+    visitTypes: (() => {
+      const types = {};
+      visitLogs.forEach((v) => {
+        const type = v.visitType || "Unknown";
+        types[type] = (types[type] || 0) + 1;
+      });
+      return Object.entries(types).map(([name, value]) => ({ name, value }));
+    })(),
+
+    // Monthly Trend (Last 6 months)
+    monthlyTrend: (() => {
+      const months = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        months.push({
+          month: date.toLocaleDateString("en-US", { month: "short" }),
+          year: date.getFullYear(),
+          monthNum: date.getMonth(),
+        });
+      }
+
+      return months.map((m) => {
+        const visitsInMonth = visitLogs.filter((v) => {
+          if (!v.date && !v.createdAt) return false;
+          const visitDate = v.date ? new Date(v.date) : (v.createdAt?.toDate ? v.createdAt.toDate() : new Date(v.createdAt));
+          return visitDate.getMonth() === m.monthNum && visitDate.getFullYear() === m.year;
+        });
+        const tripsInMonth = trips.filter((t) => {
+          if (!t.startTime) return false;
+          const tripDate = t.startTime?.toDate ? t.startTime.toDate() : new Date(t.startTime);
+          return tripDate.getMonth() === m.monthNum && tripDate.getFullYear() === m.year;
+        });
+
+        return {
+          month: m.month,
+          visits: visitsInMonth.length,
+          trips: tripsInMonth.length,
+        };
+      });
+    })(),
+
+    // Top Performers
+    topPerformers: users.map((user) => ({
+      name: user.name?.split(" ")[0] || user.empId,
+      visits: visitLogs.filter((v) => v.userId === user.id).length,
+      trips: trips.filter((t) => t.userId === user.id).length,
+      calls: manualCallLogs.filter((c) => c.userId === user.id).length,
+    })).sort((a, b) => (b.visits + b.trips + b.calls) - (a.visits + a.trips + a.calls)).slice(0, 5),
+
+    // Hourly Distribution
+    hourlyDistribution: (() => {
+      const hours = Array.from({ length: 24 }, (_, i) => ({
+        hour: `${i.toString().padStart(2, "0")}:00`,
+        visits: 0,
+      }));
+
+      visitLogs.forEach((v) => {
+        let hour = null;
+        if (v.time) {
+          hour = parseInt(v.time.split(":")[0]);
+        } else if (v.createdAt) {
+          const date = v.createdAt?.toDate ? v.createdAt.toDate() : new Date(v.createdAt);
+          hour = date.getHours();
+        }
+        if (hour !== null && hour >= 0 && hour < 24) {
+          hours[hour].visits++;
+        }
+      });
+
+      return hours;
+    })(),
+
+    // Partners by Visits
+    visitsByPartner: (() => {
+      const partners = {};
+      visitLogs.forEach((visit) => {
+        const partner = visit.partnerName || "Unknown";
+        partners[partner] = (partners[partner] || 0) + 1;
+      });
+      return Object.entries(partners)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+    })(),
+  }), [visitLogs, trips, manualCallLogs, users]);
+
+  if (!offlineVisitsData || Object.keys(offlineVisitsData).length === 0) {
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          p: 6,
+          borderRadius: "20px",
+          border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+          textAlign: "center",
+        }}
+      >
+        <DirectionsWalk sx={{ fontSize: 60, color: ANALYTICS_COLORS.textSecondary, mb: 2 }} />
+        <Typography variant="h6" color={ANALYTICS_COLORS.textSecondary}>
+          No offline visits data available
+        </Typography>
+      </Paper>
+    );
+  }
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+      {/* Row 1: Weekly Activity Trend + Visit Types */}
+      <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", md: "row" } }}>
+        <Card
+          elevation={0}
+          sx={{
+            flex: 1,
+            bgcolor: "#0f172a",
+            borderRadius: 2,
+            height: 420,
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+              Weekly Activity Trend
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1, px: 1, pb: 1.5 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={analyticsData.weeklyTrend} margin={{ top: 20, right: 30, left: 20, bottom: 45 }}>
+                <defs>
+                  <linearGradient id="visitsGradientCA" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dx={-10} />
+                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Area type="monotone" dataKey="visits" name="Visits" fill="url(#visitsGradientCA)" stroke="#10b981" strokeWidth={2} />
+                <Bar dataKey="trips" name="Trips" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Line type="monotone" dataKey="calls" name="Calls" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: "#8b5cf6", r: 4 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </Box>
+        </Card>
+
+        <Card
+          elevation={0}
+          sx={{
+            flex: 1,
+            bgcolor: "#0f172a",
+            borderRadius: 2,
+            height: 420,
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+              Visit Types
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1, px: 1, pb: 1.5 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={analyticsData.visitTypes}
+                  cx="50%"
+                  cy="45%"
+                  innerRadius={70}
+                  outerRadius={120}
+                  paddingAngle={4}
+                  dataKey="value"
+                  cornerRadius={4}
+                >
+                  {analyticsData.visitTypes.map((_, i) => (
+                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
+                <Legend
+                  verticalAlign="bottom"
+                  height={50}
+                  iconType="circle"
+                  iconSize={10}
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                  formatter={(value) => <span style={{ color: "#e2e8f0", marginLeft: 6 }}>{value}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </Box>
+        </Card>
+      </Box>
+
+      {/* Row 2: Monthly Trend + Top Performers */}
+      <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", md: "row" } }}>
+        <Card
+          elevation={0}
+          sx={{
+            flex: 1,
+            bgcolor: "#0f172a",
+            borderRadius: 2,
+            height: 420,
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+              Monthly Trend (6 Months)
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1, px: 1, pb: 1.5 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={analyticsData.monthlyTrend} margin={{ top: 20, right: 30, left: 20, bottom: 45 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dx={-10} />
+                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Bar dataKey="visits" name="Visits" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="trips" name="Trips" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Box>
+        </Card>
+
+        <Card
+          elevation={0}
+          sx={{
+            flex: 1,
+            bgcolor: "#0f172a",
+            borderRadius: 2,
+            height: 420,
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+              Top Performers
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1, px: 1, pb: 1.5 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={analyticsData.topPerformers.slice(0, 5)} layout="vertical" margin={{ top: 20, right: 30, left: 10, bottom: 45 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                <XAxis type="number" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} />
+                <YAxis dataKey="name" type="category" stroke="#94a3b8" width={80} fontSize={12} axisLine={false} tickLine={false} />
+                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Bar dataKey="visits" name="Visits" fill="#10b981" radius={[0, 4, 4, 0]} barSize={18} />
+                <Bar dataKey="trips" name="Trips" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={18} />
+                <Bar dataKey="calls" name="Calls" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={18} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Box>
+        </Card>
+      </Box>
+
+      {/* Row 3: Hourly Distribution + Summary */}
+      <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", md: "row" } }}>
+        <Card
+          elevation={0}
+          sx={{
+            flex: 1,
+            bgcolor: "#0f172a",
+            borderRadius: 2,
+            height: 420,
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+              Visits by Hour of Day
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1, px: 1, pb: 1.5 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={analyticsData.hourlyDistribution} margin={{ top: 20, right: 30, left: 20, bottom: 45 }}>
+                <defs>
+                  <linearGradient id="hourlyGradientCA" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis dataKey="hour" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dx={-10} />
+                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Area type="monotone" dataKey="visits" name="Visits" stroke="#0ea5e9" fill="url(#hourlyGradientCA)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </Box>
+        </Card>
+
+        <Card
+          elevation={0}
+          sx={{
+            flex: 1,
+            bgcolor: "#0f172a",
+            borderRadius: 2,
+            height: 420,
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+              Summary Statistics
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+              <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2 }}>
+                <Typography variant="h3" sx={{ color: "#10b981", fontWeight: 700 }}>{totalVisits}</Typography>
+                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Total Visits</Typography>
+              </Card>
+              <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2 }}>
+                <Typography variant="h3" sx={{ color: "#f59e0b", fontWeight: 700 }}>{totalTrips}</Typography>
+                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Total Trips</Typography>
+              </Card>
+              <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2 }}>
+                <Typography variant="h3" sx={{ color: "#8b5cf6", fontWeight: 700 }}>{totalManualCalls}</Typography>
+                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Manual Calls</Typography>
+              </Card>
+              <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2 }}>
+                <Typography variant="h3" sx={{ color: "#0ea5e9", fontWeight: 700 }}>{connectedCalls}</Typography>
+                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Connected</Typography>
+              </Card>
+            </Box>
+            <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2, flex: 1 }}>
+              <Typography variant="subtitle2" sx={{ color: "#e2e8f0", mb: 1.5, fontWeight: 600 }}>Top Partners</Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {analyticsData.visitsByPartner.slice(0, 4).map((partner, idx) => (
+                  <Box key={idx} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body2" sx={{ color: "#94a3b8" }}>{partner.name}</Typography>
+                    <Chip size="small" label={partner.value} sx={{ bgcolor: CHART_COLORS[idx % CHART_COLORS.length], color: "white", fontWeight: 600 }} />
+                  </Box>
+                ))}
+              </Box>
+            </Card>
+          </Box>
+        </Card>
       </Box>
     </Box>
   );

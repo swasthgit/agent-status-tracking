@@ -401,7 +401,6 @@ const DCCustomVisit = ({ userId, userRole, userName, userEmpId }) => {
                 hidden
                 multiple
                 accept="image/*"
-                capture="environment"
                 onChange={handleImageSelect}
               />
             </Button>

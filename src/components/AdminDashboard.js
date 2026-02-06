@@ -2,38 +2,40 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
-  AppBar,
-  Toolbar,
   Typography,
-  Container,
-  Tabs,
-  Tab,
-  Paper,
-  IconButton,
-  Tooltip,
   CircularProgress,
+  CssBaseline,
+  ThemeProvider,
 } from "@mui/material";
-import {
-  Logout,
-  AdminPanelSettings,
-  People,
-  Groups,
-  Business,
-  Dashboard as DashboardIcon,
-} from "@mui/icons-material";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
+import adminTheme, { colors, transitions, sidebarStyles } from "../theme/adminTheme";
+import { Sidebar } from "./admin";
 import UserManagement from "./AdminUserManagement";
 import TeamManagement from "./AdminTeamManagement";
 import DepartmentManagement from "./AdminDepartmentManagement";
 import AdminOverview from "./AdminOverview";
+import ClinicMappingManager from "./ClinicMappingManager";
+import { keyframes } from "@mui/system";
+
+// Loading spinner animation
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`;
+
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState(0);
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [triggerAddUser, setTriggerAddUser] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -88,7 +90,7 @@ function AdminDashboard() {
     navigate("/admin/login");
   };
 
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = (newValue) => {
     setActiveTab(newValue);
   };
 
@@ -109,7 +111,11 @@ function AdminDashboard() {
   };
 
   const handleDepartmentSettings = () => {
-    setActiveTab(3); // Switch to Department Management tab
+    setActiveTab(4); // Switch to Department Management tab
+  };
+
+  const handleClinicMapping = () => {
+    setActiveTab(3); // Switch to Clinic Mapping tab
   };
 
   // Reset trigger after it's consumed
@@ -117,74 +123,87 @@ function AdminDashboard() {
     setTriggerAddUser(false);
   };
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
+  // Loading state with new dark theme
   if (loading || !adminData) {
     return (
-      <Box
-        sx={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        }}
-      >
-        <CircularProgress size={60} sx={{ color: "white" }} />
-      </Box>
+      <ThemeProvider theme={adminTheme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.background.primary,
+            flexDirection: "column",
+            gap: 3,
+          }}
+        >
+          <Box
+            sx={{
+              width: 60,
+              height: 60,
+              borderRadius: "50%",
+              border: `3px solid ${colors.border.card}`,
+              borderTopColor: colors.accent.primary,
+              animation: `${spin} 1s linear infinite`,
+            }}
+          />
+          <Typography
+            variant="body2"
+            sx={{
+              color: colors.text.muted,
+              animation: `${pulse} 1.5s ease-in-out infinite`,
+            }}
+          >
+            Loading Admin Portal...
+          </Typography>
+        </Box>
+      </ThemeProvider>
     );
   }
 
+  const sidebarWidth = sidebarCollapsed
+    ? sidebarStyles.width.collapsed
+    : sidebarStyles.width.expanded;
+
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f5f5f5" }}>
-      {/* Top App Bar */}
-      <AppBar
-        position="sticky"
+    <ThemeProvider theme={adminTheme}>
+      <CssBaseline />
+      <Box
         sx={{
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          minHeight: "100vh",
+          backgroundColor: colors.background.primary,
+          display: "flex",
         }}
       >
-        <Toolbar>
-          <AdminPanelSettings sx={{ mr: 2, fontSize: 32 }} />
-          <Typography variant="h5" component="div" sx={{ flexGrow: 1, fontWeight: "bold" }}>
-            M-Swasth Admin Portal
-          </Typography>
-          <Typography variant="body1" sx={{ mr: 2 }}>
-            Admin: {adminData.loginId}
-          </Typography>
-          <Tooltip title="Logout">
-            <IconButton color="inherit" onClick={handleLogout}>
-              <Logout />
-            </IconButton>
-          </Tooltip>
-        </Toolbar>
-      </AppBar>
+        {/* Sidebar Navigation */}
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
+          adminEmail={adminData.loginId}
+          onLogout={handleLogout}
+        />
 
-      {/* Navigation Tabs */}
-      <Box sx={{ bgcolor: "white", borderBottom: 1, borderColor: "divider" }}>
-        <Container maxWidth="xl">
-          <Tabs
-            value={activeTab}
-            onChange={handleTabChange}
-            aria-label="admin tabs"
-            sx={{
-              "& .MuiTab-root": {
-                textTransform: "none",
-                fontSize: "1rem",
-                fontWeight: 500,
-                minHeight: 64,
-              },
-            }}
-          >
-            <Tab icon={<DashboardIcon />} iconPosition="start" label="Overview" />
-            <Tab icon={<People />} iconPosition="start" label="User Management" />
-            <Tab icon={<Groups />} iconPosition="start" label="Team Management" />
-            <Tab icon={<Business />} iconPosition="start" label="Department Management" />
-          </Tabs>
-        </Container>
-      </Box>
-
-      {/* Main Content */}
-      <Container maxWidth="xl" sx={{ mt: 3, mb: 4 }}>
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 2 }}>
+        {/* Main Content Area */}
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            marginLeft: `${sidebarWidth}px`,
+            padding: "24px",
+            minHeight: "100vh",
+            transition: `margin-left ${transitions.base}`,
+            backgroundColor: colors.background.primary,
+          }}
+        >
+          {/* Page Content */}
           {activeTab === 0 && (
             <AdminOverview
               onAddUser={handleAddUserFromOverview}
@@ -201,10 +220,11 @@ function AdminDashboard() {
             />
           )}
           {activeTab === 2 && <TeamManagement adminData={adminData} />}
-          {activeTab === 3 && <DepartmentManagement adminData={adminData} />}
-        </Paper>
-      </Container>
-    </Box>
+          {activeTab === 3 && <ClinicMappingManager />}
+          {activeTab === 4 && <DepartmentManagement adminData={adminData} />}
+        </Box>
+      </Box>
+    </ThemeProvider>
   );
 }
 

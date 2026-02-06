@@ -16,35 +16,118 @@ import { db } from "../firebaseConfig";
  * When a clinic code is selected, it automatically fills related fields
  *
  * Props:
- * - agentId: The DC agent's user ID
+ * - agentId: The DC agent's user ID (empId)
+ * - agentDocId: The DC agent's document ID in offlineVisits collection
+ * - assignedClinics: Array of clinic codes assigned to this DC (optional, if provided, used directly)
  * - onClinicSelect: Callback function (clinicData) => void
  * - disabled: Boolean to disable the component
  */
-const ClinicCodeAutocomplete = ({ agentId, onClinicSelect, disabled = false }) => {
+const ClinicCodeAutocomplete = ({
+  agentId,
+  agentDocId,
+  assignedClinics: propAssignedClinics,
+  onClinicSelect,
+  disabled = false
+}) => {
   const [clinics, setClinics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedClinic, setSelectedClinic] = useState(null);
 
   // Fetch clinics assigned to this DC agent
+  // Uses the DC's assignedClinics array from their profile, NOT the clinic's assignedDC field
   useEffect(() => {
     const fetchClinics = async () => {
-      if (!agentId) return;
+      if (!agentId && !agentDocId && !propAssignedClinics) return;
 
       try {
         setLoading(true);
+        let assignedClinicCodes = propAssignedClinics || [];
 
-        // Query clinicData collection for clinics assigned to this DC
+        // If assignedClinics not provided as prop, fetch from DC's profile
+        if (!propAssignedClinics || propAssignedClinics.length === 0) {
+          // Try to get the DC's assignedClinics from their profile
+          const offlineVisitsRef = collection(db, "offlineVisits");
+
+          // Try by document ID first, then by empId
+          if (agentDocId) {
+            const dcDoc = await getDocs(query(offlineVisitsRef, where("__name__", "==", agentDocId)));
+            if (!dcDoc.empty) {
+              assignedClinicCodes = dcDoc.docs[0].data().assignedClinics || [];
+            }
+          }
+
+          // If still empty, try by empId
+          if (assignedClinicCodes.length === 0 && agentId) {
+            const dcQuery = query(offlineVisitsRef, where("empId", "==", agentId));
+            const dcSnapshot = await getDocs(dcQuery);
+            if (!dcSnapshot.empty) {
+              assignedClinicCodes = dcSnapshot.docs[0].data().assignedClinics || [];
+            }
+          }
+        }
+
+        // Handle case where assignedClinics might be a concatenated string (corrupted data)
+        if (typeof assignedClinicCodes === "string") {
+          assignedClinicCodes = assignedClinicCodes.split(",").map(c => c.trim()).filter(Boolean);
+        }
+
+        // Flatten any nested arrays or concatenated items
+        const cleanedCodes = [];
+        assignedClinicCodes.forEach(code => {
+          if (typeof code === "string" && code.includes(",")) {
+            cleanedCodes.push(...code.split(",").map(c => c.trim()).filter(Boolean));
+          } else if (code) {
+            cleanedCodes.push(code);
+          }
+        });
+        assignedClinicCodes = [...new Set(cleanedCodes)]; // Remove duplicates
+
+        if (assignedClinicCodes.length === 0) {
+          setClinics([]);
+          setLoading(false);
+          return;
+        }
+
+        // Now fetch clinic details from clinicData collection
+        // Firebase 'in' query supports max 30 items, so batch if needed
         const clinicsRef = collection(db, "clinicData");
-        const q = query(clinicsRef, where("assignedDC", "==", agentId));
-        const snapshot = await getDocs(q);
+        const clinicList = [];
 
-        const clinicList = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        // Batch into chunks of 30 for Firebase 'in' query limit
+        const batchSize = 30;
+        for (let i = 0; i < assignedClinicCodes.length; i += batchSize) {
+          const batch = assignedClinicCodes.slice(i, i + batchSize);
+          const q = query(clinicsRef, where("clinicCode", "in", batch));
+          const snapshot = await getDocs(q);
+
+          snapshot.docs.forEach(doc => {
+            clinicList.push({
+              id: doc.id,
+              ...doc.data(),
+            });
+          });
+        }
+
+        // Also add clinics that are in assignedClinics but not found in clinicData
+        // (in case clinic details haven't been created yet)
+        const foundCodes = new Set(clinicList.map(c => c.clinicCode?.toUpperCase()));
+        assignedClinicCodes.forEach(code => {
+          if (!foundCodes.has(code?.toUpperCase())) {
+            clinicList.push({
+              id: `temp_${code}`,
+              clinicCode: code,
+              branchName: code, // Use code as fallback name
+              clinicName: code,
+              state: "",
+              region: "",
+              partnerName: "",
+              isPlaceholder: true, // Mark as placeholder
+            });
+          }
+        });
 
         // Sort clinics by clinic code
-        clinicList.sort((a, b) => a.clinicCode.localeCompare(b.clinicCode));
+        clinicList.sort((a, b) => (a.clinicCode || "").localeCompare(b.clinicCode || ""));
 
         setClinics(clinicList);
       } catch (error) {
@@ -55,7 +138,7 @@ const ClinicCodeAutocomplete = ({ agentId, onClinicSelect, disabled = false }) =
     };
 
     fetchClinics();
-  }, [agentId]);
+  }, [agentId, agentDocId, propAssignedClinics]);
 
   // Handle clinic selection
   const handleClinicChange = (event, value) => {

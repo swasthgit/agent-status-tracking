@@ -19,15 +19,15 @@ import { Save, Cancel } from "@mui/icons-material";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
-const InboundCallLogForm = ({ onSubmit, initialClientNumber }) => {
+const InboundCallLogForm = ({ onSubmit, initialClientNumber, defaultPartner }) => {
   const [formData, setFormData] = useState({
     agentType: "", // Health, Insurance
     clientNumber: initialClientNumber || "",
     callConnected: true,
     callStatus: "",
-    callType: "",
+    callType: "", // Will be set to "Client" when Insurance is selected
     callCategory: "",
-    partner: "",
+    partner: defaultPartner || "", // Pre-fill with agent's default partner if provided
     escalation: "",
     department: "",
     notConnectedReason: "",
@@ -76,14 +76,15 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber }) => {
       );
     } else if (field === "agentType") {
       // Reset form when agent type changes
+      // Set "Client" as default Call Coordinator for Insurance agents
       setFormData({
         agentType: value,
         clientNumber: formData.clientNumber,
         callConnected: true,
         callStatus: "",
-        callType: "",
+        callType: value === "Insurance" ? "Client" : "", // Default to "Client" for Insurance
         callCategory: "",
-        partner: "",
+        partner: defaultPartner || "", // Keep agent's default partner
         escalation: "",
         department: "",
         notConnectedReason: "",
@@ -190,9 +191,9 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber }) => {
       clientNumber: initialClientNumber || "",
       callConnected: true,
       callStatus: "",
-      callType: "",
+      callType: formData.agentType === "Insurance" ? "Client" : "", // Reset with default for Insurance
       callCategory: "",
-      partner: "",
+      partner: defaultPartner || "", // Reset with agent's default partner
       escalation: "",
       department: "",
       notConnectedReason: "",
@@ -222,6 +223,8 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber }) => {
       "Negotiation Call",
       "Intimation Call",
       "Product Information",
+      "Paid Call",
+      "Rejection Call",
     ];
   };
 
@@ -459,7 +462,7 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber }) => {
               </FormControl>
             </Grid>
 
-            {/* Call Type Dropdown */}
+            {/* Call Coordinator Dropdown */}
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth variant="outlined" required>
                 <InputLabel
@@ -467,20 +470,20 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber }) => {
                   shrink={true}
                   sx={labelStyle(formData.callType, true)}
                 >
-                  Call Type *
+                  Call Coordinator *
                 </InputLabel>
                 <Select
                   labelId="call-type-label"
                   value={formData.callType}
                   onChange={(e) => handleInputChange("callType", e.target.value)}
-                  label="Call Type *"
+                  label="Call Coordinator *"
                   required
                   sx={requiredSelectStyle(formData.callType)}
                   MenuProps={menuProps}
                   displayEmpty
                 >
                   <MenuItem value="" disabled>
-                    Select Call Type
+                    Select Call Coordinator
                   </MenuItem>
                   {getCallTypes().map((type) => (
                     <MenuItem key={type} value={type}>
