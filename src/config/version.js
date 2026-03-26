@@ -15,8 +15,8 @@
  */
 
 export const APP_VERSION = "1.0.0";
-export const BUILD_DATE = "2026-02-04";
-export const BUILD_NUMBER = 21;
+export const BUILD_DATE = "2026-03-25";
+export const BUILD_NUMBER = 26;
 
 // Version history for reference (optional - helps track changes)
 export const VERSION_HISTORY = [

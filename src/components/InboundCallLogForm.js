@@ -93,6 +93,15 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber, defaultPartner }) =
         remarks: "",
         duration: { hours: 0, minutes: 0, seconds: 0 },
       });
+    } else if (field === "callConnected") {
+      setFormData((prev) => ({
+        ...prev,
+        callConnected: value,
+        // Clear notConnectedReason when switching to Connected, reset callCategory (options change for Health)
+        ...(value === true && { notConnectedReason: "", callCategory: "" }),
+        // Clear connected-only fields when switching to Not Connected, reset callCategory (options change for Health)
+        ...(value === false && { callStatus: "", callRating: "", callRatingNumeric: "", callCategory: "" }),
+      }));
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -172,6 +181,10 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber, defaultPartner }) =
         return;
       }
     } else {
+      if (!formData.callCategory) {
+        alert("Please select a Call Category");
+        return;
+      }
       if (!formData.notConnectedReason) {
         alert("Please select a Not Connected Reason");
         return;
@@ -215,7 +228,9 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber, defaultPartner }) =
 
   const getCallCategories = () => {
     if (formData.agentType === "Health") {
-      return ["BM Review Done", "Consultation Done", "Customer Awareness Done"];
+      return formData.callConnected
+        ? ["BM Review Done", "Consultation Done", "Customer Awareness Done"]
+        : ["BM Review Not Done", "Consultation Not Done", "Customer Awareness Not Done"];
     }
     return [
       "Query Update",
@@ -586,48 +601,44 @@ const InboundCallLogForm = ({ onSubmit, initialClientNumber, defaultPartner }) =
               </Grid>
             )}
 
+            {/* Call Category Dropdown - Always visible */}
+            <Grid item xs={12}>
+              <FormControl fullWidth variant="outlined" required>
+                <InputLabel
+                  id="call-category-label"
+                  shrink={true}
+                  sx={labelStyle(formData.callCategory, true)}
+                >
+                  {formData.agentType === "Health"
+                    ? "Call Category *"
+                    : "Call Category *"}
+                </InputLabel>
+                <Select
+                  labelId="call-category-label"
+                  value={formData.callCategory}
+                  onChange={(e) =>
+                    handleInputChange("callCategory", e.target.value)
+                  }
+                  label="Call Category *"
+                  required
+                  sx={requiredSelectStyle(formData.callCategory)}
+                  MenuProps={menuProps}
+                  displayEmpty
+                >
+                  <MenuItem value="" disabled>
+                    Select Category
+                  </MenuItem>
+                  {getCallCategories().map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {category}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
             {formData.callConnected ? (
               <>
-                {/* Call Category Dropdown */}
-                <Grid item xs={12}>
-                  <FormControl fullWidth variant="outlined" required>
-                    <InputLabel
-                      id="call-category-label"
-                      shrink={true}
-                      sx={labelStyle(formData.callCategory, true)}
-                    >
-                      {formData.agentType === "Health"
-                        ? "Connected Call Category *"
-                        : "Call Category *"}
-                    </InputLabel>
-                    <Select
-                      labelId="call-category-label"
-                      value={formData.callCategory}
-                      onChange={(e) =>
-                        handleInputChange("callCategory", e.target.value)
-                      }
-                      label={
-                        formData.agentType === "Health"
-                          ? "Connected Call Category *"
-                          : "Call Category *"
-                      }
-                      required
-                      sx={requiredSelectStyle(formData.callCategory)}
-                      MenuProps={menuProps}
-                      displayEmpty
-                    >
-                      <MenuItem value="" disabled>
-                        Select Category
-                      </MenuItem>
-                      {getCallCategories().map((category) => (
-                        <MenuItem key={category} value={category}>
-                          {category}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
                 {/* Call Rating - Only for Health with specific categories */}
                 {formData.agentType === "Health" &&
                   ["BM Review Done", "Consultation Done", "Customer Awareness Done"].includes(

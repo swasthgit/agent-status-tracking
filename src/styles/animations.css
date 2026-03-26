@@ -1,0 +1,831 @@
+/* ============================================================================
+   M-Swasth Design System v2.0 — Shared CSS Animations
+   ============================================================================
+   Premium SaaS micro-interactions, entrance animations, loading states,
+   and decorative effects. Import once at the app root.
+
+   Usage:
+     .my-element { animation: fadeInUp 400ms var(--ease-out) both; }
+     .my-element { animation: fadeInUp 400ms var(--ease-out) both;
+                   animation-delay: calc(var(--stagger, 0) * 60ms); }
+   ============================================================================ */
+
+/* ── CSS Custom Properties for Animation ──────────────────────────────────── */
+:root {
+  /* Easing curves */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in:      cubic-bezier(0.4, 0, 1, 1);
+  --ease-out:     cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce:  cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-smooth:  cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* Durations */
+  --duration-instant: 50ms;
+  --duration-fast:    150ms;
+  --duration-normal:  250ms;
+  --duration-slow:    350ms;
+  --duration-slower:  500ms;
+  --duration-slowest: 700ms;
+
+  /* Stagger base (used for card entrance staggering) */
+  --stagger: 0;
+
+  /* Brand colors for animations */
+  --anim-primary:   #4F46E5;
+  --anim-secondary: #7C3AED;
+  --anim-accent:    #06B6D4;
+  --anim-emerald:   #10B981;
+  --anim-amber:     #F59E0B;
+  --anim-rose:      #F43F5E;
+}
+
+
+/* ============================================================================
+   1. ENTRANCE ANIMATIONS — Fade + Directional
+   ============================================================================ */
+
+/* fadeInUp — Content slides up and fades in */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* fadeInDown — Content slides down and fades in */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* fadeInLeft — Content slides from left */
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* fadeInRight — Content slides from right */
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* fadeIn — Simple opacity fade */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* fadeOut — Simple opacity fade out */
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+
+/* ============================================================================
+   2. SCALE ANIMATIONS
+   ============================================================================ */
+
+/* scaleIn — Grows from slightly smaller */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* scaleInBounce — Scale with overshoot */
+@keyframes scaleInBounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* bounceIn — Classic bounce entrance */
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  70% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* popIn — Quick pop for icons/badges */
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  70% {
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
+/* ============================================================================
+   3. SLIDE ANIMATIONS
+   ============================================================================ */
+
+/* slideInFromRight — Side panel / drawer entrance */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* slideInFromLeft — Navigation panel entrance */
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* slideInFromTop — Dropdown / notification entrance */
+@keyframes slideInFromTop {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* slideInFromBottom — Bottom sheet / toast entrance */
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+/* ============================================================================
+   4. LOADING & PLACEHOLDER ANIMATIONS
+   ============================================================================ */
+
+/* shimmer — Skeleton loading effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Shimmer utility class */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.06) 40%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.shimmer-light {
+  background: linear-gradient(
+    90deg,
+    rgba(79, 70, 229, 0) 0%,
+    rgba(79, 70, 229, 0.04) 40%,
+    rgba(79, 70, 229, 0.08) 50%,
+    rgba(79, 70, 229, 0.04) 60%,
+    rgba(79, 70, 229, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* pulse — Pulsing opacity for loading indicators */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* spin — Loading spinner rotation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* dotBounce — Three-dot loading bounce */
+@keyframes dotBounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* progressIndeterminate — Progress bar animation */
+@keyframes progressIndeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+
+/* ============================================================================
+   5. DECORATIVE / AMBIENT ANIMATIONS
+   ============================================================================ */
+
+/* float — Subtle floating effect for decorative elements */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* floatRotate — Floating with gentle rotation */
+@keyframes floatRotate {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(1deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(-1deg);
+  }
+}
+
+/* gradientShift — Animated gradient background */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Animated gradient utility class */
+.gradient-animated {
+  background: linear-gradient(
+    270deg,
+    var(--anim-primary),
+    var(--anim-secondary),
+    var(--anim-accent),
+    var(--anim-primary)
+  );
+  background-size: 300% 300%;
+  animation: gradientShift 8s ease infinite;
+}
+
+/* gradientShiftSubtle — Slower, more subtle variant */
+@keyframes gradientShiftSubtle {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* pulseGlow — Glowing pulse effect for status indicators */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 4px currentColor;
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 16px currentColor, 0 0 32px currentColor;
+    opacity: 0.85;
+  }
+}
+
+/* pulseGlowPrimary — Indigo-specific glow */
+@keyframes pulseGlowPrimary {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(79, 70, 229, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(79, 70, 229, 0.5), 0 0 40px rgba(79, 70, 229, 0.2);
+  }
+}
+
+/* pulseGlowSuccess — Green glow for online/success states */
+@keyframes pulseGlowSuccess {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.5), 0 0 32px rgba(16, 185, 129, 0.2);
+  }
+}
+
+/* pulseGlowError — Red glow for error/alert states */
+@keyframes pulseGlowError {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(244, 63, 94, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.5), 0 0 32px rgba(244, 63, 94, 0.2);
+  }
+}
+
+/* pulseGlowWarning — Amber glow */
+@keyframes pulseGlowWarning {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5), 0 0 32px rgba(245, 158, 11, 0.2);
+  }
+}
+
+/* ripple — Click ripple effect */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* breathe — Subtle ambient breathing for hero elements */
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+
+/* ============================================================================
+   6. NUMBER / COUNTER ANIMATIONS
+   ============================================================================ */
+
+/* countUp — For number counter reveal effect (pairs with JS counter) */
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* digitRoll — Single digit rolling effect */
+@keyframes digitRoll {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+/* ============================================================================
+   7. CARD ENTRANCE ANIMATIONS (with stagger support)
+   ============================================================================ */
+
+/* Card entrance — combines fade and rise with subtle scale */
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Utility classes for staggered card entrances */
+.animate-card-entrance {
+  animation: cardEntrance 450ms var(--ease-out) both;
+  animation-delay: calc(var(--stagger, 0) * 60ms);
+}
+
+.animate-card-entrance-fast {
+  animation: cardEntrance 300ms var(--ease-out) both;
+  animation-delay: calc(var(--stagger, 0) * 40ms);
+}
+
+/* Individual stagger delay classes */
+.stagger-1  { --stagger: 1; }
+.stagger-2  { --stagger: 2; }
+.stagger-3  { --stagger: 3; }
+.stagger-4  { --stagger: 4; }
+.stagger-5  { --stagger: 5; }
+.stagger-6  { --stagger: 6; }
+.stagger-7  { --stagger: 7; }
+.stagger-8  { --stagger: 8; }
+.stagger-9  { --stagger: 9; }
+.stagger-10 { --stagger: 10; }
+.stagger-11 { --stagger: 11; }
+.stagger-12 { --stagger: 12; }
+
+
+/* ============================================================================
+   8. MICRO-INTERACTION UTILITIES
+   ============================================================================ */
+
+/* Hover lift effect */
+.hover-lift {
+  transition: transform var(--duration-normal) var(--ease-spring),
+              box-shadow var(--duration-normal) var(--ease-default);
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+/* Hover lift (small) */
+.hover-lift-sm {
+  transition: transform var(--duration-normal) var(--ease-spring),
+              box-shadow var(--duration-normal) var(--ease-default);
+}
+.hover-lift-sm:hover {
+  transform: translateY(-2px);
+}
+
+/* Hover scale effect */
+.hover-scale {
+  transition: transform var(--duration-normal) var(--ease-spring);
+}
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* Hover scale (small) */
+.hover-scale-sm {
+  transition: transform var(--duration-fast) var(--ease-spring);
+}
+.hover-scale-sm:hover {
+  transform: scale(1.01);
+}
+
+/* Hover glow — primary color */
+.hover-glow-primary {
+  transition: box-shadow var(--duration-normal) var(--ease-default);
+}
+.hover-glow-primary:hover {
+  box-shadow: 0 0 20px rgba(79, 70, 229, 0.3), 0 0 60px rgba(79, 70, 229, 0.1);
+}
+
+/* Hover glow — accent */
+.hover-glow-accent {
+  transition: box-shadow var(--duration-normal) var(--ease-default);
+}
+.hover-glow-accent:hover {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3), 0 0 60px rgba(6, 182, 212, 0.1);
+}
+
+/* Active press effect */
+.active-press:active {
+  transform: scale(0.97);
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+
+/* Focus ring — accessible focus indicator */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--anim-primary);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+
+/* ============================================================================
+   9. PAGE TRANSITION ANIMATIONS
+   ============================================================================ */
+
+/* Page enter from right */
+@keyframes pageEnterRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Page enter from bottom */
+@keyframes pageEnterUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Page enter with zoom */
+@keyframes pageEnterZoom {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Utility classes for page transitions */
+.page-enter {
+  animation: pageEnterUp 500ms var(--ease-out) both;
+}
+
+.page-enter-right {
+  animation: pageEnterRight 400ms var(--ease-out) both;
+}
+
+.page-enter-zoom {
+  animation: pageEnterZoom 400ms var(--ease-out) both;
+}
+
+
+/* ============================================================================
+   10. NOTIFICATION / TOAST ANIMATIONS
+   ============================================================================ */
+
+/* Toast entrance from top-right */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Toast exit */
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+}
+
+/* Badge notification bounce */
+@keyframes badgeBounce {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+
+/* ============================================================================
+   11. SKELETON / PLACEHOLDER UTILITIES
+   ============================================================================ */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 40%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.06) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Light mode skeleton */
+.skeleton-light::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(79, 70, 229, 0.04) 40%,
+    rgba(79, 70, 229, 0.07) 50%,
+    rgba(79, 70, 229, 0.04) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+
+/* ============================================================================
+   12. GRADIENT BORDER ANIMATION
+   ============================================================================ */
+
+@keyframes borderGradientRotate {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Animated gradient border — use on a pseudo-element */
+.animated-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(
+    270deg,
+    rgba(79, 70, 229, 0.4),
+    rgba(124, 58, 237, 0.3),
+    rgba(6, 182, 212, 0.4),
+    rgba(79, 70, 229, 0.4)
+  );
+  background-size: 300% 300%;
+  animation: borderGradientRotate 6s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+
+/* ============================================================================
+   13. STATUS INDICATOR ANIMATIONS
+   ============================================================================ */
+
+/* Online status ping */
+@keyframes statusPing {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  75%, 100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.status-online {
+  position: relative;
+}
+
+.status-online::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: statusPing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+
+/* ============================================================================
+   14. REDUCED MOTION — Respect user preferences
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .hover-lift:hover,
+  .hover-lift-sm:hover,
+  .hover-scale:hover,
+  .hover-scale-sm:hover {
+    transform: none !important;
+  }
+}

@@ -1610,28 +1610,31 @@ function TLDashboard({ currentUser }) {
       "Call Duration", "Call Connected", "Call Status", "Not Connected Reason", "Remarks",
     ];
 
-    const rows = filteredLogs.map((log) => [
-      log.agentName || "",
-      log.callId || log.sid || "",
-      log.clientNumber || "",
-      log.callType || "",
-      log.agentType || "",
-      log.escalation || "",
-      log.department || "",
-      log.callCategory || "",
-      log.partner || "",
-      log.timestamp
-        ? (log.timestamp?.toDate ? log.timestamp.toDate() : (log.timestamp instanceof Date ? log.timestamp : new Date(log.timestamp))).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
-        : "",
-      log.callDuration || "",
-      log.callConnected ? "Connected" : "Not Connected",
-      log.callStatus || "",
-      log.notConnectedReason || "",
-      log.remarks || "",
-    ]);
+    const rows = filteredLogs.map((log) => {
+      const isConnected = log.callConnected === true || log.callConnected === "true";
+      return [
+        (log.agentName || "").replace(/"/g, ""),
+        log.callId || log.sid || "",
+        log.clientNumber || "",
+        log.callType || "",
+        log.agentType || "",
+        log.escalation || "",
+        log.department || "",
+        log.callCategory || "",
+        log.partner || "",
+        log.timestamp
+          ? (log.timestamp?.toDate ? log.timestamp.toDate() : (log.timestamp instanceof Date ? log.timestamp : new Date(log.timestamp))).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
+          : "",
+        log.callDuration || "",
+        isConnected ? "Connected" : "Not Connected",
+        isConnected ? (log.callStatus || "") : "",
+        isConnected ? "" : (log.notConnectedReason || ""),
+        log.remarks || "",
+      ];
+    });
 
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
       .join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -1687,27 +1690,30 @@ function TLDashboard({ currentUser }) {
       "Call Duration", "Call Connected", "Call Status", "Not Connected Reason", "Remarks",
     ];
 
-    const rows = filteredLogs.map((log) => [
-      log.agentName || "",
-      log.clientNumber || "",
-      log.callType || "",
-      log.agentType || "",
-      log.escalation || "",
-      log.department || "",
-      log.category || "",
-      log.partner || "",
-      log.timestamp
-        ? log.timestamp.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
-        : "",
-      log.callDuration || "",
-      log.callConnected || "",
-      log.callStatus || "",
-      log.notConnectedReason || "",
-      log.remarks || "",
-    ]);
+    const rows = filteredLogs.map((log) => {
+      const isConnected = log.callConnected === true || log.callConnected === "true";
+      return [
+        (log.agentName || "").replace(/"/g, ""),
+        log.clientNumber || "",
+        log.callType || "",
+        log.agentType || "",
+        log.escalation || "",
+        log.department || "",
+        log.callCategory || log.category || "",
+        log.partner || "",
+        log.timestamp
+          ? (log.timestamp?.toDate ? log.timestamp.toDate() : (log.timestamp instanceof Date ? log.timestamp : new Date(log.timestamp))).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
+          : "",
+        log.callDuration || "",
+        isConnected ? "Connected" : "Not Connected",
+        isConnected ? (log.callStatus || "") : "",
+        isConnected ? "" : (log.notConnectedReason || ""),
+        log.remarks || "",
+      ];
+    });
 
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
       .join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });

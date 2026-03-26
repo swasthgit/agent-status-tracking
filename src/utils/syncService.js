@@ -145,14 +145,23 @@ class SyncService {
 
     const tripRef = doc(db, agentCollection, agentId, 'trips', data.tripId);
 
-    await updateDoc(tripRef, {
+    const updateData = {
       endLocation: data.endLocation,
       endTime: serverTimestamp(),
       totalDistance: data.totalDistance,
       totalDuration: data.totalDuration,
       status: 'completed',
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    // Pass through enhanced route data if available
+    if (data.visitLocations) updateData.visitLocations = data.visitLocations;
+    if (data.routeSegments) updateData.routeSegments = data.routeSegments;
+    if (data.distanceSummary) updateData.distanceSummary = data.distanceSummary;
+    if (data.googleMapsStatus) updateData.googleMapsStatus = data.googleMapsStatus;
+    if (data.reimbursement) updateData.reimbursement = data.reimbursement;
+
+    await updateDoc(tripRef, updateData);
 
     console.log('✅ Trip ended in Firestore:', data.tripId);
   }

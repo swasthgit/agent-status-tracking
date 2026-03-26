@@ -1,84 +1,308 @@
-/* Modern Light Theme for Manual Leads */
+/* ============================================================================
+   ManualLeads.css — M-Swasth Design System v2.0
+   ============================================================================
+   Premium SaaS styling for Manual Leads and Inbound Calls pages.
+   Uses deep indigo / violet primary, electric cyan accent, glassmorphism,
+   multi-layered shadows, and smooth entrance animations.
+   ============================================================================ */
 
-/* Root container */
-.manual-leads-container {
-  background: #f5f7fa;
-  min-height: 100vh;
-  padding: 0;
-  color: #1e293b;
-  font-family: "Inter", Arial, sans-serif;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
+/* ── CSS Custom Properties (local overrides) ──────────────────────────────── */
+:root {
+  --ml-primary: #4F46E5;
+  --ml-primary-light: #818CF8;
+  --ml-primary-dark: #3730A3;
+  --ml-primary-soft: #EEF2FF;
+  --ml-secondary: #7C3AED;
+  --ml-secondary-light: #A78BFA;
+  --ml-accent: #06B6D4;
+  --ml-accent-light: #22D3EE;
+  --ml-emerald: #10B981;
+  --ml-emerald-light: #34D399;
+  --ml-amber: #F59E0B;
+  --ml-rose: #F43F5E;
+  --ml-rose-dark: #BE123C;
+  --ml-text: #0F172A;
+  --ml-text-sec: #64748B;
+  --ml-text-muted: #94A3B8;
+  --ml-bg: #F0F2F8;
+  --ml-card-bg: #FFFFFF;
+  --ml-border: rgba(79, 70, 229, 0.08);
+  --ml-border-hover: rgba(79, 70, 229, 0.18);
+  --ml-radius-sm: 6px;
+  --ml-radius-md: 8px;
+  --ml-radius-lg: 12px;
+  --ml-radius-xl: 16px;
+  --ml-radius-2xl: 20px;
+  --ml-shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 6px 16px rgba(0,0,0,0.04);
+  --ml-shadow-card-hover: 0 4px 12px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.08);
+  --ml-shadow-primary: 0 4px 14px rgba(79,70,229,0.2), 0 2px 6px rgba(79,70,229,0.1);
+  --ml-shadow-primary-lg: 0 10px 40px rgba(79,70,229,0.25), 0 4px 12px rgba(79,70,229,0.12);
+  --ml-gradient-primary: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+  --ml-gradient-accent: linear-gradient(135deg, #06B6D4 0%, #6366F1 100%);
+  --ml-gradient-success: linear-gradient(135deg, #10B981 0%, #06B6D4 100%);
+  --ml-gradient-error: linear-gradient(135deg, #F43F5E 0%, #BE123C 100%);
+  --ml-font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ml-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --ml-transition-fast: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ml-transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ml-transition-slow: all 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ml-transition-spring: all 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Manual leads section */
+
+/* ============================================================================
+   1. ROOT CONTAINER — .exo-container
+   ============================================================================ */
+
+.exo-container {
+  font-family: var(--ml-font-family);
+  color: var(--ml-text);
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  animation: fadeInUp 500ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+@media (min-width: 768px) {
+  .exo-container {
+    padding: 32px 24px 48px;
+  }
+}
+
+
+/* ============================================================================
+   2. MANUAL LEADS SECTION — Shared with InboundCalls
+   ============================================================================ */
+
 .manual-leads-section {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 24px;
+  background: var(--ml-card-bg);
+  border-radius: var(--ml-radius-xl);
+  padding: 28px 24px;
   margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(38, 166, 154, 0.2);
-  transition: box-shadow 0.2s ease;
+  box-shadow: var(--ml-shadow-card);
+  border: 1px solid var(--ml-border);
+  position: relative;
+  overflow: hidden;
+  transition: var(--ml-transition);
 }
+
+.manual-leads-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--ml-gradient-primary);
+  border-radius: var(--ml-radius-xl) var(--ml-radius-xl) 0 0;
+}
+
 .manual-leads-section:hover {
-  box-shadow: 0 8px 32px rgba(38, 166, 154, 0.15);
+  box-shadow: var(--ml-shadow-card-hover);
+  border-color: var(--ml-border-hover);
 }
 
-/* Section title */
+
+/* ============================================================================
+   3. TITLE — Shared with InboundCalls
+   ============================================================================ */
+
 .title {
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  margin: 0 0 16px;
-  color: #26a69a;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+  margin: 0 0 8px;
+  color: var(--ml-text);
+  position: relative;
+  display: inline-block;
 }
 
-/* Add Lead form */
+.title::after {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 3px;
+  margin-top: 8px;
+  border-radius: 4px;
+  background: var(--ml-gradient-primary);
+}
+
+.manual-leads-section .title {
+  margin-bottom: 20px;
+}
+
+
+/* ============================================================================
+   4. WELCOME CARD — Agent contact number panel
+   ============================================================================ */
+
+.welcome-card {
+  background: var(--ml-card-bg);
+  border-radius: var(--ml-radius-xl);
+  padding: 24px !important;
+  margin-bottom: 24px;
+  box-shadow: var(--ml-shadow-card);
+  border: 1px solid var(--ml-border);
+  position: relative;
+  overflow: hidden;
+  transition: var(--ml-transition);
+  animation: fadeInUp 450ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation-delay: 60ms;
+}
+
+.welcome-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--ml-gradient-accent);
+  border-radius: var(--ml-radius-xl) 0 0 var(--ml-radius-xl);
+}
+
+.welcome-card:hover {
+  box-shadow: var(--ml-shadow-card-hover);
+  border-color: var(--ml-border-hover);
+}
+
+
+/* ============================================================================
+   5. ADD LEAD FORM — Input + Button combo
+   ============================================================================ */
+
 .add-lead-form {
   display: flex;
   gap: 12px;
   margin-bottom: 24px;
+  animation: fadeInUp 450ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation-delay: 120ms;
+  align-items: stretch;
 }
+
 .add-lead-form input {
   flex: 1;
-  padding: 12px 16px;
-  border: 1px solid rgba(38, 166, 154, 0.3);
-  border-radius: 12px;
-  background: #ffffff;
-  color: #1e293b;
+  padding: 14px 18px;
+  padding-left: 44px;
+  border: 1.5px solid rgba(79, 70, 229, 0.12);
+  border-radius: var(--ml-radius-lg);
+  background: var(--ml-card-bg);
+  color: var(--ml-text);
+  font-family: var(--ml-font-family);
   font-weight: 500;
-  transition: border 0.2s ease, box-shadow 0.2s ease;
-}
-.add-lead-form input::placeholder {
-  color: #546e7a;
-  opacity: 0.7;
-}
-.add-lead-form input:focus {
-  border-color: #26a69a;
+  font-size: 0.95rem;
+  transition: var(--ml-transition);
   outline: none;
-  box-shadow: 0 0 8px rgba(38, 166, 154, 0.2);
 }
+
+.add-lead-form input::placeholder {
+  color: var(--ml-text-muted);
+  font-weight: 400;
+}
+
+.add-lead-form input:focus {
+  border-color: var(--ml-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12), 0 0 16px rgba(79, 70, 229, 0.08);
+}
+
 .add-lead-form button {
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #26a69a 0%, #1e8a7f 100%);
-  color: #fff;
+  padding: 14px 28px;
+  background: var(--ml-gradient-primary);
+  color: #FFFFFF;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--ml-radius-lg);
   cursor: pointer;
+  font-family: var(--ml-font-family);
   font-weight: 600;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--ml-shadow-primary);
+  transition: var(--ml-transition);
 }
+
 .add-lead-form button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(38, 166, 154, 0.3);
+  box-shadow: var(--ml-shadow-primary-lg);
 }
+
+.add-lead-form button:active {
+  transform: translateY(0) scale(0.98);
+}
+
 .add-lead-form button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-/* Call list grid */
+
+/* ============================================================================
+   6. INPUT BOX / SELECT BOX — Shared with InboundCalls
+   ============================================================================ */
+
+.input-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-box label,
+.select-box label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ml-text-sec);
+  line-height: 1.5;
+}
+
+.input-box input,
+.select-box select,
+.select-box input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid rgba(79, 70, 229, 0.12);
+  border-radius: var(--ml-radius-lg);
+  background: var(--ml-card-bg);
+  color: var(--ml-text);
+  font-family: var(--ml-font-family);
+  font-weight: 500;
+  font-size: 0.95rem;
+  outline: none;
+  transition: var(--ml-transition);
+  box-sizing: border-box;
+}
+
+.input-box input:focus,
+.select-box select:focus,
+.select-box input:focus {
+  border-color: var(--ml-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12), 0 0 16px rgba(79, 70, 229, 0.08);
+}
+
+.input-box input::placeholder,
+.select-box input::placeholder {
+  color: var(--ml-text-muted);
+  font-weight: 400;
+}
+
+.select-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+
+/* ============================================================================
+   7. CALL LIST — Grid of lead cards
+   ============================================================================ */
+
 .call-list {
   display: grid;
   gap: 18px;
@@ -86,20 +310,26 @@
   z-index: 1;
 }
 
-/* Call card */
+
+/* ============================================================================
+   8. LEAD CALL CARD — Individual lead entry
+   ============================================================================ */
+
 .lead-call-card {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 20px;
+  background: var(--ml-card-bg);
+  border-radius: var(--ml-radius-xl);
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(38, 166, 154, 0.2);
-  transition: border 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--ml-shadow-card);
+  border: 1px solid var(--ml-border);
+  transition: var(--ml-transition);
   position: relative;
   overflow: visible;
+  animation: cardEntrance 450ms cubic-bezier(0, 0, 0.2, 1) both;
 }
+
 .lead-call-card::before {
   content: "";
   position: absolute;
@@ -107,205 +337,707 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #26a69a 0%, #66bb6a 50%, #ff7043 100%);
-}
-.lead-call-card:hover {
-  border: 1px solid #26a69a;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(38, 166, 154, 0.15);
+  background: var(--ml-gradient-primary);
+  border-radius: var(--ml-radius-xl) var(--ml-radius-xl) 0 0;
 }
 
-/* Lead info */
+.lead-call-card:hover {
+  border-color: var(--ml-border-hover);
+  transform: translateY(-3px);
+  box-shadow: var(--ml-shadow-card-hover);
+}
+
+/* Stagger animation for multiple cards */
+.lead-call-card:nth-child(1) { animation-delay: 0ms; }
+.lead-call-card:nth-child(2) { animation-delay: 60ms; }
+.lead-call-card:nth-child(3) { animation-delay: 120ms; }
+.lead-call-card:nth-child(4) { animation-delay: 180ms; }
+.lead-call-card:nth-child(5) { animation-delay: 240ms; }
+.lead-call-card:nth-child(6) { animation-delay: 300ms; }
+
+
+/* ============================================================================
+   9. LEAD INFO — Phone number display
+   ============================================================================ */
+
+.lead-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .lead-info small {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #546e7a;
-  margin-bottom: 5px;
-  letter-spacing: 0.05em;
-}
-.lead-info a {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #26a69a;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-.lead-info a:hover {
-  color: #1e8a7f;
+  color: var(--ml-text-sec);
+  line-height: 1.5;
 }
 
-/* Exophone select wrapper */
+.lead-info a {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: var(--ml-font-mono);
+  letter-spacing: 0.04em;
+  color: var(--ml-primary);
+  text-decoration: none;
+  transition: color 200ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lead-info a:hover {
+  color: var(--ml-secondary);
+}
+
+
+/* ============================================================================
+   10. EXOPHONE SELECT WRAPPER — Searchable dropdown
+   ============================================================================ */
+
 .exophone-select-wrapper {
   position: relative;
   flex: 1;
 }
 
 .exophone-select-wrapper label {
-  font-size: 0.85rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  color: #546e7a;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--ml-text-sec);
   margin-bottom: 6px;
   display: block;
+  line-height: 1.5;
 }
 
+/* Exophone display badge */
 .exophone-select-display {
-  padding: 10px 12px;
-  border: 1px solid rgba(38, 166, 154, 0.3);
-  border-radius: 12px;
-  background: #ffffff;
-  color: #1e293b;
+  padding: 12px 14px;
+  border: 1.5px solid rgba(79, 70, 229, 0.12);
+  border-radius: var(--ml-radius-lg);
+  background: var(--ml-card-bg);
+  color: var(--ml-text);
   font-weight: 500;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: border 0.2s ease, box-shadow 0.2s ease;
-}
-.exophone-select-display:hover {
-  border-color: #26a69a;
-}
-.exophone-select-display:focus {
-  border-color: #26a69a;
-  outline: none;
-  box-shadow: 0 0 8px rgba(38, 166, 154, 0.2);
+  transition: var(--ml-transition);
 }
 
+.exophone-select-display:hover {
+  border-color: var(--ml-primary-light);
+}
+
+.exophone-select-display:focus {
+  border-color: var(--ml-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12), 0 0 16px rgba(79, 70, 229, 0.08);
+}
+
+/* Exophone dropdown panel */
 .exophone-dropdown {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  margin-top: 4px;
-  background: #ffffff;
-  border: 1px solid rgba(38, 166, 154, 0.3);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  max-height: 300px;
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(79, 70, 229, 0.1);
+  border-radius: var(--ml-radius-lg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+  max-height: 320px;
   overflow-y: auto;
   z-index: 1000;
+  animation: scaleIn 200ms cubic-bezier(0, 0, 0.2, 1) both;
 }
 
+/* Exophone search input */
 .exophone-search {
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: none;
-  border-bottom: 1px solid rgba(38, 166, 154, 0.2);
+  border-bottom: 1px solid rgba(79, 70, 229, 0.08);
   width: 100%;
-  color: #1e293b;
+  color: var(--ml-text);
   font-weight: 500;
-}
-.exophone-search:focus {
+  font-family: var(--ml-font-family);
+  background: transparent;
   outline: none;
-  border-bottom-color: #26a69a;
+  font-size: 0.9rem;
 }
 
+.exophone-search:focus {
+  border-bottom-color: var(--ml-primary);
+}
+
+/* Exophone option */
 .exophone-option {
-  padding: 12px;
+  padding: 12px 14px;
   cursor: pointer;
-  transition: background 0.2s ease;
-  color: #1e293b;
+  transition: var(--ml-transition-fast);
+  color: var(--ml-text);
+  border-bottom: 1px solid rgba(79, 70, 229, 0.04);
 }
+
+.exophone-option:last-child {
+  border-bottom: none;
+}
+
 .exophone-option:hover {
-  background: rgba(38, 166, 154, 0.1);
+  background: var(--ml-primary-soft);
 }
+
 .exophone-option.selected {
-  background: rgba(38, 166, 154, 0.2);
-  font-weight: 600;
+  background: rgba(79, 70, 229, 0.08);
+  border-left: 3px solid var(--ml-primary);
 }
 
 .exophone-option-number {
   font-weight: 600;
-  color: #26a69a;
+  font-family: var(--ml-font-mono);
+  color: var(--ml-primary);
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
 }
 
 .exophone-option-type {
-  font-size: 0.85rem;
-  color: #546e7a;
-  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--ml-text-sec);
+  margin-top: 3px;
 }
 
-/* Call button */
+/* Scrollbar styling for dropdown */
+.exophone-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.exophone-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.exophone-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(79, 70, 229, 0.15);
+  border-radius: 3px;
+}
+
+.exophone-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 70, 229, 0.25);
+}
+
+
+/* ============================================================================
+   11. CALL BUTTON — Round gradient action button
+   ============================================================================ */
+
 .call-btn {
   width: 48px;
   height: 48px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #26a69a 0%, #1e8a7f 100%);
-  color: #fff;
+  border-radius: 9999px;
+  background: var(--ml-gradient-primary);
+  color: #FFFFFF;
   border: none;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   cursor: pointer;
-  align-self: flex-end;
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4px 12px rgba(38, 166, 154, 0.3);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.call-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(38, 166, 154, 0.4);
-}
-.call-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
-  background: #546e7a;
+  box-shadow: var(--ml-shadow-primary);
+  transition: var(--ml-transition-spring);
+  flex-shrink: 0;
 }
 
-/* Active call state */
+.call-btn:hover {
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: var(--ml-shadow-primary-lg);
+}
+
+.call-btn:active {
+  transform: scale(0.95);
+}
+
+.call-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  background: var(--ml-text-muted);
+  transform: none;
+}
+
+
+/* ============================================================================
+   12. ACTIVE CALL / END CALL INTERFACE
+   ============================================================================ */
+
+.end-call-interface {
+  background: var(--ml-gradient-success);
+  color: #FFFFFF;
+  padding: 28px 24px;
+  border-radius: var(--ml-radius-xl);
+  margin-top: 24px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3), 0 8px 32px rgba(16, 185, 129, 0.15);
+  position: relative;
+  overflow: hidden;
+  animation: scaleInBounce 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Animated gradient border glow */
+.end-call-interface::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: calc(var(--ml-radius-xl) + 2px);
+  background: linear-gradient(270deg, rgba(16,185,129,0.6), rgba(6,182,212,0.4), rgba(52,211,153,0.6), rgba(16,185,129,0.6));
+  background-size: 300% 300%;
+  animation: gradientShift 4s ease infinite;
+  z-index: -1;
+}
+
+/* Subtle pulse overlay */
+.end-call-interface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--ml-radius-xl);
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 70%);
+  animation: breathe 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.end-call-interface h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin: 0 0 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.end-call-interface p {
+  margin: 0 0 18px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  position: relative;
+  z-index: 1;
+}
+
+.end-call-btn {
+  padding: 12px 28px;
+  background: var(--ml-gradient-error);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--ml-radius-lg);
+  cursor: pointer;
+  font-family: var(--ml-font-family);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.3);
+  transition: var(--ml-transition-spring);
+  position: relative;
+  z-index: 1;
+}
+
+.end-call-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 8px 24px rgba(244, 63, 94, 0.4);
+}
+
+.end-call-btn:active {
+  transform: scale(0.97);
+}
+
+
+/* ============================================================================
+   13. ACTIVE CALL BANNER — Legacy class support
+   ============================================================================ */
+
 .active-call-banner {
-  background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%);
-  color: #fff;
-  padding: 16px 20px;
-  border-radius: 12px;
+  background: var(--ml-gradient-success);
+  color: #FFFFFF;
+  padding: 20px 24px;
+  border-radius: var(--ml-radius-xl);
   margin-bottom: 24px;
   text-align: center;
-  box-shadow: 0 4px 20px rgba(102, 187, 106, 0.3);
-  animation: pulse-border 2s infinite;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+  animation: pulseGlowSuccess 2.5s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.active-call-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08) 0%, transparent 70%);
+  animation: breathe 3s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .active-call-banner p {
   margin: 0;
   font-weight: 600;
   font-size: 1.1rem;
+  position: relative;
+  z-index: 1;
 }
 
-.end-call-btn {
-  margin-top: 12px;
-  padding: 10px 24px;
-  background: #fff;
-  color: #66bb6a;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+
+/* ============================================================================
+   14. CALL HISTORY SECTION
+   ============================================================================ */
+
+.call-history {
+  background: var(--ml-card-bg);
+  border-radius: var(--ml-radius-xl);
+  padding: 24px;
+  margin-top: 24px;
+  box-shadow: var(--ml-shadow-card);
+  border: 1px solid var(--ml-border);
+  animation: fadeInUp 450ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation-delay: 200ms;
+}
+
+.call-history .title {
+  font-size: 1.125rem;
+  margin-bottom: 16px;
+}
+
+.call-history ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.call-history li {
+  padding: 14px 16px;
+  background: var(--ml-primary-soft);
+  border-radius: var(--ml-radius-md);
+  font-size: 0.8125rem;
+  font-family: var(--ml-font-mono);
+  color: var(--ml-text-sec);
+  line-height: 1.6;
+  border-left: 3px solid var(--ml-primary);
+  word-break: break-all;
+  transition: var(--ml-transition-fast);
+}
+
+.call-history li:hover {
+  background: rgba(79, 70, 229, 0.08);
+}
+
+
+/* ============================================================================
+   15. ALERT MESSAGES
+   ============================================================================ */
+
+.alert {
+  padding: 14px 18px;
+  border-radius: var(--ml-radius-lg);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  animation: fadeInDown 300ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+.alert-danger {
+  background: rgba(244, 63, 94, 0.08);
+  color: var(--ml-rose);
+  border: 1px solid rgba(244, 63, 94, 0.15);
+}
+
+.alert-success {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--ml-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+
+/* ============================================================================
+   16. CALL FORM SLIDE-IN CONTAINER
+   ============================================================================ */
+
+.call-form-container {
+  animation: fadeInUp 400ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+
+/* ============================================================================
+   17. EMPTY STATES & HELPER TEXT
+   ============================================================================ */
+
+.ml-empty-state {
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--ml-text-muted);
+  font-size: 0.875rem;
+  animation: fadeIn 400ms ease both;
+}
+
+.ml-empty-state-icon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.ml-empty-state-text {
+  font-weight: 500;
+  color: var(--ml-text-sec);
+}
+
+.ml-helper-text {
+  font-size: 0.8125rem;
+  color: var(--ml-text-muted);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+
+/* ============================================================================
+   18. STATUS BADGES
+   ============================================================================ */
+
+.ml-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
   font-weight: 600;
-  transition: all 0.2s ease;
-}
-.end-call-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-/* Responsive layout */
+.ml-badge-primary {
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--ml-primary);
+}
+
+.ml-badge-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--ml-emerald);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
+}
+
+.ml-badge-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--ml-amber);
+}
+
+.ml-badge-error {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--ml-rose);
+}
+
+
+/* ============================================================================
+   19. BTN-PRIMARY — Generic gradient button class
+   ============================================================================ */
+
+.btn-primary {
+  padding: 12px 24px;
+  background: var(--ml-gradient-primary);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--ml-radius-lg);
+  cursor: pointer;
+  font-family: var(--ml-font-family);
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+  box-shadow: var(--ml-shadow-primary);
+  transition: var(--ml-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ml-shadow-primary-lg);
+}
+
+.btn-primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+
+/* ============================================================================
+   20. RESPONSIVE LAYOUT
+   ============================================================================ */
+
 @media (min-width: 768px) {
   .lead-call-card {
     flex-direction: row;
     align-items: center;
     gap: 18px;
   }
+
   .call-btn {
     align-self: center;
   }
 }
 
-/* Animations */
-@keyframes pulse-border {
+@media (max-width: 640px) {
+  .exo-container {
+    padding: 16px 12px 32px;
+  }
+
+  .add-lead-form {
+    flex-direction: column;
+  }
+
+  .add-lead-form button {
+    justify-content: center;
+  }
+
+  .lead-call-card {
+    padding: 18px;
+  }
+
+  .title {
+    font-size: 1.25rem;
+  }
+
+  .welcome-card {
+    padding: 18px !important;
+  }
+}
+
+
+/* ============================================================================
+   21. KEYFRAMES (local — supplement shared animations.css)
+   ============================================================================ */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleInBounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes breathe {
   0%, 100% {
-    box-shadow: 0 4px 20px rgba(102, 187, 106, 0.3);
+    transform: scale(1);
+    opacity: 0.8;
   }
   50% {
-    box-shadow: 0 8px 32px rgba(102, 187, 106, 0.5);
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+@keyframes pulseGlowSuccess {
+  0%, 100% {
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3), 0 0 32px rgba(16, 185, 129, 0.2);
+  }
+}
+
+
+/* ============================================================================
+   22. REDUCED MOTION
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .exo-container,
+  .welcome-card,
+  .add-lead-form,
+  .lead-call-card,
+  .end-call-interface,
+  .active-call-banner,
+  .call-history,
+  .alert,
+  .call-form-container,
+  .ml-empty-state {
+    animation: none !important;
+  }
+
+  .lead-call-card:hover,
+  .add-lead-form button:hover,
+  .call-btn:hover,
+  .end-call-btn:hover,
+  .btn-primary:hover {
+    transform: none !important;
   }
 }

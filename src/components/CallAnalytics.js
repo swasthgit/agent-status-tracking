@@ -36,7 +36,6 @@ import {
   Tooltip,
   Badge,
   Fade,
-  Zoom,
 } from "@mui/material";
 import {
   Phone,
@@ -90,35 +89,40 @@ import {
   RadialBar,
   ComposedChart,
 } from "recharts";
+import { useThemeMode } from "../context/ThemeContext";
 
-// Modern Analytics Theme - Cyan/Blue gradient theme
+// Unified indigo design system
 const ANALYTICS_GRADIENTS = {
-  primary: "linear-gradient(135deg, #0891b2 0%, #0e7490 100%)",
-  secondary: "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)",
-  accent: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-  success: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  danger: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-  purple: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
-  pink: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
-  indigo: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+  primary: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
+  secondary: "linear-gradient(135deg, #6366F1 0%, #818CF8 100%)",
+  accent: "linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%)",
+  success: "linear-gradient(135deg, #4F46E5 0%, #818CF8 100%)",
+  danger: "linear-gradient(135deg, #C7D2FE 0%, #A5B4FC 100%)",
+  purple: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)",
+  pink: "linear-gradient(135deg, #818CF8 0%, #A5B4FC 100%)",
+  indigo: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
   dark: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
 };
 
 const ANALYTICS_COLORS = {
-  primary: "#0891b2",
-  secondary: "#06b6d4",
-  accent: "#f59e0b",
-  success: "#10b981",
-  danger: "#ef4444",
-  warning: "#f59e0b",
-  purple: "#8b5cf6",
-  pink: "#ec4899",
-  indigo: "#6366f1",
+  primary: "#4F46E5",
+  secondary: "#6366F1",
+  accent: "#818CF8",
+  success: "#6366F1",
+  danger: "#A5B4FC",
+  warning: "#818CF8",
+  purple: "#7C3AED",
+  pink: "#A5B4FC",
+  indigo: "#6366F1",
   text: "#0f172a",
   textSecondary: "#64748b",
   background: "#f8fafc",
   cardBg: "#ffffff",
 };
+
+// Monochromatic indigo chart palette
+const CHART_COLORS_INDIGO = ['#4F46E5', '#6366F1', '#818CF8', '#A5B4FC', '#C7D2FE'];
+const SPARKLINE_DATA = [{v:30},{v:45},{v:35},{v:50},{v:42},{v:55},{v:48}];
 
 // Animated Counter Hook
 const useAnimatedCounter = (end, duration = 1500) => {
@@ -151,100 +155,67 @@ const useAnimatedCounter = (end, duration = 1500) => {
 };
 
 // Animated Stat Card Component
-const AnimatedStatCard = ({ title, value, subtitle, icon, gradient, suffix = "", isString = false, delay = 0 }) => {
+const AnimatedStatCard = ({ title, value, subtitle, icon, suffix = "", isString = false, colors: c = {} }) => {
   const numericValue = isString ? 0 : (typeof value === 'number' ? value : parseFloat(value) || 0);
-  const animatedValue = useAnimatedCounter(numericValue, 1500 + delay);
+  const animatedValue = useAnimatedCounter(numericValue, 1500);
   const displayValue = isString ? value : `${animatedValue.toLocaleString()}${suffix}`;
 
   return (
-    <Zoom in={true} style={{ transitionDelay: `${delay}ms` }}>
-      <Card
-        sx={{
-          background: gradient,
-          borderRadius: "20px",
-          height: "150px",
-          position: "relative",
-          overflow: "hidden",
-          transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-          boxShadow: "0 10px 40px rgba(8, 145, 178, 0.3)",
-          "&:hover": {
-            transform: "translateY(-8px) scale(1.02)",
-            boxShadow: "0 20px 60px rgba(8, 145, 178, 0.4)",
-          },
-        }}
-      >
-        {/* Decorative circles */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: -30,
-            right: -30,
-            width: 120,
-            height: 120,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.1)",
-          }}
-        />
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: -40,
-            left: -40,
-            width: 100,
-            height: 100,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.08)",
-          }}
-        />
-
-        <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative", zIndex: 1, p: 2.5 }}>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <Box
-              sx={{
-                bgcolor: "rgba(255, 255, 255, 0.2)",
-                borderRadius: "14px",
-                p: 1.2,
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              {icon}
-            </Box>
+    <Card
+      elevation={0}
+      sx={{
+        bgcolor: c.bgCard || '#fff',
+        border: `1px solid ${c.border || '#e2e8f0'}`,
+        borderRadius: '12px',
+        transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
+        "&:hover": {
+          transform: "translateY(-2px)",
+          borderColor: c.borderHover || '#c7d2fe',
+          boxShadow: c.shadowCard || '0 4px 12px rgba(0,0,0,0.08)',
+        },
+      }}
+    >
+      <CardContent sx={{ p: 2.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+          <Box sx={{
+            width: 32, height: 32, borderRadius: '8px',
+            bgcolor: c.primarySoft || '#EEF2FF',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {React.cloneElement(icon, { sx: { fontSize: 17, color: c.primary || '#4F46E5' } })}
           </Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 500, color: c.textMuted || '#64748b' }}>
+            {title}
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: 'space-between' }}>
           <Box>
-            <Typography
-              variant="h3"
-              fontWeight={800}
-              color="#fff"
-              sx={{
-                textShadow: "0 2px 10px rgba(0,0,0,0.2)",
-                fontSize: { xs: "1.8rem", md: "2.2rem" },
-                letterSpacing: "-0.5px",
-              }}
-            >
+            <Typography sx={{ fontSize: 28, fontWeight: 700, color: c.text || '#0f172a', lineHeight: 1 }}>
               {displayValue}
             </Typography>
-            <Typography
-              variant="body2"
-              color="rgba(255, 255, 255, 0.95)"
-              fontWeight={600}
-              sx={{ textTransform: "uppercase", letterSpacing: "1px", fontSize: "0.75rem" }}
-            >
-              {title}
-            </Typography>
             {subtitle && (
-              <Typography variant="caption" color="rgba(255, 255, 255, 0.8)" sx={{ display: "block", mt: 0.3 }}>
+              <Typography sx={{ fontSize: 11, color: c.textMuted || '#64748b', mt: 0.5 }}>
                 {subtitle}
               </Typography>
             )}
           </Box>
-        </CardContent>
-      </Card>
-    </Zoom>
+          <Box sx={{ width: 60, height: 24 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={SPARKLINE_DATA}>
+                <Line type="monotone" dataKey="v" stroke="#818CF8" strokeWidth={1.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 
 // Agent Performance Card
 const AgentPerformanceCard = ({ agent, rank, maxCalls }) => {
+  const { colors } = useThemeMode();
+  const AC = { ...ANALYTICS_COLORS, text: colors.text, textSecondary: colors.textSec, background: colors.bg, cardBg: colors.bgPaper };
   const percentage = maxCalls > 0 ? (agent.totalCalls / maxCalls) * 100 : 0;
   const getRankColor = () => {
     if (rank === 1) return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
@@ -257,11 +228,12 @@ const AgentPerformanceCard = ({ agent, rank, maxCalls }) => {
     <Card
       sx={{
         borderRadius: "16px",
-        border: `1px solid ${ANALYTICS_COLORS.primary}20`,
-        transition: "all 0.3s ease",
+        bgcolor: AC.cardBg,
+        border: `1px solid ${colors.border}`,
+        transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
         "&:hover": {
-          transform: "translateY(-4px)",
-          boxShadow: `0 12px 30px ${ANALYTICS_COLORS.primary}20`,
+          transform: "translateY(-2px)",
+          boxShadow: `0 8px 24px ${ANALYTICS_COLORS.primary}20`,
           borderColor: ANALYTICS_COLORS.primary,
         },
       }}
@@ -301,10 +273,10 @@ const AgentPerformanceCard = ({ agent, rank, maxCalls }) => {
             </Avatar>
           </Badge>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" fontWeight={600} color={ANALYTICS_COLORS.text}>
+            <Typography variant="subtitle1" fontWeight={600} color={AC.text}>
               {agent.name || "Unknown Agent"}
             </Typography>
-            <Typography variant="caption" color={ANALYTICS_COLORS.textSecondary}>
+            <Typography variant="caption" color={AC.textSecondary}>
               {agent.role || "Agent"}
             </Typography>
           </Box>
@@ -324,7 +296,7 @@ const AgentPerformanceCard = ({ agent, rank, maxCalls }) => {
               <Typography variant="h6" fontWeight={700} color={ANALYTICS_COLORS.primary}>
                 {agent.totalCalls}
               </Typography>
-              <Typography variant="caption" color={ANALYTICS_COLORS.textSecondary}>
+              <Typography variant="caption" color={AC.textSecondary}>
                 Total
               </Typography>
             </Box>
@@ -334,7 +306,7 @@ const AgentPerformanceCard = ({ agent, rank, maxCalls }) => {
               <Typography variant="h6" fontWeight={700} color={ANALYTICS_COLORS.success}>
                 {agent.connected}
               </Typography>
-              <Typography variant="caption" color={ANALYTICS_COLORS.textSecondary}>
+              <Typography variant="caption" color={AC.textSecondary}>
                 Connected
               </Typography>
             </Box>
@@ -344,7 +316,7 @@ const AgentPerformanceCard = ({ agent, rank, maxCalls }) => {
               <Typography variant="h6" fontWeight={700} color={ANALYTICS_COLORS.accent}>
                 {agent.rate}%
               </Typography>
-              <Typography variant="caption" color={ANALYTICS_COLORS.textSecondary}>
+              <Typography variant="caption" color={AC.textSecondary}>
                 Rate
               </Typography>
             </Box>
@@ -353,7 +325,7 @@ const AgentPerformanceCard = ({ agent, rank, maxCalls }) => {
 
         <Box>
           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-            <Typography variant="caption" color={ANALYTICS_COLORS.textSecondary}>
+            <Typography variant="caption" color={AC.textSecondary}>
               Performance Score
             </Typography>
             <Typography variant="caption" fontWeight={600} color={ANALYTICS_COLORS.primary}>
@@ -411,7 +383,8 @@ const exportToCSV = (data, filename, columns) => {
 };
 
 // Chart Card Component with Expand Button
-const ChartCard = ({ title, children, chartData, columns, chartElement, height = 320 }) => {
+const ChartCard = ({ title, children, chartData, columns, chartElement, height = 300 }) => {
+  const { colors } = useThemeMode();
   const [expandedOpen, setExpandedOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -421,13 +394,14 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
       elevation={0}
       sx={{
         p: 3,
-        borderRadius: "20px",
-        border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+        borderRadius: "16px",
+        bgcolor: colors.bgPaper,
+        border: `1px solid ${colors.border}`,
         position: "relative",
-        transition: "all 0.3s ease",
+        transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
         "&:hover": {
-          boxShadow: `0 12px 40px ${ANALYTICS_COLORS.primary}15`,
-          transform: "translateY(-4px)",
+          boxShadow: `0 8px 24px ${ANALYTICS_COLORS.primary}15`,
+          transform: "translateY(-2px)",
         },
       }}
     >
@@ -448,7 +422,7 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
                   bgcolor: ANALYTICS_COLORS.primary,
                   "& .MuiSvgIcon-root": { color: "#fff" }
                 },
-                transition: "all 0.2s ease",
+                transition: "background-color 0.2s ease, color 0.2s ease",
               }}
             >
               <ZoomOutMap sx={{ color: ANALYTICS_COLORS.primary, fontSize: 20 }} />
@@ -510,13 +484,16 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: "20px",
+            borderRadius: "16px",
             maxHeight: "90vh",
+            bgcolor: colors.dialogBg,
+            border: `1px solid ${colors.dialogBorder}`,
+            color: colors.text,
           }
         }}
       >
         <DialogTitle sx={{
-          borderBottom: `1px solid ${ANALYTICS_COLORS.primary}20`,
+          borderBottom: `1px solid ${colors.border}`,
           background: ANALYTICS_GRADIENTS.primary,
           color: "#fff",
         }}>
@@ -529,7 +506,7 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: 4 }}>
+        <DialogContent sx={{ p: 4, bgcolor: colors.dialogBg }}>
           <Box sx={{ width: "100%", height: 550, pt: 2 }}>{chartElement}</Box>
         </DialogContent>
       </Dialog>
@@ -541,10 +518,10 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
         maxWidth="md"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: "16px" }
+          sx: { borderRadius: "16px", bgcolor: colors.dialogBg, border: `1px solid ${colors.dialogBorder}`, color: colors.text }
         }}
       >
-        <DialogTitle sx={{ borderBottom: `1px solid ${ANALYTICS_COLORS.primary}20` }}>
+        <DialogTitle sx={{ borderBottom: `1px solid ${colors.border}`, color: colors.text }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Typography variant="h6" fontWeight={600} color={ANALYTICS_COLORS.primary}>
               {title} - Data Table
@@ -566,11 +543,11 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
             </Button>
           </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ bgcolor: colors.dialogBg }}>
           <TableContainer sx={{ mt: 2 }}>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ bgcolor: `${ANALYTICS_COLORS.primary}10` }}>
+                <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
                   {columns.map((col) => (
                     <TableCell key={col} sx={{ fontWeight: 600, textTransform: "capitalize", color: ANALYTICS_COLORS.primary }}>
                       {col}
@@ -582,7 +559,7 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
                 {chartData.map((row, idx) => (
                   <TableRow key={idx} hover>
                     {columns.map((col) => (
-                      <TableCell key={col}>{row[col]}</TableCell>
+                      <TableCell key={col} sx={{ color: colors.text }}>{row[col]}</TableCell>
                     ))}
                   </TableRow>
                 ))}
@@ -590,7 +567,7 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
             </Table>
           </TableContainer>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ p: 2, bgcolor: colors.dialogBg }}>
           <Button
             onClick={() => setTableOpen(false)}
             variant="outlined"
@@ -614,6 +591,7 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
 
 // Chart Menu Component (kept for backwards compatibility)
 const ChartMenu = ({ chartData, chartTitle, columns, chartElement }) => {
+  const { colors } = useThemeMode();
   const [anchorEl, setAnchorEl] = useState(null);
   const [expandedOpen, setExpandedOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
@@ -665,16 +643,18 @@ const ChartMenu = ({ chartData, chartTitle, columns, chartElement }) => {
       </Menu>
 
       {/* Expanded View Dialog */}
-      <Dialog open={expandedOpen} onClose={() => setExpandedOpen(false)} maxWidth="lg" fullWidth>
-        <DialogTitle sx={{ borderBottom: `1px solid ${ANALYTICS_COLORS.primary}20` }}>
+      <Dialog open={expandedOpen} onClose={() => setExpandedOpen(false)} maxWidth="lg" fullWidth
+        PaperProps={{ sx: { bgcolor: colors.dialogBg, border: `1px solid ${colors.dialogBorder}`, color: colors.text } }}
+      >
+        <DialogTitle sx={{ borderBottom: `1px solid ${colors.border}`, color: colors.text }}>
           <Typography variant="h6" fontWeight={600} color={ANALYTICS_COLORS.primary}>
             {chartTitle}
           </Typography>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ bgcolor: colors.dialogBg }}>
           <Box sx={{ width: "100%", height: 500, pt: 2 }}>{chartElement}</Box>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ bgcolor: colors.dialogBg }}>
           <Button onClick={() => setExpandedOpen(false)} sx={{ color: ANALYTICS_COLORS.primary }}>
             Close
           </Button>
@@ -682,17 +662,19 @@ const ChartMenu = ({ chartData, chartTitle, columns, chartElement }) => {
       </Dialog>
 
       {/* Table View Dialog */}
-      <Dialog open={tableOpen} onClose={() => setTableOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ borderBottom: `1px solid ${ANALYTICS_COLORS.primary}20` }}>
+      <Dialog open={tableOpen} onClose={() => setTableOpen(false)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { bgcolor: colors.dialogBg, border: `1px solid ${colors.dialogBorder}`, color: colors.text } }}
+      >
+        <DialogTitle sx={{ borderBottom: `1px solid ${colors.border}`, color: colors.text }}>
           <Typography variant="h6" fontWeight={600} color={ANALYTICS_COLORS.primary}>
             {chartTitle} - Data Table
           </Typography>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ bgcolor: colors.dialogBg }}>
           <TableContainer sx={{ mt: 2 }}>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ bgcolor: `${ANALYTICS_COLORS.primary}10` }}>
+                <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
                   {columns.map((col) => (
                     <TableCell key={col} sx={{ fontWeight: 600, textTransform: "capitalize", color: ANALYTICS_COLORS.primary }}>
                       {col}
@@ -704,7 +686,7 @@ const ChartMenu = ({ chartData, chartTitle, columns, chartElement }) => {
                 {chartData.map((row, idx) => (
                   <TableRow key={idx} hover>
                     {columns.map((col) => (
-                      <TableCell key={col}>{row[col]}</TableCell>
+                      <TableCell key={col} sx={{ color: colors.text }}>{row[col]}</TableCell>
                     ))}
                   </TableRow>
                 ))}
@@ -712,7 +694,7 @@ const ChartMenu = ({ chartData, chartTitle, columns, chartElement }) => {
             </Table>
           </TableContainer>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ bgcolor: colors.dialogBg }}>
           <Button onClick={() => setTableOpen(false)} sx={{ color: ANALYTICS_COLORS.primary }}>
             Close
           </Button>
@@ -724,19 +706,20 @@ const ChartMenu = ({ chartData, chartTitle, columns, chartElement }) => {
 
 // Custom Tooltip for Charts
 const CustomChartTooltip = ({ active, payload, label }) => {
+  const { colors } = useThemeMode();
   if (active && payload && payload.length) {
     return (
       <Paper
-        elevation={8}
+        elevation={0}
         sx={{
           p: 2,
-          bgcolor: "rgba(255, 255, 255, 0.98)",
-          backdropFilter: "blur(20px)",
-          border: `1px solid ${ANALYTICS_COLORS.primary}30`,
-          borderRadius: "12px",
+          bgcolor: colors.chartTooltipBg,
+          border: `1px solid ${colors.chartTooltipBorder}`,
+          borderRadius: "8px",
+          boxShadow: colors.shadowCard || '0 4px 12px rgba(0,0,0,0.08)',
         }}
       >
-        <Typography variant="subtitle2" fontWeight={600} color={ANALYTICS_COLORS.text} sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" fontWeight={600} color={colors.chartTooltipText} sx={{ mb: 1 }}>
           {label}
         </Typography>
         {payload.map((entry, index) => (
@@ -752,6 +735,16 @@ const CustomChartTooltip = ({ active, payload, label }) => {
 
 const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => {
   const navigate = useNavigate();
+  const { colors } = useThemeMode();
+
+  // Dynamic theme-aware analytics colors (overrides only theme-dependent fields)
+  const AC = {
+    ...ANALYTICS_COLORS,
+    text: colors.text,
+    textSecondary: colors.textSec,
+    background: colors.bg,
+    cardBg: colors.bgPaper,
+  };
   const [dateRange, setDateRange] = useState("7days");
   const [directionFilter, setDirectionFilter] = useState("all");
   const [agentFilter, setAgentFilter] = useState("all");
@@ -1034,7 +1027,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
       typeMap.set(type, (typeMap.get(type) || 0) + 1);
     });
 
-    const colors = [
+    const typeColors = [
       ANALYTICS_COLORS.primary,
       ANALYTICS_COLORS.success,
       ANALYTICS_COLORS.accent,
@@ -1047,7 +1040,69 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
       .map(([name, value], index) => ({
         name,
         value,
-        color: colors[index % colors.length],
+        color: typeColors[index % typeColors.length],
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredLogs]);
+
+  // Call Coordinator Distribution (Client, Branch Manager, Nurse)
+  const callCoordinatorData = useMemo(() => {
+    const types = {};
+    filteredLogs.forEach((log) => {
+      let typeValue = null;
+
+      // Priority 1: Use coordinatorType field (new format)
+      if (log.coordinatorType && ['Client', 'Branch Manager', 'Nurse'].includes(log.coordinatorType)) {
+        typeValue = log.coordinatorType;
+      }
+      // Priority 2: For regular outbound calls, callType contains the coordinator
+      else if (log.callType && ['Client', 'Branch Manager', 'Nurse'].includes(log.callType)) {
+        typeValue = log.callType;
+      }
+      // Priority 3: Fallback to agentType if it has coordinator values
+      else if (log.agentType && ['Client', 'Branch Manager', 'Nurse'].includes(log.agentType)) {
+        typeValue = log.agentType;
+      }
+
+      if (typeValue) {
+        types[typeValue] = (types[typeValue] || 0) + 1;
+      }
+    });
+    return Object.entries(types)
+      .map(([name, value]) => ({
+        name,
+        value,
+        color: name === 'Nurse' ? '#ec4899' :
+               name === 'Branch Manager' ? '#8b5cf6' :
+               name === 'Client' ? '#14b8a6' :
+               '#6b7280'
+      }))
+      .filter(item => item.value > 0);
+  }, [filteredLogs]);
+
+  // Call Category Distribution (Query Update, Claim Status, etc.)
+  const callCategoryData = useMemo(() => {
+    const categories = {};
+    const categoryColors = {
+      'Query Update': '#3b82f6',
+      'Claim Status': '#10b981',
+      'Negotiation Call': '#f59e0b',
+      'Intimation Call': '#8b5cf6',
+      'Product Information': '#ec4899',
+      'Paid Call': '#06b6d4',
+      'Rejection Call': '#ef4444',
+    };
+    filteredLogs.forEach((log) => {
+      const category = log.callCategory;
+      if (category) {
+        categories[category] = (categories[category] || 0) + 1;
+      }
+    });
+    return Object.entries(categories)
+      .map(([name, value]) => ({
+        name,
+        value,
+        color: categoryColors[name] || '#6b7280'
       }))
       .sort((a, b) => b.value - a.value);
   }, [filteredLogs]);
@@ -1181,11 +1236,11 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
       }
     });
 
-    const colors = [ANALYTICS_COLORS.primary, ANALYTICS_COLORS.success, ANALYTICS_COLORS.accent, ANALYTICS_COLORS.purple, ANALYTICS_COLORS.pink];
+    const durationColors = [ANALYTICS_COLORS.primary, ANALYTICS_COLORS.success, ANALYTICS_COLORS.accent, ANALYTICS_COLORS.purple, ANALYTICS_COLORS.pink];
     return ranges.map((range, index) => ({
       name: range.name,
       value: range.count,
-      color: colors[index],
+      color: durationColors[index],
     })).filter(item => item.value > 0);
   }, [filteredLogs]);
 
@@ -1250,61 +1305,34 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
   const maxAgentCalls = agentPerformanceData.length > 0 ? agentPerformanceData[0].totalCalls : 0;
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: ANALYTICS_COLORS.background }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: AC.background, color: AC.text }}>
       {/* Header Section */}
       <Box
         sx={{
           background: ANALYTICS_GRADIENTS.primary,
-          pt: 4,
-          pb: 6,
+          pt: 2.5,
+          pb: 2.5,
           px: 3,
-          position: "relative",
-          overflow: "hidden",
         }}
       >
-        {/* Decorative elements */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: -100,
-            right: -100,
-            width: 300,
-            height: 300,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.1)",
-          }}
-        />
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: -50,
-            left: -50,
-            width: 200,
-            height: 200,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.08)",
-          }}
-        />
-
-        <Box sx={{ maxWidth: 1600, mx: "auto", position: "relative", zIndex: 1 }}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
+        <Box sx={{ maxWidth: 1600, mx: "auto" }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
             <Button
               onClick={handleBack}
               startIcon={<ArrowBack />}
               sx={{
                 color: "#fff",
                 bgcolor: "rgba(255,255,255,0.15)",
-                backdropFilter: "blur(10px)",
                 borderRadius: "12px",
-                px: 2.5,
-                py: 1,
+                px: 2,
+                py: 0.75,
                 fontWeight: 600,
+                fontSize: "0.85rem",
                 textTransform: "none",
                 "&:hover": {
                   bgcolor: "rgba(255,255,255,0.25)",
-                  transform: "translateX(-4px)",
                 },
-                transition: "all 0.3s ease",
+                transition: 'background-color 150ms ease',
               }}
             >
               Back to Dashboard
@@ -1313,6 +1341,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
             <Tooltip title="Refresh Data">
               <IconButton
                 onClick={handleRefresh}
+                size="small"
                 sx={{
                   bgcolor: "rgba(255,255,255,0.15)",
                   color: "#fff",
@@ -1321,6 +1350,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
               >
                 <Refresh
                   sx={{
+                    fontSize: 20,
                     animation: isRefreshing ? "spin 1s linear infinite" : "none",
                     "@keyframes spin": {
                       "0%": { transform: "rotate(0deg)" },
@@ -1332,22 +1362,21 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
             </Tooltip>
           </Box>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Avatar
               sx={{
-                width: 56,
-                height: 56,
+                width: 40,
+                height: 40,
                 background: "rgba(255,255,255,0.2)",
-                backdropFilter: "blur(10px)",
               }}
             >
-              <Analytics sx={{ fontSize: 32, color: "#fff" }} />
+              <Analytics sx={{ fontSize: 22, color: "#fff" }} />
             </Avatar>
             <Box>
-              <Typography variant="h4" fontWeight={800} color="#fff" sx={{ textShadow: "0 2px 10px rgba(0,0,0,0.2)" }}>
+              <Typography variant="h5" fontWeight={700} color="#fff">
                 Call Analytics Dashboard
               </Typography>
-              <Typography variant="body1" color="rgba(255,255,255,0.9)">
+              <Typography variant="body2" color="rgba(255,255,255,0.85)" sx={{ fontSize: "0.8rem" }}>
                 Comprehensive insights into call performance and trends
               </Typography>
             </Box>
@@ -1355,17 +1384,16 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
         </Box>
       </Box>
 
-      {/* Stat Cards - Overlapping header */}
-      <Box sx={{ maxWidth: 1600, mx: "auto", px: 3, mt: -4 }}>
+      {/* Stat Cards */}
+      <Box sx={{ maxWidth: 1600, mx: "auto", px: 3, mt: 3 }}>
         <Grid container spacing={2.5}>
           <Grid item xs={12} sm={6} md={3} lg={2}>
             <AnimatedStatCard
               title="Total Calls"
               value={metrics.totalCalls}
               subtitle="All calls"
-              icon={<Phone sx={{ color: "#fff", fontSize: 26 }} />}
-              gradient={ANALYTICS_GRADIENTS.primary}
-              delay={0}
+              icon={<Phone />}
+              colors={colors}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3} lg={2}>
@@ -1373,9 +1401,8 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
               title="Connected"
               value={metrics.connectedCalls}
               subtitle="Successful"
-              icon={<CheckCircle sx={{ color: "#fff", fontSize: 26 }} />}
-              gradient={ANALYTICS_GRADIENTS.success}
-              delay={100}
+              icon={<CheckCircle />}
+              colors={colors}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3} lg={2}>
@@ -1383,9 +1410,8 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
               title="Not Connected"
               value={metrics.notConnectedCalls}
               subtitle="Missed/Failed"
-              icon={<Cancel sx={{ color: "#fff", fontSize: 26 }} />}
-              gradient={ANALYTICS_GRADIENTS.danger}
-              delay={200}
+              icon={<Cancel />}
+              colors={colors}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3} lg={2}>
@@ -1393,9 +1419,8 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
               title="Avg Duration"
               value={metrics.avgDuration}
               subtitle="Per call"
-              icon={<AccessTime sx={{ color: "#fff", fontSize: 26 }} />}
-              gradient={ANALYTICS_GRADIENTS.purple}
-              delay={300}
+              icon={<AccessTime />}
+              colors={colors}
               isString={true}
             />
           </Grid>
@@ -1404,10 +1429,9 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
               title="Success Rate"
               value={metrics.completionRate}
               subtitle="Connection rate"
-              icon={<TrendingUp sx={{ color: "#fff", fontSize: 26 }} />}
-              gradient={ANALYTICS_GRADIENTS.accent}
+              icon={<TrendingUp />}
+              colors={colors}
               suffix="%"
-              delay={400}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3} lg={2}>
@@ -1415,10 +1439,9 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
               title="Talk Time"
               value={metrics.totalDurationHours}
               subtitle="Total hours"
-              icon={<Timer sx={{ color: "#fff", fontSize: 26 }} />}
-              gradient={ANALYTICS_GRADIENTS.indigo}
+              icon={<Timer />}
+              colors={colors}
               suffix="h"
-              delay={500}
             />
           </Grid>
         </Grid>
@@ -1432,10 +1455,10 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
           sx={{
             p: 3,
             mb: 4,
-            borderRadius: "20px",
-            border: `1px solid ${ANALYTICS_COLORS.primary}20`,
-            background: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(20px)",
+            borderRadius: "16px",
+            border: `1px solid ${colors.border}`,
+            bgcolor: colors.bgPaper,
+            /* backdrop-filter removed for performance */
           }}
         >
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2.5 }}>
@@ -1459,15 +1482,17 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
           <Grid container spacing={2.5}>
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel>Date Range</InputLabel>
+                <InputLabel sx={{ color: colors.textMuted }}>Date Range</InputLabel>
                 <Select
                   value={dateRange}
                   label="Date Range"
                   onChange={(e) => setDateRange(e.target.value)}
                   sx={{
                     borderRadius: "12px",
-                    "& .MuiOutlinedInput-notchedOutline": { borderColor: `${ANALYTICS_COLORS.primary}40` },
-                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: ANALYTICS_COLORS.primary },
+                    color: colors.text,
+                    "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border },
+                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: colors.primary || ANALYTICS_COLORS.primary },
+                    "& .MuiSvgIcon-root": { color: colors.textMuted },
                   }}
                 >
                   <MenuItem value="24h">Last 24 Hours</MenuItem>
@@ -1489,11 +1514,13 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
+                    InputLabelProps={{ shrink: true, sx: { color: colors.textMuted } }}
                     sx={{
                       "& .MuiOutlinedInput-root": {
                         borderRadius: "12px",
-                        "& fieldset": { borderColor: `${ANALYTICS_COLORS.primary}40` },
+                        color: colors.text,
+                        "& fieldset": { borderColor: colors.border },
+                        "&:hover fieldset": { borderColor: colors.primary || ANALYTICS_COLORS.primary },
                       },
                     }}
                   />
@@ -1506,11 +1533,13 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
+                    InputLabelProps={{ shrink: true, sx: { color: colors.textMuted } }}
                     sx={{
                       "& .MuiOutlinedInput-root": {
                         borderRadius: "12px",
-                        "& fieldset": { borderColor: `${ANALYTICS_COLORS.primary}40` },
+                        color: colors.text,
+                        "& fieldset": { borderColor: colors.border },
+                        "&:hover fieldset": { borderColor: colors.primary || ANALYTICS_COLORS.primary },
                       },
                     }}
                   />
@@ -1520,14 +1549,17 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
 
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel>Direction</InputLabel>
+                <InputLabel sx={{ color: colors.textMuted }}>Direction</InputLabel>
                 <Select
                   value={directionFilter}
                   label="Direction"
                   onChange={(e) => setDirectionFilter(e.target.value)}
                   sx={{
                     borderRadius: "12px",
-                    "& .MuiOutlinedInput-notchedOutline": { borderColor: `${ANALYTICS_COLORS.primary}40` },
+                    color: colors.text,
+                    "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border },
+                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: colors.primary || ANALYTICS_COLORS.primary },
+                    "& .MuiSvgIcon-root": { color: colors.textMuted },
                   }}
                 >
                   <MenuItem value="all">All Directions</MenuItem>
@@ -1556,7 +1588,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                       startAdornment: (
                         <>
                           <InputAdornment position="start">
-                            <Search sx={{ color: ANALYTICS_COLORS.textSecondary, fontSize: 20 }} />
+                            <Search sx={{ color: AC.textSecondary, fontSize: 20 }} />
                           </InputAdornment>
                           {params.InputProps.startAdornment}
                         </>
@@ -1565,8 +1597,12 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     sx={{
                       "& .MuiOutlinedInput-root": {
                         borderRadius: "12px",
-                        "& fieldset": { borderColor: `${ANALYTICS_COLORS.primary}40` },
+                        color: colors.text,
+                        "& fieldset": { borderColor: colors.border },
+                        "&:hover fieldset": { borderColor: colors.primary || ANALYTICS_COLORS.primary },
                       },
+                      "& .MuiInputLabel-root": { color: colors.textMuted },
+                      "& .MuiChip-root": { color: colors.text, borderColor: colors.border },
                     }}
                   />
                 )}
@@ -1582,7 +1618,8 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
           sx={{
             mb: 3,
             borderRadius: "16px",
-            border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+            bgcolor: colors.bgPaper,
+            border: `1px solid ${colors.border}`,
             overflow: "hidden",
           }}
         >
@@ -1591,13 +1628,13 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
             onChange={(e, val) => setActiveTab(val)}
             variant="fullWidth"
             sx={{
-              bgcolor: "white",
+              bgcolor: colors.bgPaper,
               "& .MuiTab-root": {
                 textTransform: "none",
                 fontWeight: 600,
                 fontSize: "0.95rem",
                 py: 2,
-                color: ANALYTICS_COLORS.textSecondary,
+                color: AC.textSecondary,
                 "&.Mui-selected": {
                   color: ANALYTICS_COLORS.primary,
                 },
@@ -1635,18 +1672,18 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                         <defs>
                           <linearGradient id="colorConnectedOverview" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0.3} />
-                            <stop offset="95%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0} />
+                            <stop offset="95%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0.02} />
                           </linearGradient>
                           <linearGradient id="colorNotConnectedOverview" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={ANALYTICS_COLORS.danger} stopOpacity={0.3} />
-                            <stop offset="95%" stopColor={ANALYTICS_COLORS.danger} stopOpacity={0} />
+                            <stop offset="95%" stopColor={ANALYTICS_COLORS.danger} stopOpacity={0.02} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="date" tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 12 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                         <Area type="monotone" dataKey="connected" stroke={ANALYTICS_COLORS.success} fillOpacity={1} fill="url(#colorConnectedOverview)" name="Connected" strokeWidth={2} />
                         <Area type="monotone" dataKey="notConnected" stroke={ANALYTICS_COLORS.danger} fillOpacity={1} fill="url(#colorNotConnectedOverview)" name="Not Connected" strokeWidth={2} />
                       </AreaChart>
@@ -1659,25 +1696,25 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                         <defs>
                           <linearGradient id="colorConnectedOverviewSmall" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0.3} />
-                            <stop offset="95%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0} />
+                            <stop offset="95%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0.02} />
                           </linearGradient>
                           <linearGradient id="colorNotConnectedOverviewSmall" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={ANALYTICS_COLORS.danger} stopOpacity={0.3} />
-                            <stop offset="95%" stopColor={ANALYTICS_COLORS.danger} stopOpacity={0} />
+                            <stop offset="95%" stopColor={ANALYTICS_COLORS.danger} stopOpacity={0.02} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="date" tick={{ fill: colors.chartTick, fontSize: 11 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 11 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                         <Area type="monotone" dataKey="connected" stroke={ANALYTICS_COLORS.success} fillOpacity={1} fill="url(#colorConnectedOverviewSmall)" name="Connected" strokeWidth={2} />
                         <Area type="monotone" dataKey="notConnected" stroke={ANALYTICS_COLORS.danger} fillOpacity={1} fill="url(#colorNotConnectedOverviewSmall)" name="Not Connected" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -1689,7 +1726,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   title="Call Status Distribution"
                   chartData={callStatusData}
                   columns={["name", "value"]}
-                  height={280}
+                  height={300}
                   chartElement={
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -1707,7 +1744,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                           ))}
                         </Pie>
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                       </PieChart>
                     </ResponsiveContainer>
                   }
@@ -1729,12 +1766,12 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                           ))}
                         </Pie>
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -1745,15 +1782,15 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   title="Top 5 Performers"
                   chartData={topPerformersData}
                   columns={["name", "totalCalls", "connected"]}
-                  height={280}
+                  height={300}
                   chartElement={
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={topPerformersData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis type="number" />
-                        <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis type="number" tick={{ fill: colors.chartTick }} />
+                        <YAxis type="category" dataKey="name" width={80} tick={{ fill: colors.chartTick, fontSize: 12 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                         <Bar dataKey="connected" fill={ANALYTICS_COLORS.success} name="Connected" radius={[0, 4, 4, 0]} />
                         <Bar dataKey="totalCalls" fill={ANALYTICS_COLORS.primary} name="Total Calls" radius={[0, 4, 4, 0]} />
                       </BarChart>
@@ -1763,18 +1800,18 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   {topPerformersData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={topPerformersData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis type="number" tick={{ fontSize: 10 }} />
-                        <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 10 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis type="number" tick={{ fill: colors.chartTick, fontSize: 10 }} />
+                        <YAxis type="category" dataKey="name" width={70} tick={{ fill: colors.chartTick, fontSize: 10 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Legend wrapperStyle={{ fontSize: 10, color: colors.chartLegend }} />
                         <Bar dataKey="connected" fill={ANALYTICS_COLORS.success} name="Connected" radius={[0, 4, 4, 0]} />
                         <Bar dataKey="totalCalls" fill={ANALYTICS_COLORS.primary} name="Total Calls" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -1785,13 +1822,13 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   title="Calls by Type"
                   chartData={callTypeData}
                   columns={["name", "value"]}
-                  height={280}
+                  height={300}
                   chartElement={
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={callTypeData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="name" tick={{ fill: colors.chartTick, fontSize: 11 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 11 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
                         <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                           {callTypeData.map((entry, index) => (
@@ -1805,9 +1842,9 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   {callTypeData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={callTypeData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-15} textAnchor="end" height={60} />
-                        <YAxis tick={{ fontSize: 10 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="name" tick={{ fill: colors.chartTick, fontSize: 10 }} angle={-15} textAnchor="end" height={60} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 10 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
                         <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                           {callTypeData.map((entry, index) => (
@@ -1818,7 +1855,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -1829,15 +1866,15 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   title="Connection Rate Trend"
                   chartData={connectionRateTrendData}
                   columns={["date", "rate", "total"]}
-                  height={280}
+                  height={300}
                   chartElement={
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={connectionRateTrendData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="date" tick={{ fill: colors.chartTick, fontSize: 11 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 11 }} domain={[0, 100]} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                         <Line type="monotone" dataKey="rate" stroke={ANALYTICS_COLORS.accent} name="Rate %" strokeWidth={3} dot={{ r: 5 }} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -1846,16 +1883,16 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   {connectionRateTrendData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={connectionRateTrendData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="date" tick={{ fill: colors.chartTick, fontSize: 10 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 10 }} domain={[0, 100]} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
                         <Line type="monotone" dataKey="rate" stroke={ANALYTICS_COLORS.accent} name="Rate %" strokeWidth={2} dot={{ r: 3 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -1867,7 +1904,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   title="Call Duration Distribution"
                   chartData={durationDistributionData}
                   columns={["name", "value"]}
-                  height={280}
+                  height={300}
                   chartElement={
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -1885,7 +1922,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                           ))}
                         </Pie>
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                       </PieChart>
                     </ResponsiveContainer>
                   }
@@ -1908,12 +1945,12 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                           ))}
                         </Pie>
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Legend wrapperStyle={{ fontSize: 10, color: colors.chartLegend }} />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -1924,15 +1961,15 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   title="Calls by Day of Week"
                   chartData={dayOfWeekData}
                   columns={["day", "calls", "connected"]}
-                  height={280}
+                  height={300}
                   chartElement={
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={dayOfWeekData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="day" tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 12 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                         <Bar dataKey="calls" fill={ANALYTICS_COLORS.primary} name="Total Calls" radius={[6, 6, 0, 0]} />
                         <Bar dataKey="connected" fill={ANALYTICS_COLORS.success} name="Connected" radius={[6, 6, 0, 0]} />
                       </BarChart>
@@ -1942,18 +1979,18 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   {dayOfWeekData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={dayOfWeekData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="day" tick={{ fill: colors.chartTick, fontSize: 10 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 10 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Legend wrapperStyle={{ fontSize: 10, color: colors.chartLegend }} />
                         <Bar dataKey="calls" fill={ANALYTICS_COLORS.primary} name="Total" radius={[4, 4, 0, 0]} />
                         <Bar dataKey="connected" fill={ANALYTICS_COLORS.success} name="Connected" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -1964,19 +2001,19 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   title="Hourly Call Distribution"
                   chartData={hourlyData}
                   columns={["hour", "calls", "connected"]}
-                  height={280}
+                  height={300}
                   chartElement={
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={hourlyData}>
                         <defs>
                           <linearGradient id="colorHourlyExpand" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0.4} />
-                            <stop offset="95%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0} />
+                            <stop offset="95%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0.02} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
-                        <YAxis tick={{ fontSize: 10 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="hour" tick={{ fill: colors.chartTick, fontSize: 10 }} interval={2} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 10 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
                         <Area type="monotone" dataKey="calls" stroke={ANALYTICS_COLORS.purple} fill="url(#colorHourlyExpand)" name="Calls" strokeWidth={2} />
                       </AreaChart>
@@ -1989,19 +2026,19 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                         <defs>
                           <linearGradient id="colorHourlySmall" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0.4} />
-                            <stop offset="95%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0} />
+                            <stop offset="95%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0.02} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="hour" tick={{ fontSize: 9 }} interval={3} />
-                        <YAxis tick={{ fontSize: 9 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="hour" tick={{ fill: colors.chartTick, fontSize: 9 }} interval={3} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 9 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
                         <Area type="monotone" dataKey="calls" stroke={ANALYTICS_COLORS.purple} fill="url(#colorHourlySmall)" name="Calls" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -2013,13 +2050,14 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   elevation={0}
                   sx={{
                     p: 3,
-                    borderRadius: "20px",
-                    border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+                    borderRadius: "16px",
+                    bgcolor: colors.bgPaper,
+                    border: `1px solid ${colors.border}`,
                     height: "100%",
-                    transition: "all 0.3s ease",
+                    transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
                     "&:hover": {
-                      boxShadow: `0 12px 40px ${ANALYTICS_COLORS.primary}15`,
-                      transform: "translateY(-4px)",
+                      boxShadow: `0 8px 24px ${ANALYTICS_COLORS.primary}15`,
+                      transform: "translateY(-2px)",
                     },
                   }}
                 >
@@ -2054,11 +2092,11 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                             {index + 1}
                           </Avatar>
                           <Box sx={{ flex: 1 }}>
-                            <Typography variant="subtitle1" fontWeight={600} color={ANALYTICS_COLORS.text}>
+                            <Typography variant="subtitle1" fontWeight={600} color={AC.text}>
                               {hour.hour}
                             </Typography>
                             <Box sx={{ display: "flex", gap: 2 }}>
-                              <Typography variant="caption" color={ANALYTICS_COLORS.textSecondary}>
+                              <Typography variant="caption" color={AC.textSecondary}>
                                 {hour.calls} calls
                               </Typography>
                               <Typography variant="caption" color={ANALYTICS_COLORS.success}>
@@ -2082,7 +2120,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     </Box>
                   ) : (
                     <Box sx={{ textAlign: "center", py: 8 }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </Paper>
@@ -2093,15 +2131,15 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   title="Weekly Performance Comparison"
                   chartData={weeklyComparisonData}
                   columns={["week", "totalCalls", "connected", "rate"]}
-                  height={280}
+                  height={300}
                   chartElement={
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={weeklyComparisonData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="week" tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 12 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
                         <Bar dataKey="totalCalls" fill={ANALYTICS_COLORS.primary} name="Total Calls" radius={[6, 6, 0, 0]} />
                         <Bar dataKey="connected" fill={ANALYTICS_COLORS.success} name="Connected" radius={[6, 6, 0, 0]} />
                       </BarChart>
@@ -2111,18 +2149,155 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   {weeklyComparisonData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={weeklyComparisonData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                        <XAxis dataKey="week" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis dataKey="week" tick={{ fill: colors.chartTick, fontSize: 10 }} />
+                        <YAxis tick={{ fill: colors.chartTick, fontSize: 10 }} />
                         <RechartsTooltip content={<CustomChartTooltip />} />
-                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        <Legend wrapperStyle={{ fontSize: 10, color: colors.chartLegend }} />
                         <Bar dataKey="totalCalls" fill={ANALYTICS_COLORS.primary} name="Total" radius={[4, 4, 0, 0]} />
                         <Bar dataKey="connected" fill={ANALYTICS_COLORS.success} name="Connected" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
+                    </Box>
+                  )}
+                </ChartCard>
+              </Grid>
+
+              {/* Row 5: Call Coordinator Distribution */}
+              <Grid item xs={12} md={6}>
+                <ChartCard
+                  title="Call Coordinator Distribution"
+                  chartData={callCoordinatorData}
+                  columns={["name", "value"]}
+                  height={300}
+                  chartElement={
+                    callCoordinatorData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={callCoordinatorData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            paddingAngle={2}
+                            dataKey="value"
+                            label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                            labelLine={{ stroke: colors.chartTick, strokeWidth: 1 }}
+                          >
+                            {callCoordinatorData.map((entry, index) => (
+                              <Cell key={`cell-coordinator-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip content={<CustomChartTooltip />} />
+                          <Legend wrapperStyle={{ color: colors.chartLegend }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                        <Typography variant="body2" sx={{ color: colors.textMuted }}>
+                          No coordinator data available yet
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: colors.textMuted, textAlign: "center", maxWidth: 200 }}>
+                          Data will appear as new calls are logged with coordinator selection
+                        </Typography>
+                      </Box>
+                    )
+                  }
+                >
+                  {callCoordinatorData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={callCoordinatorData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        >
+                          {callCoordinatorData.map((entry, index) => (
+                            <Cell key={`cell-coordinator-small-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip content={<CustomChartTooltip />} />
+                        <Legend wrapperStyle={{ color: colors.chartLegend }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: colors.textMuted }}>
+                        No coordinator data available yet
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: colors.textMuted, textAlign: "center", maxWidth: 200 }}>
+                        Data will appear as new calls are logged with coordinator selection
+                      </Typography>
+                    </Box>
+                  )}
+                </ChartCard>
+              </Grid>
+
+              {/* Call Category Distribution */}
+              <Grid item xs={12} md={6}>
+                <ChartCard
+                  title="Call Category Distribution"
+                  chartData={callCategoryData}
+                  columns={["name", "value"]}
+                  height={300}
+                  chartElement={
+                    callCategoryData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={callCategoryData} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                          <XAxis type="number" tick={{ fill: colors.chartTick, fontSize: 11 }} />
+                          <YAxis dataKey="name" type="category" tick={{ fill: colors.chartTick, fontSize: 10 }} width={100} />
+                          <RechartsTooltip content={<CustomChartTooltip />} />
+                          <Bar dataKey="value" radius={[0, 8, 8, 0]}>
+                            {callCategoryData.map((entry, index) => (
+                              <Cell key={`cell-category-${index}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                        <Typography variant="body2" sx={{ color: colors.textMuted }}>
+                          No category data available yet
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: colors.textMuted, textAlign: "center", maxWidth: 200 }}>
+                          Data will appear as calls are logged with category selection
+                        </Typography>
+                      </Box>
+                    )
+                  }
+                >
+                  {callCategoryData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={callCategoryData} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                        <XAxis type="number" tick={{ fill: colors.chartTick, fontSize: 10 }} />
+                        <YAxis dataKey="name" type="category" tick={{ fill: colors.chartTick, fontSize: 9 }} width={90} />
+                        <RechartsTooltip content={<CustomChartTooltip />} />
+                        <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                          {callCategoryData.map((entry, index) => (
+                            <Cell key={`cell-category-small-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: colors.textMuted }}>
+                        No category data available yet
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: colors.textMuted, textAlign: "center", maxWidth: 200 }}>
+                        Data will appear as calls are logged with category selection
+                      </Typography>
                     </Box>
                   )}
                 </ChartCard>
@@ -2141,10 +2316,11 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   elevation={0}
                   sx={{
                     p: 3,
-                    borderRadius: "20px",
-                    border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+                    borderRadius: "16px",
+                    bgcolor: colors.bgPaper,
+                    border: `1px solid ${colors.border}`,
                     position: "relative",
-                    transition: "all 0.3s ease",
+                    transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
                     "&:hover": {
                       boxShadow: `0 12px 40px ${ANALYTICS_COLORS.primary}15`,
                     },
@@ -2164,18 +2340,18 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                             <defs>
                               <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor={ANALYTICS_COLORS.primary} stopOpacity={0.3} />
-                                <stop offset="95%" stopColor={ANALYTICS_COLORS.primary} stopOpacity={0} />
+                                <stop offset="95%" stopColor={ANALYTICS_COLORS.primary} stopOpacity={0.02} />
                               </linearGradient>
                               <linearGradient id="colorConnected" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0.3} />
-                                <stop offset="95%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0} />
+                                <stop offset="95%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0.02} />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                            <XAxis dataKey="date" />
-                            <YAxis />
+                            <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                            <XAxis dataKey="date" tick={{ fill: colors.chartTick }} />
+                            <YAxis tick={{ fill: colors.chartTick }} />
                             <RechartsTooltip content={<CustomChartTooltip />} />
-                            <Legend />
+                            <Legend wrapperStyle={{ color: colors.chartLegend }} />
                             <Area type="monotone" dataKey="total" stroke={ANALYTICS_COLORS.primary} fillOpacity={1} fill="url(#colorTotal)" name="Total Calls" />
                             <Area type="monotone" dataKey="connected" stroke={ANALYTICS_COLORS.success} fillOpacity={1} fill="url(#colorConnected)" name="Connected" />
                             <Line type="monotone" dataKey="notConnected" stroke={ANALYTICS_COLORS.danger} name="Not Connected" strokeWidth={2} dot={{ r: 4 }} />
@@ -2185,24 +2361,24 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     />
                   )}
                   {dailyTrendsData.length > 0 ? (
-                    <Box sx={{ height: 350 }}>
+                    <Box sx={{ height: 300 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={dailyTrendsData}>
                           <defs>
                             <linearGradient id="colorTotalMain" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor={ANALYTICS_COLORS.primary} stopOpacity={0.3} />
-                              <stop offset="95%" stopColor={ANALYTICS_COLORS.primary} stopOpacity={0} />
+                              <stop offset="95%" stopColor={ANALYTICS_COLORS.primary} stopOpacity={0.02} />
                             </linearGradient>
                             <linearGradient id="colorConnectedMain" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0.3} />
-                              <stop offset="95%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0} />
+                              <stop offset="95%" stopColor={ANALYTICS_COLORS.success} stopOpacity={0.02} />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                          <YAxis tick={{ fontSize: 12 }} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                          <XAxis dataKey="date" tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                          <YAxis tick={{ fill: colors.chartTick, fontSize: 12 }} />
                           <RechartsTooltip content={<CustomChartTooltip />} />
-                          <Legend />
+                          <Legend wrapperStyle={{ color: colors.chartLegend }} />
                           <Area type="monotone" dataKey="total" stroke={ANALYTICS_COLORS.primary} fillOpacity={1} fill="url(#colorTotalMain)" name="Total Calls" strokeWidth={2} />
                           <Area type="monotone" dataKey="connected" stroke={ANALYTICS_COLORS.success} fillOpacity={1} fill="url(#colorConnectedMain)" name="Connected" strokeWidth={2} />
                           <Line type="monotone" dataKey="notConnected" stroke={ANALYTICS_COLORS.danger} name="Not Connected" strokeWidth={2} dot={{ r: 3 }} />
@@ -2211,7 +2387,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     </Box>
                   ) : (
                     <Box sx={{ textAlign: "center", py: 8 }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </Paper>
@@ -2223,10 +2399,11 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   elevation={0}
                   sx={{
                     p: 3,
-                    borderRadius: "20px",
-                    border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+                    borderRadius: "16px",
+                    bgcolor: colors.bgPaper,
+                    border: `1px solid ${colors.border}`,
                     position: "relative",
-                    transition: "all 0.3s ease",
+                    transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
                     "&:hover": {
                       boxShadow: `0 12px 40px ${ANALYTICS_COLORS.primary}15`,
                     },
@@ -2243,11 +2420,11 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                       chartElement={
                         <ResponsiveContainer width="100%" height={400}>
                           <BarChart data={dailyTrendsData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis />
+                            <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                            <XAxis dataKey="date" tick={{ fill: colors.chartTick }} />
+                            <YAxis tick={{ fill: colors.chartTick }} />
                             <RechartsTooltip content={<CustomChartTooltip />} />
-                            <Legend />
+                            <Legend wrapperStyle={{ color: colors.chartLegend }} />
                             <Bar dataKey="outbound" fill={ANALYTICS_COLORS.primary} name="Outbound" radius={[8, 8, 0, 0]} />
                             <Bar dataKey="inbound" fill={ANALYTICS_COLORS.success} name="Inbound" radius={[8, 8, 0, 0]} />
                           </BarChart>
@@ -2259,11 +2436,11 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     <Box sx={{ height: 300 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={dailyTrendsData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 12 }} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                          <XAxis dataKey="date" tick={{ fill: colors.chartTick, fontSize: 11 }} />
+                          <YAxis tick={{ fill: colors.chartTick, fontSize: 12 }} />
                           <RechartsTooltip content={<CustomChartTooltip />} />
-                          <Legend />
+                          <Legend wrapperStyle={{ color: colors.chartLegend }} />
                           <Bar dataKey="outbound" fill={ANALYTICS_COLORS.primary} name="Outbound" radius={[6, 6, 0, 0]} />
                           <Bar dataKey="inbound" fill={ANALYTICS_COLORS.success} name="Inbound" radius={[6, 6, 0, 0]} />
                         </BarChart>
@@ -2271,7 +2448,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     </Box>
                   ) : (
                     <Box sx={{ textAlign: "center", py: 8 }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </Paper>
@@ -2283,10 +2460,11 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   elevation={0}
                   sx={{
                     p: 3,
-                    borderRadius: "20px",
-                    border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+                    borderRadius: "16px",
+                    bgcolor: colors.bgPaper,
+                    border: `1px solid ${colors.border}`,
                     position: "relative",
-                    transition: "all 0.3s ease",
+                    transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
                     "&:hover": {
                       boxShadow: `0 12px 40px ${ANALYTICS_COLORS.primary}15`,
                     },
@@ -2303,11 +2481,11 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                       chartElement={
                         <ResponsiveContainer width="100%" height={400}>
                           <BarChart data={hourlyData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="hour" />
-                            <YAxis />
+                            <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                            <XAxis dataKey="hour" tick={{ fill: colors.chartTick }} />
+                            <YAxis tick={{ fill: colors.chartTick }} />
                             <RechartsTooltip content={<CustomChartTooltip />} />
-                            <Legend />
+                            <Legend wrapperStyle={{ color: colors.chartLegend }} />
                             <Bar dataKey="calls" fill={ANALYTICS_COLORS.purple} name="Total Calls" radius={[6, 6, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
@@ -2321,12 +2499,12 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                           <defs>
                             <linearGradient id="colorHourly" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0.4} />
-                              <stop offset="95%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0} />
+                              <stop offset="95%" stopColor={ANALYTICS_COLORS.purple} stopOpacity={0.02} />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke={`${ANALYTICS_COLORS.primary}20`} />
-                          <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
-                          <YAxis tick={{ fontSize: 12 }} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                          <XAxis dataKey="hour" tick={{ fill: colors.chartTick, fontSize: 10 }} interval={2} />
+                          <YAxis tick={{ fill: colors.chartTick, fontSize: 12 }} />
                           <RechartsTooltip content={<CustomChartTooltip />} />
                           <Area type="monotone" dataKey="calls" stroke={ANALYTICS_COLORS.purple} fill="url(#colorHourly)" name="Calls" strokeWidth={2} />
                         </AreaChart>
@@ -2334,7 +2512,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     </Box>
                   ) : (
                     <Box sx={{ textAlign: "center", py: 8 }}>
-                      <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                      <Typography color={AC.textSecondary}>No data available</Typography>
                     </Box>
                   )}
                 </Paper>
@@ -2350,7 +2528,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
               <Typography variant="h6" fontWeight={700} color={ANALYTICS_COLORS.primary} sx={{ mb: 0.5 }}>
                 Agent Performance Rankings
               </Typography>
-              <Typography variant="body2" color={ANALYTICS_COLORS.textSecondary}>
+              <Typography variant="body2" color={AC.textSecondary}>
                 Top performing agents based on call volume and success rate
               </Typography>
             </Box>
@@ -2368,12 +2546,13 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                 elevation={0}
                 sx={{
                   p: 6,
-                  borderRadius: "20px",
-                  border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+                  borderRadius: "16px",
+                  bgcolor: colors.bgPaper,
+                  border: `1px solid ${colors.border}`,
                   textAlign: "center",
                 }}
               >
-                <Typography color={ANALYTICS_COLORS.textSecondary}>No agent performance data available</Typography>
+                <Typography color={AC.textSecondary}>No agent performance data available</Typography>
               </Paper>
             )}
           </Box>
@@ -2385,18 +2564,19 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
             <Paper
               elevation={0}
               sx={{
-                borderRadius: "20px",
-                border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+                borderRadius: "16px",
+                bgcolor: colors.bgPaper,
+                border: `1px solid ${colors.border}`,
                 overflow: "hidden",
               }}
             >
-              <Box sx={{ p: 3, borderBottom: `1px solid ${ANALYTICS_COLORS.primary}20` }}>
+              <Box sx={{ p: 3, borderBottom: `1px solid ${colors.border}` }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <Box>
-                    <Typography variant="h6" fontWeight={700} color={ANALYTICS_COLORS.primary}>
+                    <Typography variant="h6" fontWeight={700} color={colors.primary || ANALYTICS_COLORS.primary}>
                       Daily Call Statistics
                     </Typography>
-                    <Typography variant="body2" color={ANALYTICS_COLORS.textSecondary}>
+                    <Typography variant="body2" color={colors.textSec}>
                       Detailed breakdown by day
                     </Typography>
                   </Box>
@@ -2431,21 +2611,21 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                   <TableContainer>
                     <Table>
                       <TableHead>
-                        <TableRow sx={{ bgcolor: `${ANALYTICS_COLORS.primary}08` }}>
-                          <TableCell sx={{ fontWeight: 700, color: ANALYTICS_COLORS.primary }}>Date</TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, color: ANALYTICS_COLORS.primary }}>
+                        <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
+                          <TableCell sx={{ fontWeight: 700, color: colors.primary || ANALYTICS_COLORS.primary, borderBottomColor: colors.border }}>Date</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, color: colors.primary || ANALYTICS_COLORS.primary, borderBottomColor: colors.border }}>
                             Total Calls
                           </TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, color: ANALYTICS_COLORS.primary }}>
+                          <TableCell align="center" sx={{ fontWeight: 700, color: colors.primary || ANALYTICS_COLORS.primary, borderBottomColor: colors.border }}>
                             Connected
                           </TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, color: ANALYTICS_COLORS.primary }}>
+                          <TableCell align="center" sx={{ fontWeight: 700, color: colors.primary || ANALYTICS_COLORS.primary, borderBottomColor: colors.border }}>
                             Not Connected
                           </TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, color: ANALYTICS_COLORS.primary }}>
+                          <TableCell align="center" sx={{ fontWeight: 700, color: colors.primary || ANALYTICS_COLORS.primary, borderBottomColor: colors.border }}>
                             Success Rate
                           </TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, color: ANALYTICS_COLORS.primary }}>
+                          <TableCell align="center" sx={{ fontWeight: 700, color: colors.primary || ANALYTICS_COLORS.primary, borderBottomColor: colors.border }}>
                             Avg Duration
                           </TableCell>
                         </TableRow>
@@ -2456,13 +2636,13 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                             key={index}
                             hover
                             sx={{
-                              "&:hover": { bgcolor: `${ANALYTICS_COLORS.primary}08` },
+                              "&:hover": { bgcolor: colors.primarySoft || `${ANALYTICS_COLORS.primary}08` },
                             }}
                           >
-                            <TableCell>
+                            <TableCell sx={{ borderBottomColor: colors.border }}>
                               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                <CalendarToday sx={{ fontSize: 18, color: ANALYTICS_COLORS.primary }} />
-                                <Typography fontWeight={500}>
+                                <CalendarToday sx={{ fontSize: 18, color: colors.primary || ANALYTICS_COLORS.primary }} />
+                                <Typography fontWeight={500} color={colors.text}>
                                   {new Date(day.date).toLocaleDateString("en-US", {
                                     year: "numeric",
                                     month: "short",
@@ -2471,18 +2651,18 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                                 </Typography>
                               </Box>
                             </TableCell>
-                            <TableCell align="center">
+                            <TableCell align="center" sx={{ borderBottomColor: colors.border }}>
                               <Chip
                                 label={day.totalCalls}
                                 size="small"
                                 sx={{
                                   bgcolor: `${ANALYTICS_COLORS.primary}15`,
-                                  color: ANALYTICS_COLORS.primary,
+                                  color: colors.primary || ANALYTICS_COLORS.primary,
                                   fontWeight: 600,
                                 }}
                               />
                             </TableCell>
-                            <TableCell align="center">
+                            <TableCell align="center" sx={{ borderBottomColor: colors.border }}>
                               <Chip
                                 label={day.connected}
                                 size="small"
@@ -2493,7 +2673,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                                 }}
                               />
                             </TableCell>
-                            <TableCell align="center">
+                            <TableCell align="center" sx={{ borderBottomColor: colors.border }}>
                               <Chip
                                 label={day.notConnected}
                                 size="small"
@@ -2504,7 +2684,7 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                                 }}
                               />
                             </TableCell>
-                            <TableCell align="center">
+                            <TableCell align="center" sx={{ borderBottomColor: colors.border }}>
                               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
                                 <LinearProgress
                                   variant="determinate"
@@ -2525,15 +2705,15 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                                     },
                                   }}
                                 />
-                                <Typography variant="body2" fontWeight={600}>
+                                <Typography variant="body2" fontWeight={600} color={colors.text}>
                                   {day.completionRate}%
                                 </Typography>
                               </Box>
                             </TableCell>
-                            <TableCell align="center">
+                            <TableCell align="center" sx={{ borderBottomColor: colors.border }}>
                               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5 }}>
-                                <Schedule sx={{ fontSize: 16, color: ANALYTICS_COLORS.textSecondary }} />
-                                <Typography variant="body2" color={ANALYTICS_COLORS.textSecondary}>
+                                <Schedule sx={{ fontSize: 16, color: colors.textSec }} />
+                                <Typography variant="body2" color={colors.textSec}>
                                   {day.avgDuration > 0 ? `${Math.floor(day.avgDuration / 60)}m ${day.avgDuration % 60}s` : "N/A"}
                                 </Typography>
                               </Box>
@@ -2555,14 +2735,19 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
                     }}
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     sx={{
-                      borderTop: `1px solid ${ANALYTICS_COLORS.primary}20`,
-                      ".MuiTablePagination-select": { borderRadius: "8px" },
+                      borderTop: `1px solid ${colors.border}`,
+                      color: colors.text,
+                      ".MuiTablePagination-select": { borderRadius: "8px", color: colors.text },
+                      ".MuiTablePagination-selectLabel": { color: colors.textSec },
+                      ".MuiTablePagination-displayedRows": { color: colors.textSec },
+                      ".MuiTablePagination-selectIcon": { color: colors.textMuted },
+                      ".MuiIconButton-root": { color: colors.textSec },
                     }}
                   />
                 </>
               ) : (
                 <Box sx={{ p: 6, textAlign: "center" }}>
-                  <Typography color={ANALYTICS_COLORS.textSecondary}>No data available</Typography>
+                  <Typography color={AC.textSecondary}>No data available</Typography>
                 </Box>
               )}
             </Paper>
@@ -2582,6 +2767,8 @@ const CallAnalytics = ({ callLogs, agents, onBack, offlineVisitsData = {} }) => 
 
 // Offline Visits Analytics Tab Component
 const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
+  const { colors } = useThemeMode();
+  const AC = { ...ANALYTICS_COLORS, text: colors.text, textSecondary: colors.textSec, background: colors.bg, cardBg: colors.bgPaper };
   const { users = [], visitLogs = [], manualCallLogs = [], trips = [] } = offlineVisitsData;
 
   // Calculate stats
@@ -2724,13 +2911,14 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
         elevation={0}
         sx={{
           p: 6,
-          borderRadius: "20px",
-          border: `1px solid ${ANALYTICS_COLORS.primary}20`,
+          borderRadius: "16px",
+          bgcolor: colors.bgPaper,
+          border: `1px solid ${colors.border}`,
           textAlign: "center",
         }}
       >
-        <DirectionsWalk sx={{ fontSize: 60, color: ANALYTICS_COLORS.textSecondary, mb: 2 }} />
-        <Typography variant="h6" color={ANALYTICS_COLORS.textSecondary}>
+        <DirectionsWalk sx={{ fontSize: 60, color: AC.textSecondary, mb: 2 }} />
+        <Typography variant="h6" color={AC.textSecondary}>
           No offline visits data available
         </Typography>
       </Paper>
@@ -2745,7 +2933,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           elevation={0}
           sx={{
             flex: 1,
-            bgcolor: "#0f172a",
+            bgcolor: colors.bg,
             borderRadius: 2,
             height: 420,
             display: "flex",
@@ -2753,7 +2941,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           }}
         >
           <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.textSec }}>
               Weekly Activity Trend
             </Typography>
           </Box>
@@ -2763,14 +2951,14 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
                 <defs>
                   <linearGradient id="visitsGradientCA" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dy={10} />
-                <YAxis stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dx={-10} />
-                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                <XAxis dataKey="day" stroke={colors.chartTick} fontSize={12} axisLine={false} tickLine={false} dy={10} />
+                <YAxis stroke={colors.chartTick} fontSize={12} axisLine={false} tickLine={false} dx={-10} />
+                <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText, borderRadius: 8 }} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8, color: colors.chartLegend }} />
                 <Area type="monotone" dataKey="visits" name="Visits" fill="url(#visitsGradientCA)" stroke="#10b981" strokeWidth={2} />
                 <Bar dataKey="trips" name="Trips" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                 <Line type="monotone" dataKey="calls" name="Calls" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: "#8b5cf6", r: 4 }} />
@@ -2783,7 +2971,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           elevation={0}
           sx={{
             flex: 1,
-            bgcolor: "#0f172a",
+            bgcolor: colors.bg,
             borderRadius: 2,
             height: 420,
             display: "flex",
@@ -2791,7 +2979,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           }}
         >
           <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.textSec }}>
               Visit Types
             </Typography>
           </Box>
@@ -2812,14 +3000,14 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
+                <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText, borderRadius: 8 }} />
                 <Legend
                   verticalAlign="bottom"
                   height={50}
                   iconType="circle"
                   iconSize={10}
-                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                  formatter={(value) => <span style={{ color: "#e2e8f0", marginLeft: 6 }}>{value}</span>}
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8, color: colors.chartLegend }}
+                  formatter={(value) => <span style={{ color: colors.textSec, marginLeft: 6 }}>{value}</span>}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -2833,7 +3021,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           elevation={0}
           sx={{
             flex: 1,
-            bgcolor: "#0f172a",
+            bgcolor: colors.bg,
             borderRadius: 2,
             height: 420,
             display: "flex",
@@ -2841,18 +3029,18 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           }}
         >
           <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.textSec }}>
               Monthly Trend (6 Months)
             </Typography>
           </Box>
           <Box sx={{ flex: 1, px: 1, pb: 1.5 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={analyticsData.monthlyTrend} margin={{ top: 20, right: 30, left: 20, bottom: 45 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dy={10} />
-                <YAxis stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dx={-10} />
-                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                <XAxis dataKey="month" stroke={colors.chartTick} fontSize={12} axisLine={false} tickLine={false} dy={10} />
+                <YAxis stroke={colors.chartTick} fontSize={12} axisLine={false} tickLine={false} dx={-10} />
+                <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText, borderRadius: 8 }} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8, color: colors.chartLegend }} />
                 <Bar dataKey="visits" name="Visits" fill="#10b981" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="trips" name="Trips" fill="#f59e0b" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -2864,7 +3052,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           elevation={0}
           sx={{
             flex: 1,
-            bgcolor: "#0f172a",
+            bgcolor: colors.bg,
             borderRadius: 2,
             height: 420,
             display: "flex",
@@ -2872,18 +3060,18 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           }}
         >
           <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.textSec }}>
               Top Performers
             </Typography>
           </Box>
           <Box sx={{ flex: 1, px: 1, pb: 1.5 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={analyticsData.topPerformers.slice(0, 5)} layout="vertical" margin={{ top: 20, right: 30, left: 10, bottom: 45 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} />
-                <YAxis dataKey="name" type="category" stroke="#94a3b8" width={80} fontSize={12} axisLine={false} tickLine={false} />
-                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} horizontal={false} />
+                <XAxis type="number" stroke={colors.chartTick} fontSize={12} axisLine={false} tickLine={false} />
+                <YAxis dataKey="name" type="category" stroke={colors.chartTick} width={80} fontSize={12} axisLine={false} tickLine={false} />
+                <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText, borderRadius: 8 }} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8, color: colors.chartLegend }} />
                 <Bar dataKey="visits" name="Visits" fill="#10b981" radius={[0, 4, 4, 0]} barSize={18} />
                 <Bar dataKey="trips" name="Trips" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={18} />
                 <Bar dataKey="calls" name="Calls" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={18} />
@@ -2899,7 +3087,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           elevation={0}
           sx={{
             flex: 1,
-            bgcolor: "#0f172a",
+            bgcolor: colors.bg,
             borderRadius: 2,
             height: 420,
             display: "flex",
@@ -2907,7 +3095,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           }}
         >
           <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.textSec }}>
               Visits by Hour of Day
             </Typography>
           </Box>
@@ -2917,14 +3105,14 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
                 <defs>
                   <linearGradient id="hourlyGradientCA" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="hour" stroke="#94a3b8" fontSize={11} axisLine={false} tickLine={false} dy={10} />
-                <YAxis stroke="#94a3b8" fontSize={12} axisLine={false} tickLine={false} dx={-10} />
-                <RechartsTooltip contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: 8 }} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} vertical={false} />
+                <XAxis dataKey="hour" stroke={colors.chartTick} fontSize={11} axisLine={false} tickLine={false} dy={10} />
+                <YAxis stroke={colors.chartTick} fontSize={12} axisLine={false} tickLine={false} dx={-10} />
+                <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText, borderRadius: 8 }} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, paddingTop: 8, color: colors.chartLegend }} />
                 <Area type="monotone" dataKey="visits" name="Visits" stroke="#0ea5e9" fill="url(#hourlyGradientCA)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
@@ -2935,7 +3123,7 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           elevation={0}
           sx={{
             flex: 1,
-            bgcolor: "#0f172a",
+            bgcolor: colors.bg,
             borderRadius: 2,
             height: 420,
             display: "flex",
@@ -2943,35 +3131,35 @@ const OfflineVisitsAnalyticsTab = ({ offlineVisitsData }) => {
           }}
         >
           <Box sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "#e2e8f0" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.textSec }}>
               Summary Statistics
             </Typography>
           </Box>
           <Box sx={{ flex: 1, p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-              <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2 }}>
+              <Card sx={{ bgcolor: colors.isDark ? "#1e293b" : colors.bgPaper, p: 2, borderRadius: 2 }}>
                 <Typography variant="h3" sx={{ color: "#10b981", fontWeight: 700 }}>{totalVisits}</Typography>
-                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Total Visits</Typography>
+                <Typography variant="body2" sx={{ color: colors.textMuted }}>Total Visits</Typography>
               </Card>
-              <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2 }}>
+              <Card sx={{ bgcolor: colors.isDark ? "#1e293b" : colors.bgPaper, p: 2, borderRadius: 2 }}>
                 <Typography variant="h3" sx={{ color: "#f59e0b", fontWeight: 700 }}>{totalTrips}</Typography>
-                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Total Trips</Typography>
+                <Typography variant="body2" sx={{ color: colors.textMuted }}>Total Trips</Typography>
               </Card>
-              <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2 }}>
+              <Card sx={{ bgcolor: colors.isDark ? "#1e293b" : colors.bgPaper, p: 2, borderRadius: 2 }}>
                 <Typography variant="h3" sx={{ color: "#8b5cf6", fontWeight: 700 }}>{totalManualCalls}</Typography>
-                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Manual Calls</Typography>
+                <Typography variant="body2" sx={{ color: colors.textMuted }}>Manual Calls</Typography>
               </Card>
-              <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2 }}>
+              <Card sx={{ bgcolor: colors.isDark ? "#1e293b" : colors.bgPaper, p: 2, borderRadius: 2 }}>
                 <Typography variant="h3" sx={{ color: "#0ea5e9", fontWeight: 700 }}>{connectedCalls}</Typography>
-                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Connected</Typography>
+                <Typography variant="body2" sx={{ color: colors.textMuted }}>Connected</Typography>
               </Card>
             </Box>
-            <Card sx={{ bgcolor: "#1e293b", p: 2, borderRadius: 2, flex: 1 }}>
-              <Typography variant="subtitle2" sx={{ color: "#e2e8f0", mb: 1.5, fontWeight: 600 }}>Top Partners</Typography>
+            <Card sx={{ bgcolor: colors.isDark ? "#1e293b" : colors.bgPaper, p: 2, borderRadius: 2, flex: 1 }}>
+              <Typography variant="subtitle2" sx={{ color: colors.textSec, mb: 1.5, fontWeight: 600 }}>Top Partners</Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 {analyticsData.visitsByPartner.slice(0, 4).map((partner, idx) => (
                   <Box key={idx} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography variant="body2" sx={{ color: "#94a3b8" }}>{partner.name}</Typography>
+                    <Typography variant="body2" sx={{ color: colors.textMuted }}>{partner.name}</Typography>
                     <Chip size="small" label={partner.value} sx={{ bgcolor: CHART_COLORS[idx % CHART_COLORS.length], color: "white", fontWeight: 600 }} />
                   </Box>
                 ))}

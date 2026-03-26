@@ -73,6 +73,15 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber, agentType, defaultPa
           ? "Client Number must be exactly 10 digits"
           : ""
       );
+    } else if (field === "callConnected") {
+      setFormData((prev) => ({
+        ...prev,
+        callConnected: value,
+        // Clear notConnectedReason when switching to Connected
+        ...(value === true && { notConnectedReason: "", callCategory: "" }),
+        // Clear connected-only fields when switching to Not Connected
+        ...(value === false && { callStatus: "", callRating: "", callRatingNumeric: "", callCategory: "" }),
+      }));
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -157,6 +166,10 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber, agentType, defaultPa
         }
       }
     } else {
+      if (!formData.callCategory) {
+        alert("Please select a Call Category");
+        return;
+      }
       if (!formData.notConnectedReason) {
         alert("Please select a Not Connected Reason");
         return;
@@ -195,7 +208,9 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber, agentType, defaultPa
     : ["Client", "Branch Manager", "Nurse"];
 
   const callCategories = agentType === "Health"
-    ? ["BM Review Done", "Consultation Done", "Customer Awareness Done"]
+    ? (formData.callConnected
+        ? ["BM Review Done", "Consultation Done", "Customer Awareness Done"]
+        : ["BM Review Not Done", "Consultation Not Done", "Customer Awareness Not Done"])
     : [
         "Query Update",
         "Claim Status",
@@ -651,88 +666,88 @@ const ManualCallLogForm = ({ onSubmit, initialClientNumber, agentType, defaultPa
           </FormControl>
         </Grid>
 
-        {formData.callConnected ? (
-          <>
-            {/* Call Category Dropdown */}
-            <Grid item xs={12}>
-              <FormControl fullWidth variant="outlined" required>
-                <InputLabel
-                  id="call-category-label"
-                  shrink={true}
-                  sx={{
-                    fontSize: "0.85rem",
-                    fontWeight: 600,
-                    color: formData.callCategory ? "#546e7a" : "#ff9800",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    "&.Mui-focused": {
-                      color: formData.callCategory ? "#26a69a" : "#ff9800",
-                    },
-                  }}
-                >
-                  Call Category *
-                </InputLabel>
-                <Select
-                  labelId="call-category-label"
-                  value={formData.callCategory}
-                  onChange={(e) =>
-                    handleInputChange("callCategory", e.target.value)
-                  }
-                  label="Call Category *"
-                  required
-                  sx={{
-                    borderRadius: "12px",
+        {/* Call Category Dropdown - Always visible */}
+        <Grid item xs={12}>
+          <FormControl fullWidth variant="outlined" required>
+            <InputLabel
+              id="call-category-label"
+              shrink={true}
+              sx={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: formData.callCategory ? "#546e7a" : "#ff9800",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                "&.Mui-focused": {
+                  color: formData.callCategory ? "#26a69a" : "#ff9800",
+                },
+              }}
+            >
+              Call Category *
+            </InputLabel>
+            <Select
+              labelId="call-category-label"
+              value={formData.callCategory}
+              onChange={(e) =>
+                handleInputChange("callCategory", e.target.value)
+              }
+              label="Call Category *"
+              required
+              sx={{
+                borderRadius: "12px",
+                backgroundColor: "#ffffff",
+                color: "#1e293b",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.callCategory
+                    ? "rgba(38, 166, 154, 0.3)"
+                    : "#ff9800",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.callCategory
+                    ? "#26a69a"
+                    : "#ff9800",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#26a69a",
+                },
+                "& .MuiSelect-icon": {
+                  color: "#546e7a",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
                     backgroundColor: "#ffffff",
-                    color: "#1e293b",
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: formData.callCategory
-                        ? "rgba(38, 166, 154, 0.3)"
-                        : "#ff9800",
-                    },
-                    "&:hover .MuiOutlinedInput-notchedOutline": {
-                      borderColor: formData.callCategory
-                        ? "#26a69a"
-                        : "#ff9800",
-                    },
-                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                      borderColor: "#26a69a",
-                    },
-                    "& .MuiSelect-icon": {
-                      color: "#546e7a",
-                    },
-                  }}
-                  MenuProps={{
-                    PaperProps: {
-                      sx: {
-                        backgroundColor: "#ffffff",
-                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
-                        borderRadius: "12px",
-                        "& .MuiMenuItem-root": {
-                          color: "#1e293b",
-                          "&:hover": {
-                            backgroundColor: "rgba(38, 166, 154, 0.1)",
-                          },
-                          "&.Mui-disabled": {
-                            color: "#546e7a",
-                          },
-                        },
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                    borderRadius: "12px",
+                    "& .MuiMenuItem-root": {
+                      color: "#1e293b",
+                      "&:hover": {
+                        backgroundColor: "rgba(38, 166, 154, 0.1)",
+                      },
+                      "&.Mui-disabled": {
+                        color: "#546e7a",
                       },
                     },
-                  }}
-                  displayEmpty
-                >
-                  <MenuItem value="" disabled>
-                    Select Category
-                  </MenuItem>
-                  {callCategories.map((category) => (
-                    <MenuItem key={category} value={category}>
-                      {category}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+                  },
+                },
+              }}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Category
+              </MenuItem>
+              {callCategories.map((category) => (
+                <MenuItem key={category} value={category}>
+                  {category}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
 
+        {formData.callConnected ? (
+          <>
             {/* Call Rating - Shown only for Health agent type with specific categories */}
             {showCallRating && (
               <Grid item xs={12} sm={6}>

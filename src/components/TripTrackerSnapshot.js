@@ -24,6 +24,8 @@ import {
   CloudDone,
   CloudQueue,
 } from "@mui/icons-material";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../firebaseConfig";
 import { useLazyTimer, formatDuration } from "../hooks/useLazyTimer";
 import {
   saveActiveTrip,
@@ -32,6 +34,8 @@ import {
   queueSync,
 } from "../utils/snapshotUtils";
 import { syncService } from "../utils/syncService";
+import { calculateChainDistance } from "../services/googleMapsService";
+import { REIMBURSEMENT_CONFIG, calculateReimbursement } from "../config/reimbursementConfig";
 
 /**
  * OPTIMIZED Trip Tracker - Snapshot Architecture
@@ -300,14 +304,14 @@ function TripTrackerSnapshot({ agentId, agentCollection }) {
     }
   };
 
-  // End trip - SNAPSHOT APPROACH
+  // End trip - SNAPSHOT APPROACH with Google Maps road distance
   const handleEndTrip = async () => {
     try {
       setLocationError(null);
       setLoading(true);
       const endLocation = await getCurrentLocation();
 
-      // Calculate total distance (including all stops)
+      // Calculate total Haversine distance (including all stops) - kept for backward compatibility
       let totalDistance = 0;
       const locations = [
         activeTrip.startLocation,
@@ -331,6 +335,86 @@ function TripTrackerSnapshot({ agentId, agentCollection }) {
       const endTime = new Date();
       const totalDuration = endTime - startTime;
 
+      // --- ENHANCED: Fetch clinic visits during this trip and calculate road distance ---
+      let visitLocations = [];
+      let routeResult = null;
+      let reimbursementData = null;
+
+      try {
+        if (navigator.onLine) {
+          // Fetch visitLogs that occurred during this trip
+          const visitLogsRef = collection(db, agentCollection, agentId, "visitLogs");
+          const visitLogsSnap = await getDocs(visitLogsRef);
+
+          // Filter visits that occurred during this trip's time window
+          const tripStartMs = startTime.getTime();
+          const tripEndMs = endTime.getTime();
+
+          const tripsVisits = visitLogsSnap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter((visit) => {
+              const visitTime = visit.punchInTime
+                ? new Date(visit.punchInTime).getTime()
+                : visit.createdAt?.toDate?.()
+                ? visit.createdAt.toDate().getTime()
+                : 0;
+              return visitTime >= tripStartMs && visitTime <= tripEndMs;
+            })
+            .sort((a, b) => {
+              const timeA = new Date(a.punchInTime || 0).getTime();
+              const timeB = new Date(b.punchInTime || 0).getTime();
+              return timeA - timeB;
+            });
+
+          visitLocations = tripsVisits
+            .filter((v) => v.punchInLocation?.latitude && v.punchInLocation?.longitude)
+            .map((v) => ({
+              visitLogId: v.id,
+              clinicCode: v.clinicCode || v.partnerName || "Visit",
+              punchInLocation: v.punchInLocation,
+              punchInTime: v.punchInTime,
+            }));
+
+          // Build waypoints chain: Start → Clinic1 → Clinic2 → ... → End
+          const waypoints = [
+            {
+              lat: activeTrip.startLocation.latitude,
+              lng: activeTrip.startLocation.longitude,
+              label: "Trip Start",
+            },
+            ...visitLocations.map((v) => ({
+              lat: v.punchInLocation.latitude,
+              lng: v.punchInLocation.longitude,
+              label: v.clinicCode,
+            })),
+            {
+              lat: endLocation.latitude,
+              lng: endLocation.longitude,
+              label: "Trip End",
+            },
+          ];
+
+          // Calculate road distance via Google Maps API (chain calculation)
+          if (waypoints.length >= 2) {
+            routeResult = await calculateChainDistance(waypoints);
+
+            // Calculate reimbursement based on road distance
+            const roadDistance = routeResult.allSegmentsSuccess
+              ? routeResult.summary.roadTotalKm
+              : null;
+
+            reimbursementData = {
+              ratePerKm: REIMBURSEMENT_CONFIG.ratePerKm,
+              calculatedAmount: roadDistance ? calculateReimbursement(roadDistance) : null,
+              calculatedAt: new Date().toISOString(),
+              status: "calculated",
+            };
+          }
+        }
+      } catch (routeError) {
+        console.error("Error calculating road distance (trip will still be saved):", routeError);
+      }
+
       const completedTrip = {
         ...activeTrip,
         endLocation,
@@ -340,6 +424,19 @@ function TripTrackerSnapshot({ agentId, agentCollection }) {
         status: 'completed',
         updatedAt: new Date().toISOString(),
       };
+
+      // Add enhanced route data if available
+      if (visitLocations.length > 0) {
+        completedTrip.visitLocations = visitLocations;
+      }
+      if (routeResult) {
+        completedTrip.routeSegments = routeResult.segments;
+        completedTrip.distanceSummary = routeResult.summary;
+        completedTrip.googleMapsStatus = routeResult.allSegmentsSuccess ? "success" : "partial";
+      }
+      if (reimbursementData) {
+        completedTrip.reimbursement = reimbursementData;
+      }
 
       // Clear localStorage
       clearActiveTrip(agentId);
@@ -365,11 +462,24 @@ function TripTrackerSnapshot({ agentId, agentCollection }) {
 
       setConfirmDialog(false);
 
-      alert(
-        `Trip completed!\n\nTotal Distance: ${totalDistance.toFixed(2)} km\nTotal Stops: ${
-          activeTrip.stops?.length || 0
-        }\nDuration: ${formatDuration(totalDuration)}`
-      );
+      // Build completion message
+      const roadDistanceKm = routeResult?.allSegmentsSuccess
+        ? routeResult.summary.roadTotalKm
+        : null;
+      const reimbursementAmt = reimbursementData?.calculatedAmount;
+      const clinicCount = visitLocations.length;
+
+      let message = `Trip completed!\n\n`;
+      message += `Straight-line Distance: ${totalDistance.toFixed(2)} km\n`;
+      if (roadDistanceKm !== null) {
+        message += `Road Distance: ${roadDistanceKm} km\n`;
+        message += `Estimated Reimbursement: ${REIMBURSEMENT_CONFIG.currencySymbol}${reimbursementAmt}\n`;
+      }
+      message += `Clinics Visited: ${clinicCount}\n`;
+      message += `Total Stops: ${activeTrip.stops?.length || 0}\n`;
+      message += `Duration: ${formatDuration(totalDuration)}`;
+
+      alert(message);
     } catch (error) {
       console.error("Error ending trip:", error);
       setLocationError(error.message);

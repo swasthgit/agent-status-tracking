@@ -97,6 +97,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { useThemeMode } from "../context/ThemeContext";
 
 // Animated Counter Hook
 const useAnimatedCounter = (end, duration = 1500) => {
@@ -137,104 +138,77 @@ const useAnimatedCounter = (end, duration = 1500) => {
   return count;
 };
 
-// Animated Stat Card
-const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue, onClick, isActive }) => {
+// Animated Stat Card — Premium redesign with icon pill + sparkline
+const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue, onClick, isActive, colors }) => {
   const animatedValue = useAnimatedCounter(value);
+  const c = colors || {};
 
   return (
     <Card
       elevation={0}
       onClick={onClick}
       sx={{
-        background: gradient,
-        color: "white",
-        borderRadius: 3,
-        overflow: "hidden",
-        position: "relative",
-        transition: "all 0.3s ease",
+        bgcolor: c.bgCard || '#fff',
+        border: `1px solid ${isActive ? (c.primary || '#D97706') : (c.border || '#e2e8f0')}`,
+        borderRadius: '12px',
+        height: "100%",
+        transition: 'transform 150ms ease, border-color 150ms ease',
         cursor: onClick ? "pointer" : "default",
-        border: isActive ? "3px solid #fff" : "3px solid transparent",
-        boxShadow: isActive ? "0 0 20px rgba(255,255,255,0.4)" : "none",
         "&:hover": {
-          transform: "translateY(-8px)",
-          boxShadow: isActive ? "0 0 25px rgba(255,255,255,0.5)" : "0 20px 40px rgba(0,0,0,0.15)",
+          borderColor: c.borderHover || '#F59E0B',
         },
       }}
     >
-      <CardContent sx={{ p: 3, position: "relative", zIndex: 1 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <Box>
-            <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontWeight: 500 }}>
-              {title}
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-              {animatedValue}
-            </Typography>
-            {subtitle && (
-              <Chip
-                label={subtitle}
-                size="small"
-                sx={{
-                  bgcolor: "rgba(255,255,255,0.2)",
-                  color: "white",
-                  fontWeight: 600,
-                  fontSize: "0.7rem",
-                }}
-              />
-            )}
+      <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+        {/* Top: Title + Icon */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 500, color: c.textMuted || '#94A3B8' }}>
+            {title}
+          </Typography>
+          <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: c.primarySoft || '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {React.cloneElement(icon, { sx: { fontSize: 20, color: c.primary || '#D97706' } })}
+          </Box>
+        </Box>
+        {/* Bottom: Number + Trend/Sparkline */}
+        <Typography sx={{ fontSize: 28, fontWeight: 700, color: c.text || '#0F172A', lineHeight: 1, letterSpacing: '-0.02em' }}>
+          {animatedValue}
+        </Typography>
+        {(trend || subtitle) && (
+          <Box sx={{ display: "flex", alignItems: "center", mt: 1, gap: 0.5 }}>
             {trend && (
-              <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+              <>
                 {trend === "up" ? (
-                  <ArrowUpward sx={{ fontSize: 16, mr: 0.5 }} />
+                  <ArrowUpward sx={{ fontSize: 14, color: '#10B981' }} />
                 ) : (
-                  <ArrowDownward sx={{ fontSize: 16, mr: 0.5 }} />
+                  <ArrowDownward sx={{ fontSize: 14, color: '#F43F5E' }} />
                 )}
-                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: trend === "up" ? '#10B981' : '#F43F5E' }}>
                   {trendValue}
                 </Typography>
-              </Box>
+              </>
+            )}
+            {!trend && subtitle && (
+              <Typography sx={{ fontSize: 12, fontWeight: 500, color: c.textSec || '#64748B' }}>
+                {subtitle}
+              </Typography>
             )}
           </Box>
-          <Avatar
-            sx={{
-              bgcolor: "rgba(255,255,255,0.2)",
-              width: 56,
-              height: 56,
-            }}
-          >
-            {icon}
-          </Avatar>
+        )}
+        {/* Mini sparkline */}
+        <Box sx={{ width: '100%', height: 24, mt: 1.5 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={SPARKLINE_DATA}>
+              <Line type="monotone" dataKey="v" stroke={c.primaryLight || "#F59E0B"} strokeWidth={1.5} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
         </Box>
       </CardContent>
-      {/* Decorative circles */}
-      <Box
-        sx={{
-          position: "absolute",
-          top: -30,
-          right: -30,
-          width: 120,
-          height: 120,
-          borderRadius: "50%",
-          bgcolor: "rgba(255,255,255,0.1)",
-        }}
-      />
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: -40,
-          right: 40,
-          width: 80,
-          height: 80,
-          borderRadius: "50%",
-          bgcolor: "rgba(255,255,255,0.08)",
-        }}
-      />
     </Card>
   );
 };
 
 // Agent Card Component
-const AgentCard = ({ agent, onDownload, onClick }) => {
+const AgentCard = ({ agent, onDownload, onClick, colors, statusConfig }) => {
   const successRate = agent.totalCalls > 0
     ? Math.round((agent.connectedCalls / agent.totalCalls) * 100)
     : 0;
@@ -243,132 +217,85 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
     <Card
       elevation={0}
       sx={{
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 3,
+        border: `1px solid ${colors.border}`,
+        borderRadius: '12px',
+        bgcolor: colors.bgPaper,
         cursor: "pointer",
-        transition: "all 0.3s ease",
+        transition: 'border-color 150ms ease',
         "&:hover": {
-          transform: "translateY(-6px)",
-          boxShadow: "0 12px 24px rgba(0,0,0,0.1)",
-          borderColor: "#11998e",
+          borderColor: colors.borderHover || '#F59E0B',
         },
       }}
       onClick={onClick}
     >
-      <CardContent sx={{ p: 2.5 }}>
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
-          <Badge
-            overlap="circular"
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-            badgeContent={
-              <Circle
-                sx={{
-                  fontSize: 14,
-                  color: isAgentActive(agent.status) ? "#22c55e" : "#94a3b8",
-                }}
-              />
-            }
+      <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+          <Avatar
+            sx={{
+              width: 40,
+              height: 40,
+              bgcolor: colors.primary || '#D97706',
+              fontSize: "0.95rem",
+              fontWeight: 600,
+            }}
           >
-            <Avatar
-              sx={{
-                width: 56,
-                height: 56,
-                bgcolor: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
-                background: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
-                fontSize: "1.5rem",
-                fontWeight: 600,
-              }}
-            >
-              {agent.avatar}
-            </Avatar>
-          </Badge>
+            {agent.avatar}
+          </Avatar>
           <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }} noWrap>
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.text, lineHeight: 1.3 }} noWrap>
               {agent.name}
             </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+            <Typography sx={{ fontSize: 12, color: colors.textMuted }}>
               {agent.empId}
             </Typography>
-            <Chip
-              label={getStatusConfig(agent.status).label}
-              size="small"
-              sx={{
-                mt: 0.5,
-                height: 22,
-                bgcolor: getStatusConfig(agent.status).bgColor,
-                color: getStatusConfig(agent.status).color,
-                fontWeight: 600,
-                fontSize: "0.7rem",
-              }}
-            />
           </Box>
-          <Tooltip title="Download Report">
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDownload(e, agent);
-              }}
-              sx={{
-                bgcolor: "#f0fdf4",
-                color: "#11998e",
-                "&:hover": { bgcolor: "#dcfce7" },
-              }}
-            >
-              <FileDownload fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          <Chip
+            label={statusConfig.label}
+            size="small"
+            sx={{
+              height: 22,
+              bgcolor: statusConfig.bgColor,
+              color: statusConfig.color,
+              fontWeight: 600,
+              fontSize: "0.7rem",
+            }}
+          />
         </Box>
 
         {/* Stats Row */}
-        <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
-          <Grid container spacing={2}>
-            <Grid item xs={4}>
-              <Box sx={{ textAlign: "center" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#3b82f6" }}>
-                  {agent.totalCalls || 0}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Total
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={4}>
-              <Box sx={{ textAlign: "center" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#22c55e" }}>
-                  {agent.connectedCalls || 0}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Connected
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={4}>
-              <Box sx={{ textAlign: "center" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#f59e0b" }}>
-                  {successRate}%
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Success
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
+        <Box sx={{ display: "flex", gap: 2, pt: 2, borderTop: `1px solid ${colors.border}` }}>
+          <Box sx={{ flex: 1, textAlign: "center" }}>
+            <Typography sx={{ fontSize: 18, fontWeight: 700, color: colors.text }}>
+              {agent.totalCalls || 0}
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: colors.textMuted }}>Calls</Typography>
+          </Box>
+          <Box sx={{ flex: 1, textAlign: "center" }}>
+            <Typography sx={{ fontSize: 18, fontWeight: 700, color: '#10B981' }}>
+              {agent.connectedCalls || 0}
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: colors.textMuted }}>Connected</Typography>
+          </Box>
+          <Box sx={{ flex: 1, textAlign: "center" }}>
+            <Typography sx={{ fontSize: 18, fontWeight: 700, color: colors.primary || '#D97706' }}>
+              {successRate}%
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: colors.textMuted }}>Rate</Typography>
+          </Box>
         </Box>
 
         {/* Progress Bar */}
-        <Box sx={{ mt: 2 }}>
+        <Box sx={{ mt: 1.5 }}>
           <LinearProgress
             variant="determinate"
             value={successRate}
             sx={{
-              height: 6,
-              borderRadius: 3,
-              bgcolor: "#e2e8f0",
+              height: 4,
+              borderRadius: 2,
+              bgcolor: colors.border,
               "& .MuiLinearProgress-bar": {
-                borderRadius: 3,
-                background: "linear-gradient(90deg, #11998e 0%, #38ef7d 100%)",
+                borderRadius: 2,
+                bgcolor: colors.primary || '#D97706',
               },
             }}
           />
@@ -378,20 +305,11 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
   );
 };
 
-// Chart Colors
-const CHART_COLORS = ["#11998e", "#38ef7d", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444"];
+// Warm amber/green chart palette
+const CHART_COLORS = ['#D97706', '#059669', '#EA580C', '#0891B2', '#7C3AED'];
 
-// Health Manager Theme
-const HEALTH_THEME = {
-  primary: "#11998e",
-  primaryLight: "#38ef7d",
-  success: "#22c55e",
-  danger: "#ef4444",
-  accent: "#f59e0b",
-  purple: "#8b5cf6",
-  pink: "#ec4899",
-  gradient: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
-};
+// Sparkline data for stat cards
+const SPARKLINE_DATA = [{v:30},{v:45},{v:35},{v:50},{v:42},{v:55},{v:48}];
 
 // Helper function to check if agent is active/online
 const isAgentActive = (status) => {
@@ -445,20 +363,21 @@ const exportToCSV = (data, filename, columns) => {
 };
 
 // Custom Tooltip for Charts
-const CustomChartTooltip = ({ active, payload, label }) => {
+const CustomChartTooltip = ({ active, payload, label, colors }) => {
   if (active && payload && payload.length) {
     return (
       <Paper
-        elevation={8}
+        elevation={0}
         sx={{
-          p: 2,
-          bgcolor: "rgba(255, 255, 255, 0.98)",
-          backdropFilter: "blur(20px)",
-          border: `1px solid ${HEALTH_THEME.primary}30`,
-          borderRadius: "12px",
+          p: 1.5,
+          bgcolor: colors ? colors.chartTooltipBg : "rgba(255, 255, 255, 0.98)",
+          border: `1px solid ${colors ? colors.chartTooltipBorder : 'rgba(217,119,6,0.08)'}`,
+          borderRadius: '8px',
+          boxShadow: colors ? colors.shadowCard : '0 4px 12px rgba(0,0,0,0.08)',
+          color: colors ? colors.chartTooltipText : undefined,
         }}
       >
-        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, color: colors ? colors.chartTooltipText : undefined }}>
           {label}
         </Typography>
         {payload.map((entry, index) => (
@@ -472,8 +391,8 @@ const CustomChartTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-// Chart Card Component with Expand Button
-const ChartCard = ({ title, children, chartData, columns, chartElement, height = 300 }) => {
+// Chart Card Component
+const ChartCard = ({ title, children, chartData, columns, chartElement, height = 300, colors }) => {
   const [expandedOpen, setExpandedOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -482,86 +401,45 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
     <Card
       elevation={0}
       sx={{
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 3,
+        border: `1px solid ${colors ? colors.border : "divider"}`,
+        borderRadius: '12px',
+        bgcolor: colors ? colors.bgPaper : undefined,
         position: "relative",
-        transition: "all 0.3s ease",
-        "&:hover": {
-          boxShadow: `0 12px 40px ${HEALTH_THEME.primary}15`,
-          transform: "translateY(-4px)",
-        },
       }}
     >
-      <CardContent sx={{ p: 3 }}>
-        {/* Header with Title and Actions */}
+      <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+        {/* Header */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-          <Typography variant="h6" fontWeight={700} color={HEALTH_THEME.primary}>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors?.text || "#0F172A" }}>
             {title}
           </Typography>
-          <Box sx={{ display: "flex", gap: 0.5 }}>
-            {/* Direct Expand Button */}
-            <Tooltip title="Expand Chart">
-              <IconButton
-                size="small"
-                onClick={() => setExpandedOpen(true)}
-                sx={{
-                  bgcolor: `${HEALTH_THEME.primary}15`,
-                  "&:hover": {
-                    bgcolor: HEALTH_THEME.primary,
-                    "& .MuiSvgIcon-root": { color: "#fff" }
-                  },
-                  transition: "all 0.2s ease",
-                }}
-              >
-                <ZoomOutMap sx={{ color: HEALTH_THEME.primary, fontSize: 20 }} />
-              </IconButton>
-            </Tooltip>
-            {/* More Options Menu */}
-            <IconButton
-              size="small"
-              onClick={(e) => setAnchorEl(e.currentTarget)}
-              sx={{
-                bgcolor: `${HEALTH_THEME.primary}15`,
-                "&:hover": { bgcolor: `${HEALTH_THEME.primary}25` },
-              }}
-            >
-              <MoreVert sx={{ color: HEALTH_THEME.primary, fontSize: 20 }} />
-            </IconButton>
-          </Box>
+          <IconButton
+            size="small"
+            onClick={(e) => setAnchorEl(e.currentTarget)}
+            sx={{ color: colors?.textMuted || "#94A3B8", p: 0.5 }}
+          >
+            <MoreVert sx={{ fontSize: 18 }} />
+          </IconButton>
         </Box>
 
         {/* Chart Content */}
         <Box sx={{ height }}>{children}</Box>
       </CardContent>
 
-      {/* More Options Menu */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-        <MenuItem
-          onClick={() => {
-            setExpandedOpen(true);
-            setAnchorEl(null);
-          }}
-        >
-          <ZoomOutMap sx={{ mr: 1, fontSize: 20, color: HEALTH_THEME.primary }} />
-          Expanded View
+      {/* Options Menu */}
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
+        PaperProps={{ sx: { bgcolor: colors?.dialogBg, color: colors?.text, border: `1px solid ${colors?.border || '#e2e8f0'}`, borderRadius: '8px' } }}
+      >
+        <MenuItem onClick={() => { setExpandedOpen(true); setAnchorEl(null); }} sx={{ fontSize: 13 }}>
+          <ZoomOutMap sx={{ mr: 1, fontSize: 18, color: colors?.textSec || "#64748B" }} />
+          Expand
         </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setTableOpen(true);
-            setAnchorEl(null);
-          }}
-        >
-          <TableChart sx={{ mr: 1, fontSize: 20, color: HEALTH_THEME.primary }} />
+        <MenuItem onClick={() => { setTableOpen(true); setAnchorEl(null); }} sx={{ fontSize: 13 }}>
+          <TableChart sx={{ mr: 1, fontSize: 18, color: colors?.textSec || "#64748B" }} />
           Table View
         </MenuItem>
-        <MenuItem
-          onClick={() => {
-            exportToCSV(chartData, title.replace(/\s+/g, "_"), columns);
-            setAnchorEl(null);
-          }}
-        >
-          <Download sx={{ mr: 1, fontSize: 20, color: HEALTH_THEME.primary }} />
+        <MenuItem onClick={() => { exportToCSV(chartData, title.replace(/\s+/g, "_"), columns); setAnchorEl(null); }} sx={{ fontSize: 13 }}>
+          <Download sx={{ mr: 1, fontSize: 18, color: colors?.textSec || "#64748B" }} />
           Export CSV
         </MenuItem>
       </Menu>
@@ -574,26 +452,25 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: "20px",
+            borderRadius: "12px",
             maxHeight: "90vh",
+            bgcolor: colors ? colors.dialogBg : undefined,
+            border: `1px solid ${colors?.dialogBorder || '#e2e8f0'}`,
+            color: colors ? colors.text : undefined,
           }
         }}
       >
-        <DialogTitle sx={{
-          borderBottom: `1px solid ${HEALTH_THEME.primary}20`,
-          background: HEALTH_THEME.gradient,
-          color: "#fff",
-        }}>
+        <DialogTitle sx={{ borderBottom: `1px solid ${colors?.border || '#e2e8f0'}`, py: 2 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Typography variant="h5" fontWeight={700}>
+            <Typography variant="h6" fontWeight={600} color={colors?.text}>
               {title}
             </Typography>
-            <IconButton onClick={() => setExpandedOpen(false)} sx={{ color: "#fff" }}>
-              <Cancel />
+            <IconButton size="small" onClick={() => setExpandedOpen(false)} sx={{ color: colors?.textMuted }}>
+              <Cancel sx={{ fontSize: 20 }} />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: 4 }}>
+        <DialogContent sx={{ p: 3 }}>
           <Box sx={{ width: "100%", height: 550, pt: 2 }}>{chartElement}</Box>
         </DialogContent>
       </Dialog>
@@ -605,38 +482,43 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
         maxWidth="md"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: "16px" }
+          sx: {
+            borderRadius: "12px",
+            bgcolor: colors ? colors.dialogBg : undefined,
+            border: `1px solid ${colors?.dialogBorder || '#e2e8f0'}`,
+            color: colors ? colors.text : undefined,
+          }
         }}
       >
-        <DialogTitle sx={{ borderBottom: `1px solid ${HEALTH_THEME.primary}20` }}>
+        <DialogTitle sx={{ borderBottom: `1px solid ${colors?.border || '#e2e8f0'}`, py: 2 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Typography variant="h6" fontWeight={600} color={HEALTH_THEME.primary}>
+            <Typography sx={{ fontSize: 15, fontWeight: 600, color: colors?.text }}>
               {title} - Data Table
             </Typography>
             <Button
-              startIcon={<Download />}
+              startIcon={<Download sx={{ fontSize: 16 }} />}
               onClick={() => exportToCSV(chartData, title.replace(/\s+/g, "_"), columns)}
               size="small"
               sx={{
-                bgcolor: `${HEALTH_THEME.primary}15`,
-                color: HEALTH_THEME.primary,
+                color: colors?.primary || "#D97706",
                 textTransform: "none",
                 fontWeight: 600,
-                borderRadius: "10px",
-                "&:hover": { bgcolor: `${HEALTH_THEME.primary}25` },
+                fontSize: "0.8rem",
+                borderRadius: "8px",
+                "&:hover": { bgcolor: colors?.primarySoft || 'rgba(217,119,6,0.08)' },
               }}
             >
               Export
             </Button>
           </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ bgcolor: colors?.dialogBg }}>
           <TableContainer sx={{ mt: 2 }}>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ bgcolor: `${HEALTH_THEME.primary}10` }}>
+                <TableRow sx={{ bgcolor: colors ? colors.bgTableHeader : undefined }}>
                   {columns.map((col) => (
-                    <TableCell key={col} sx={{ fontWeight: 600, textTransform: "capitalize", color: HEALTH_THEME.primary }}>
+                    <TableCell key={col} sx={{ fontWeight: 600, textTransform: "capitalize", color: colors?.textSec || "#64748B", fontSize: 12, borderBottomColor: colors?.border }}>
                       {col}
                     </TableCell>
                   ))}
@@ -644,9 +526,9 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
               </TableHead>
               <TableBody>
                 {chartData.map((row, idx) => (
-                  <TableRow key={idx} hover>
+                  <TableRow key={idx} hover sx={{ "&:hover": { bgcolor: colors ? colors.bgCardHover : undefined } }}>
                     {columns.map((col) => (
-                      <TableCell key={col}>{row[col]}</TableCell>
+                      <TableCell key={col} sx={{ color: colors ? colors.text : undefined, borderBottomColor: colors?.border }}>{row[col]}</TableCell>
                     ))}
                   </TableRow>
                 ))}
@@ -654,18 +536,14 @@ const ChartCard = ({ title, children, chartData, columns, chartElement, height =
             </Table>
           </TableContainer>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ p: 2, bgcolor: colors?.dialogBg }}>
           <Button
             onClick={() => setTableOpen(false)}
-            variant="outlined"
+            size="small"
             sx={{
-              color: HEALTH_THEME.primary,
-              borderColor: HEALTH_THEME.primary,
-              borderRadius: "10px",
-              "&:hover": {
-                bgcolor: `${HEALTH_THEME.primary}10`,
-                borderColor: HEALTH_THEME.primary,
-              }
+              color: colors?.textSec || "#64748B",
+              textTransform: "none",
+              borderRadius: "8px",
             }}
           >
             Close
@@ -695,6 +573,23 @@ const isREAgent = (designation) => {
 };
 
 function HealthManagerDashboard({ currentUser }) {
+  const { colors } = useThemeMode();
+
+  // Theme-aware status config
+  const getThemedStatusConfig = useCallback((status) => {
+    const configs = {
+      "Available": { label: "Available", color: colors.statusAvailable.color, bgColor: colors.statusAvailable.bg },
+      "On Call": { label: "On Call", color: colors.statusOnCallHealth.color, bgColor: colors.statusOnCallHealth.bg },
+      "Unavailable": { label: "Offline", color: colors.statusOffline.color, bgColor: colors.statusOffline.bg },
+      "Login": { label: "Available", color: colors.statusAvailable.color, bgColor: colors.statusAvailable.bg },
+      "Logout": { label: "Offline", color: colors.statusOffline.color, bgColor: colors.statusOffline.bg },
+      "Logged Out": { label: "Offline", color: colors.statusOffline.color, bgColor: colors.statusOffline.bg },
+      "Idle": { label: "Available", color: colors.statusAvailable.color, bgColor: colors.statusAvailable.bg },
+      "Busy": { label: "On Call", color: colors.statusOnCallHealth.color, bgColor: colors.statusOnCallHealth.bg },
+    };
+    return configs[status] || configs["Unavailable"];
+  }, [colors]);
+
   const [healthAgents, setHealthAgents] = useState([]);
   const [healthTLs, setHealthTLs] = useState([]);
   const [callLogs, setCallLogs] = useState([]);
@@ -1033,7 +928,7 @@ function HealthManagerDashboard({ currentUser }) {
         }
       });
 
-      const colors = [HEALTH_THEME.primary, HEALTH_THEME.success, HEALTH_THEME.accent, HEALTH_THEME.purple, HEALTH_THEME.pink];
+      const colors = ["#D97706", "#059669", "#EA580C", "#0891B2", "#7C3AED"];
       return ranges.map((range, index) => ({
         name: range.name,
         value: range.count,
@@ -1298,10 +1193,11 @@ function HealthManagerDashboard({ currentUser }) {
           justifyContent: "center",
           alignItems: "center",
           minHeight: "60vh",
+          bgcolor: colors.bg,
         }}
       >
-        <CircularProgress size={60} sx={{ color: "#11998e", mb: 2 }} />
-        <Typography variant="body1" color="text.secondary">
+        <CircularProgress size={60} sx={{ color: colors.primary || '#D97706', mb: 2 }} />
+        <Typography variant="body1" sx={{ color: colors.textSec }}>
           Loading Health Department data...
         </Typography>
       </Box>
@@ -1309,66 +1205,74 @@ function HealthManagerDashboard({ currentUser }) {
   }
 
   return (
-    <Box>
+    <Box sx={{ bgcolor: colors.bg, color: colors.text, minHeight: "100vh" }}>
       {/* Loading Progress */}
       {refreshing && <LinearProgress sx={{ position: "absolute", top: 0, left: 0, right: 0 }} />}
 
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Avatar
-              sx={{
-                width: 56,
-                height: 56,
-                background: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
-              }}
-            >
-              <LocalHospital sx={{ fontSize: 32 }} />
-            </Avatar>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: "#0f172a" }}>
-                Health Department
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#64748b" }}>
-                {totalHealthAgents} agents • {onlineHealthAgents} online
-              </Typography>
-            </Box>
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: colors.text, lineHeight: 1.3 }}>
+              Health Department
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.textSec, mt: 0.5 }}>
+              {totalHealthAgents} agents &middot; {onlineHealthAgents} online &middot; View and manage your team's performance
+            </Typography>
           </Box>
 
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Tooltip title="Refresh">
-              <IconButton
-                onClick={handleRefresh}
-                sx={{
-                  bgcolor: refreshing ? "primary.light" : "#f1f5f9",
-                  animation: refreshing ? "spin 1s linear infinite" : "none",
-                  "@keyframes spin": {
-                    "0%": { transform: "rotate(0deg)" },
-                    "100%": { transform: "rotate(360deg)" },
-                  },
-                }}
-              >
-                <Refresh />
-              </IconButton>
-            </Tooltip>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <IconButton
+              size="small"
+              onClick={handleRefresh}
+              sx={{
+                color: colors.textSec,
+                animation: refreshing ? "spin 1s linear infinite" : "none",
+                "@keyframes spin": {
+                  "0%": { transform: "rotate(0deg)" },
+                  "100%": { transform: "rotate(360deg)" },
+                },
+              }}
+            >
+              <Refresh sx={{ fontSize: 20 }} />
+            </IconButton>
             <Button
+              size="small"
               variant="outlined"
-              startIcon={<FilterList />}
+              startIcon={<FilterList sx={{ fontSize: 18 }} />}
               onClick={() => setFilterDialogOpen(true)}
-              sx={{ borderRadius: 2 }}
+              sx={{
+                borderRadius: "8px",
+                borderColor: colors.border,
+                color: colors.textSec,
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.8rem",
+                px: 2,
+                "&:hover": {
+                  borderColor: colors.primary || '#D97706',
+                  bgcolor: colors.primarySoft || 'rgba(217,119,6,0.08)',
+                },
+              }}
             >
               Filters
             </Button>
             <Button
-              variant="contained"
-              startIcon={<FileDownload />}
+              size="small"
+              variant="outlined"
+              startIcon={<FileDownload sx={{ fontSize: 18 }} />}
               onClick={handleExportCSV}
               sx={{
-                borderRadius: 2,
-                background: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
+                borderRadius: "8px",
+                borderColor: colors.primary || '#D97706',
+                color: colors.primary || '#D97706',
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.8rem",
+                px: 2,
                 "&:hover": {
-                  background: "linear-gradient(135deg, #0d7d71 0%, #2fd36b 100%)",
+                  bgcolor: colors.primarySoft || 'rgba(217,119,6,0.08)',
+                  borderColor: colors.primaryDark || '#B45309',
                 },
               }}
             >
@@ -1377,80 +1281,37 @@ function HealthManagerDashboard({ currentUser }) {
           </Box>
         </Box>
 
-        {/* Agent Type Filter Toggle */}
-        <Box
-          sx={{
-            mt: 3,
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            p: 2,
-            bgcolor: "#f8fafc",
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-          }}
-        >
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#64748b", mr: 1 }}>
-            Filter by Agent Type:
-          </Typography>
-          <ToggleButtonGroup
-            value={agentTypeFilter}
-            exclusive
-            onChange={(e, newValue) => {
-              if (newValue !== null) {
-                setAgentTypeFilter(newValue);
-                setPage(0);
-              }
-            }}
-            size="small"
-            sx={{
-              "& .MuiToggleButton-root": {
-                textTransform: "none",
-                fontWeight: 600,
-                px: 3,
-                py: 1,
-                borderRadius: "12px !important",
-                border: "1px solid #e2e8f0 !important",
-                mx: 0.5,
-                "&.Mui-selected": {
-                  bgcolor: "#11998e",
-                  color: "white",
-                  "&:hover": {
-                    bgcolor: "#0d7d71",
-                  },
-                },
-              },
-            }}
-          >
-            <ToggleButton value="all">
-              <Group sx={{ mr: 1, fontSize: 18 }} />
-              All Agents ({healthAgents.length})
-            </ToggleButton>
-            <ToggleButton value="pe">
-              <LocalPharmacy sx={{ mr: 1, fontSize: 18 }} />
-              PE - Pharmacist ({peAgentCount})
-            </ToggleButton>
-            <ToggleButton value="re">
-              <SupportAgent sx={{ mr: 1, fontSize: 18 }} />
-              RE - Relationship ({reAgentCount})
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          {agentTypeFilter !== "all" && (
+        {/* Agent Type Filter - Clean pill buttons */}
+        <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+          {[
+            { value: "all", label: `All (${healthAgents.length})`, icon: <Group sx={{ fontSize: 16 }} /> },
+            { value: "pe", label: `PE - Pharmacist (${peAgentCount})`, icon: <LocalPharmacy sx={{ fontSize: 16 }} /> },
+            { value: "re", label: `RE - Relationship (${reAgentCount})`, icon: <SupportAgent sx={{ fontSize: 16 }} /> },
+          ].map((item) => (
             <Chip
-              label={`Showing: ${agentTypeFilter === "pe" ? "Pharmacist Executive" : "Relationship Executive"}`}
-              onDelete={() => setAgentTypeFilter("all")}
+              key={item.value}
+              icon={item.icon}
+              label={item.label}
+              size="small"
+              onClick={() => { setAgentTypeFilter(item.value); setPage(0); }}
               sx={{
-                bgcolor: agentTypeFilter === "pe" ? "#fef3c7" : "#dbeafe",
-                color: agentTypeFilter === "pe" ? "#d97706" : "#2563eb",
                 fontWeight: 600,
-                "& .MuiChip-deleteIcon": {
-                  color: agentTypeFilter === "pe" ? "#d97706" : "#2563eb",
+                fontSize: "0.78rem",
+                borderRadius: "8px",
+                height: 32,
+                border: `1px solid ${agentTypeFilter === item.value ? (colors.primary || '#D97706') : colors.border}`,
+                bgcolor: agentTypeFilter === item.value ? (colors.primarySoft || '#FFFBEB') : 'transparent',
+                color: agentTypeFilter === item.value ? (colors.primary || '#D97706') : colors.textSec,
+                "& .MuiChip-icon": {
+                  color: agentTypeFilter === item.value ? (colors.primary || '#D97706') : colors.textMuted,
+                },
+                "&:hover": {
+                  bgcolor: colors.primarySoft || 'rgba(217,119,6,0.08)',
+                  borderColor: colors.primary || '#D97706',
                 },
               }}
             />
-          )}
+          ))}
         </Box>
       </Box>
 
@@ -1461,7 +1322,7 @@ function HealthManagerDashboard({ currentUser }) {
           sx={{
             p: 2,
             mb: 2,
-            bgcolor: "#e0e7ff",
+            bgcolor: colors.isDark ? "rgba(99,102,241,0.12)" : "#e0e7ff",
             borderRadius: 2,
             display: "flex",
             alignItems: "center",
@@ -1491,11 +1352,11 @@ function HealthManagerDashboard({ currentUser }) {
             title="Total Agents"
             value={totalHealthAgents}
             icon={<Group sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+            colors={colors}
             subtitle={`${healthTLs.length} TLs`}
             onClick={() => {
               setScorecardFilter(scorecardFilter === "totalAgents" ? null : "totalAgents");
-              setActiveTab(0); // Switch to Agents tab
+              setActiveTab(0);
             }}
             isActive={scorecardFilter === "totalAgents"}
           />
@@ -1505,12 +1366,12 @@ function HealthManagerDashboard({ currentUser }) {
             title="Online Now"
             value={onlineHealthAgents}
             icon={<Circle sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
+            colors={colors}
             trend="up"
             trendValue={`${Math.round((onlineHealthAgents / totalHealthAgents) * 100) || 0}% Active`}
             onClick={() => {
               setScorecardFilter(scorecardFilter === "online" ? null : "online");
-              setActiveTab(0); // Switch to Agents tab
+              setActiveTab(0);
             }}
             isActive={scorecardFilter === "online"}
           />
@@ -1520,11 +1381,11 @@ function HealthManagerDashboard({ currentUser }) {
             title="Total Calls"
             value={totalCallsAllAgents}
             icon={<Phone sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+            colors={colors}
             subtitle={`${totalConnectedCalls} Connected`}
             onClick={() => {
               setScorecardFilter(scorecardFilter === "totalCalls" ? null : "totalCalls");
-              setActiveTab(0); // Switch to Agents tab
+              setActiveTab(0);
             }}
             isActive={scorecardFilter === "totalCalls"}
           />
@@ -1534,11 +1395,11 @@ function HealthManagerDashboard({ currentUser }) {
             title="Success Rate"
             value={overallSuccessRate}
             icon={<TrendingUp sx={{ fontSize: 28 }} />}
-            gradient="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+            colors={colors}
             subtitle={`${overallSuccessRate}% Conversion`}
             onClick={() => {
               setScorecardFilter(scorecardFilter === "successRate" ? null : "successRate");
-              setActiveTab(0); // Switch to Agents tab
+              setActiveTab(0);
             }}
             isActive={scorecardFilter === "successRate"}
           />
@@ -1552,11 +1413,18 @@ function HealthManagerDashboard({ currentUser }) {
           onChange={(e, v) => setActiveTab(v)}
           sx={{
             borderBottom: 1,
-            borderColor: "divider",
+            borderColor: colors.border,
             "& .MuiTab-root": {
               textTransform: "none",
               fontWeight: 600,
               fontSize: "0.95rem",
+              color: colors.textSec,
+              "&.Mui-selected": {
+                color: colors.primary || '#D97706',
+              },
+            },
+            "& .MuiTabs-indicator": {
+              backgroundColor: colors.primary || '#D97706',
             },
           }}
         >
@@ -1575,24 +1443,34 @@ function HealthManagerDashboard({ currentUser }) {
               placeholder="Search by name, phone, SID, Call ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flexGrow: 1, minWidth: 300 }}
+              sx={{
+                flexGrow: 1,
+                minWidth: 300,
+                "& .MuiOutlinedInput-root": {
+                  color: colors.text,
+                  "& fieldset": { borderColor: colors.border },
+                  "&:hover fieldset": { borderColor: colors.primary || '#D97706' },
+                },
+                "& .MuiInputBase-input::placeholder": { color: colors.textMuted, opacity: 1 },
+              }}
               size="small"
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon />
+                    <SearchIcon sx={{ color: colors.textMuted }} />
                   </InputAdornment>
                 ),
                 sx: { borderRadius: 2 },
               }}
             />
-            <Box sx={{ display: "flex", bgcolor: "#f1f5f9", borderRadius: 2, p: 0.5 }}>
+            <Box sx={{ display: "flex", bgcolor: colors.bgCardHover, borderRadius: 2, p: 0.5 }}>
               <IconButton
                 onClick={() => setViewMode("grid")}
                 sx={{
-                  bgcolor: viewMode === "grid" ? "white" : "transparent",
+                  bgcolor: viewMode === "grid" ? colors.bgPaper : "transparent",
                   boxShadow: viewMode === "grid" ? 1 : 0,
                   borderRadius: 1.5,
+                  color: colors.text,
                 }}
               >
                 <GridView />
@@ -1600,9 +1478,10 @@ function HealthManagerDashboard({ currentUser }) {
               <IconButton
                 onClick={() => setViewMode("list")}
                 sx={{
-                  bgcolor: viewMode === "list" ? "white" : "transparent",
+                  bgcolor: viewMode === "list" ? colors.bgPaper : "transparent",
                   boxShadow: viewMode === "list" ? 1 : 0,
                   borderRadius: 1.5,
+                  color: colors.text,
                 }}
               >
                 <ViewList />
@@ -1619,22 +1498,24 @@ function HealthManagerDashboard({ currentUser }) {
                     agent={agent}
                     onDownload={handleDownloadAgentCSV}
                     onClick={() => navigate(`/agent-details/healthAgents/${agent.uid}`)}
+                    colors={colors}
+                    statusConfig={getThemedStatusConfig(agent.status)}
                   />
                 </Grid>
               ))}
             </Grid>
           ) : (
-            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: '12px', border: `1px solid ${colors.border}`, bgcolor: colors.bgPaper }}>
               <Table>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                    <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }} align="center">Total Calls</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }} align="center">Connected</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }} align="center">Success Rate</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }} align="center">Actions</TableCell>
+                  <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
+                    <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }}>Agent</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }}>Designation</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }} align="center">Total Calls</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }} align="center">Connected</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }} align="center">Success Rate</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }} align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1642,15 +1523,15 @@ function HealthManagerDashboard({ currentUser }) {
                     <TableRow
                       key={agent.uid}
                       hover
-                      sx={{ cursor: "pointer" }}
+                      sx={{ cursor: "pointer", "&:hover": { bgcolor: colors.bgCardHover } }}
                       onClick={() => navigate(`/agent-details/healthAgents/${agent.uid}`)}
                     >
-                      <TableCell>
+                      <TableCell sx={{ color: colors.text }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                          <Avatar sx={{ bgcolor: "#11998e" }}>{agent.avatar}</Avatar>
+                          <Avatar sx={{ bgcolor: "#D97706" }}>{agent.avatar}</Avatar>
                           <Box>
-                            <Typography variant="body2" fontWeight={600}>{agent.name}</Typography>
-                            <Typography variant="caption" color="text.secondary">{agent.empId}</Typography>
+                            <Typography variant="body2" fontWeight={600} sx={{ color: colors.text }}>{agent.name}</Typography>
+                            <Typography variant="caption" sx={{ color: colors.textSec }}>{agent.empId}</Typography>
                           </Box>
                         </Box>
                       </TableCell>
@@ -1659,24 +1540,24 @@ function HealthManagerDashboard({ currentUser }) {
                           label={agent.designation || "N/A"}
                           size="small"
                           sx={{
-                            bgcolor: isPEAgent(agent.designation) ? "#fef3c7" : isREAgent(agent.designation) ? "#dbeafe" : "#f1f5f9",
-                            color: isPEAgent(agent.designation) ? "#d97706" : isREAgent(agent.designation) ? "#2563eb" : "#64748b",
+                            bgcolor: isPEAgent(agent.designation) ? colors.statusBreak.bg : isREAgent(agent.designation) ? colors.statusOnCall.bg : colors.statusOffline.bg,
+                            color: isPEAgent(agent.designation) ? colors.statusBreak.color : isREAgent(agent.designation) ? colors.statusOnCall.color : colors.statusOffline.color,
                             fontWeight: 500,
                           }}
                         />
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={getStatusConfig(agent.status).label}
+                          label={getThemedStatusConfig(agent.status).label}
                           size="small"
                           sx={{
-                            bgcolor: getStatusConfig(agent.status).bgColor,
-                            color: getStatusConfig(agent.status).color,
+                            bgcolor: getThemedStatusConfig(agent.status).bgColor,
+                            color: getThemedStatusConfig(agent.status).color,
                           }}
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Typography variant="body2" fontWeight={600}>{agent.totalCalls || 0}</Typography>
+                        <Typography variant="body2" fontWeight={600} sx={{ color: colors.text }}>{agent.totalCalls || 0}</Typography>
                       </TableCell>
                       <TableCell align="center">
                         <Typography variant="body2" fontWeight={600} color="success.main">{agent.connectedCalls || 0}</Typography>
@@ -1685,7 +1566,7 @@ function HealthManagerDashboard({ currentUser }) {
                         <Chip
                           label={`${agent.totalCalls > 0 ? Math.round((agent.connectedCalls / agent.totalCalls) * 100) : 0}%`}
                           size="small"
-                          sx={{ bgcolor: "#eff6ff", color: "#3b82f6" }}
+                          sx={{ bgcolor: colors.isDark ? "rgba(59,130,246,0.08)" : "#eff6ff", color: "#3b82f6" }}
                         />
                       </TableCell>
                       <TableCell align="center">
@@ -1693,12 +1574,13 @@ function HealthManagerDashboard({ currentUser }) {
                           <IconButton
                             size="small"
                             onClick={(e) => handleDownloadAgentCSV(e, agent)}
+                            sx={{ color: colors.textSec }}
                           >
                             <FileDownload fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="View Details">
-                          <IconButton size="small">
+                          <IconButton size="small" sx={{ color: colors.textSec }}>
                             <Visibility fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -1718,14 +1600,23 @@ function HealthManagerDashboard({ currentUser }) {
                   setRowsPerPage(parseInt(e.target.value, 10));
                   setPage(0);
                 }}
+                sx={{
+                  color: colors.text,
+                  borderTop: `1px solid ${colors.border}`,
+                  ".MuiTablePagination-selectLabel": { color: colors.textSec },
+                  ".MuiTablePagination-displayedRows": { color: colors.textSec },
+                  ".MuiTablePagination-selectIcon": { color: colors.textMuted },
+                  ".MuiTablePagination-select": { color: colors.text },
+                  ".MuiIconButton-root": { color: colors.textSec },
+                }}
               />
             </TableContainer>
           )}
 
           {filteredAgents.length === 0 && (
-            <Paper sx={{ p: 6, textAlign: "center", borderRadius: 3 }}>
-              <Group sx={{ fontSize: 64, color: "#e2e8f0", mb: 2 }} />
-              <Typography variant="h6" color="text.secondary">
+            <Paper sx={{ p: 6, textAlign: "center", borderRadius: 3, bgcolor: colors.bgPaper, border: `1px solid ${colors.border}` }}>
+              <Group sx={{ fontSize: 64, color: colors.textMuted, mb: 2 }} />
+              <Typography variant="h6" sx={{ color: colors.textSec }}>
                 No health agents found
               </Typography>
             </Paper>
@@ -1738,6 +1629,7 @@ function HealthManagerDashboard({ currentUser }) {
           {/* Row 1: Calls Trend (Full Width) */}
           <Grid item xs={12}>
             <ChartCard
+              colors={colors}
               title="Calls Trend (Last 7 Days)"
               chartData={analyticsData.callsByDate}
               columns={["date", "total", "connected", "notConnected"]}
@@ -1747,21 +1639,21 @@ function HealthManagerDashboard({ currentUser }) {
                   <AreaChart data={analyticsData.callsByDate}>
                     <defs>
                       <linearGradient id="colorConnectedHealth" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={HEALTH_THEME.success} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={HEALTH_THEME.success} stopOpacity={0} />
+                        <stop offset="5%" stopColor={"#059669"} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={"#059669"} stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorNotConnectedHealth" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={HEALTH_THEME.danger} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={HEALTH_THEME.danger} stopOpacity={0} />
+                        <stop offset="5%" stopColor={"#A5B4FC"} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={"#A5B4FC"} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
-                    <Area type="monotone" dataKey="connected" stroke={HEALTH_THEME.success} fillOpacity={1} fill="url(#colorConnectedHealth)" name="Connected" strokeWidth={2} />
-                    <Area type="monotone" dataKey="notConnected" stroke={HEALTH_THEME.danger} fillOpacity={1} fill="url(#colorNotConnectedHealth)" name="Not Connected" strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 12, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Area type="monotone" dataKey="connected" stroke={"#059669"} fillOpacity={1} fill="url(#colorConnectedHealth)" name="Connected" strokeWidth={2} />
+                    <Area type="monotone" dataKey="notConnected" stroke={"#A5B4FC"} fillOpacity={1} fill="url(#colorNotConnectedHealth)" name="Not Connected" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               }
@@ -1771,38 +1663,39 @@ function HealthManagerDashboard({ currentUser }) {
                   <AreaChart data={analyticsData.callsByDate}>
                     <defs>
                       <linearGradient id="colorConnectedHealthSmall" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={HEALTH_THEME.success} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={HEALTH_THEME.success} stopOpacity={0} />
+                        <stop offset="5%" stopColor={"#059669"} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={"#059669"} stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="colorNotConnectedHealthSmall" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={HEALTH_THEME.danger} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={HEALTH_THEME.danger} stopOpacity={0} />
+                        <stop offset="5%" stopColor={"#A5B4FC"} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={"#A5B4FC"} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
-                    <Area type="monotone" dataKey="connected" stroke={HEALTH_THEME.success} fillOpacity={1} fill="url(#colorConnectedHealthSmall)" name="Connected" strokeWidth={2} />
-                    <Area type="monotone" dataKey="notConnected" stroke={HEALTH_THEME.danger} fillOpacity={1} fill="url(#colorNotConnectedHealthSmall)" name="Not Connected" strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 11, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Area type="monotone" dataKey="connected" stroke={"#059669"} fillOpacity={1} fill="url(#colorConnectedHealthSmall)" name="Connected" strokeWidth={2} />
+                    <Area type="monotone" dataKey="notConnected" stroke={"#A5B4FC"} fillOpacity={1} fill="url(#colorNotConnectedHealthSmall)" name="Not Connected" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
           </Grid>
 
-          {/* Row 2: Call Status, Top Performers, Calls by Type, Connection Rate */}
-          <Grid item xs={12} md={6} lg={3}>
+          {/* Row 2: Call Status & Top Performers */}
+          <Grid item xs={12} md={6}>
             <ChartCard
+              colors={colors}
               title="Call Status Distribution"
               chartData={analyticsData.callStatus}
               columns={["name", "value"]}
-              height={280}
+              height={300}
               chartElement={
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -1811,8 +1704,8 @@ function HealthManagerDashboard({ currentUser }) {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
               }
@@ -1825,34 +1718,35 @@ function HealthManagerDashboard({ currentUser }) {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
           </Grid>
 
-          <Grid item xs={12} md={6} lg={3}>
+          <Grid item xs={12} md={6}>
             <ChartCard
+              colors={colors}
               title="Top 5 Performers"
               chartData={analyticsData.topAgents}
               columns={["name", "totalCalls", "connectedCalls"]}
-              height={280}
+              height={300}
               chartElement={
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.topAgents} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
-                    <Bar dataKey="connectedCalls" fill={HEALTH_THEME.success} name="Connected" radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="totalCalls" fill={HEALTH_THEME.primary} name="Total Calls" radius={[0, 4, 4, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: colors.chartTick }} />
+                    <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Bar dataKey="connectedCalls" fill={"#059669"} name="Connected" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="totalCalls" fill={"#D97706"} name="Total Calls" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               }
@@ -1860,37 +1754,39 @@ function HealthManagerDashboard({ currentUser }) {
               {analyticsData.topAgents.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.topAgents} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis dataKey="name" type="category" width={70} tick={{ fontSize: 10 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
-                    <Bar dataKey="connectedCalls" fill={HEALTH_THEME.success} name="Connected" radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="totalCalls" fill={HEALTH_THEME.primary} name="Total" radius={[0, 4, 4, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <YAxis dataKey="name" type="category" width={70} tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Bar dataKey="connectedCalls" fill={"#059669"} name="Connected" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="totalCalls" fill={"#D97706"} name="Total" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
           </Grid>
 
-          <Grid item xs={12} md={6} lg={3}>
+          {/* Row 3: Calls by Type & Connection Rate */}
+          <Grid item xs={12} md={6}>
             <ChartCard
+              colors={colors}
               title="Calls by Type"
               chartData={analyticsData.callsByType}
               columns={["name", "value"]}
-              height={280}
+              height={300}
               chartElement={
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.callsByType}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Bar dataKey="value" fill={HEALTH_THEME.primary} radius={[8, 8, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 11, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Bar dataKey="value" fill={"#D97706"} radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               }
@@ -1898,36 +1794,37 @@ function HealthManagerDashboard({ currentUser }) {
               {analyticsData.callsByType.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.callsByType}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-15} textAnchor="end" height={60} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Bar dataKey="value" fill={HEALTH_THEME.primary} radius={[6, 6, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: colors.chartTick }} angle={-15} textAnchor="end" height={60} />
+                    <YAxis tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Bar dataKey="value" fill={"#D97706"} radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
           </Grid>
 
-          <Grid item xs={12} md={6} lg={3}>
+          <Grid item xs={12} md={6}>
             <ChartCard
+              colors={colors}
               title="Connection Rate Trend"
               chartData={analyticsData.connectionRateTrend}
               columns={["date", "rate", "total"]}
-              height={280}
+              height={300}
               chartElement={
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={analyticsData.connectionRateTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
-                    <Line type="monotone" dataKey="rate" stroke={HEALTH_THEME.accent} name="Rate %" strokeWidth={3} dot={{ r: 5 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 11, fill: colors.chartTick }} domain={[0, 100]} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Line type="monotone" dataKey="rate" stroke={"#F59E0B"} name="Rate %" strokeWidth={3} dot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
               }
@@ -1935,28 +1832,29 @@ function HealthManagerDashboard({ currentUser }) {
               {analyticsData.connectionRateTrend.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={analyticsData.connectionRateTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Line type="monotone" dataKey="rate" stroke={HEALTH_THEME.accent} name="Rate %" strokeWidth={2} dot={{ r: 3 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 10, fill: colors.chartTick }} domain={[0, 100]} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Line type="monotone" dataKey="rate" stroke={"#F59E0B"} name="Rate %" strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
           </Grid>
 
-          {/* Row 3: Duration Distribution, Day of Week, Hourly Distribution */}
-          <Grid item xs={12} md={4}>
+          {/* Row 4: Duration Distribution & Day of Week */}
+          <Grid item xs={12} md={6}>
             <ChartCard
+              colors={colors}
               title="Call Duration Distribution"
               chartData={analyticsData.durationDistribution}
               columns={["name", "value"]}
-              height={280}
+              height={300}
               chartElement={
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -1965,8 +1863,8 @@ function HealthManagerDashboard({ currentUser }) {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
               }
@@ -1979,34 +1877,35 @@ function HealthManagerDashboard({ currentUser }) {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={6}>
             <ChartCard
+              colors={colors}
               title="Calls by Day of Week"
               chartData={analyticsData.dayOfWeekData}
               columns={["day", "calls", "connected"]}
-              height={280}
+              height={300}
               chartElement={
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.dayOfWeekData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
-                    <Bar dataKey="calls" fill={HEALTH_THEME.primary} name="Total Calls" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="connected" fill={HEALTH_THEME.success} name="Connected" radius={[6, 6, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="day" tick={{ fontSize: 12, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 12, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Bar dataKey="calls" fill={"#D97706"} name="Total Calls" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="connected" fill={"#059669"} name="Connected" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               }
@@ -2014,43 +1913,45 @@ function HealthManagerDashboard({ currentUser }) {
               {analyticsData.dayOfWeekData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.dayOfWeekData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
-                    <Bar dataKey="calls" fill={HEALTH_THEME.primary} name="Total" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="connected" fill={HEALTH_THEME.success} name="Connected" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="day" tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Bar dataKey="calls" fill={"#D97706"} name="Total" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="connected" fill={"#059669"} name="Connected" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
           </Grid>
 
-          <Grid item xs={12} md={4}>
+          {/* Row 5: Hourly Distribution */}
+          <Grid item xs={12} md={6}>
             <ChartCard
+              colors={colors}
               title="Hourly Call Distribution"
               chartData={analyticsData.hourlyDistribution}
               columns={["hour", "calls", "connected"]}
-              height={280}
+              height={300}
               chartElement={
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={analyticsData.hourlyDistribution}>
                     <defs>
                       <linearGradient id="colorHourlyHealthExpand" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={HEALTH_THEME.purple} stopOpacity={0.4} />
-                        <stop offset="95%" stopColor={HEALTH_THEME.purple} stopOpacity={0} />
+                        <stop offset="5%" stopColor={"#EA580C"} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={"#EA580C"} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Area type="monotone" dataKey="calls" stroke={HEALTH_THEME.purple} fill="url(#colorHourlyHealthExpand)" name="Calls" strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="hour" tick={{ fontSize: 10, fill: colors.chartTick }} interval={2} />
+                    <YAxis tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Area type="monotone" dataKey="calls" stroke={"#EA580C"} fill="url(#colorHourlyHealthExpand)" name="Calls" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               }
@@ -2060,20 +1961,20 @@ function HealthManagerDashboard({ currentUser }) {
                   <AreaChart data={analyticsData.hourlyDistribution}>
                     <defs>
                       <linearGradient id="colorHourlyHealthSmall" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={HEALTH_THEME.purple} stopOpacity={0.4} />
-                        <stop offset="95%" stopColor={HEALTH_THEME.purple} stopOpacity={0} />
+                        <stop offset="5%" stopColor={"#EA580C"} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={"#EA580C"} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="hour" tick={{ fontSize: 9 }} interval={3} />
-                    <YAxis tick={{ fontSize: 9 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Area type="monotone" dataKey="calls" stroke={HEALTH_THEME.purple} fill="url(#colorHourlyHealthSmall)" name="Calls" strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="hour" tick={{ fontSize: 9, fill: colors.chartTick }} interval={3} />
+                    <YAxis tick={{ fontSize: 9, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Area type="monotone" dataKey="calls" stroke={"#EA580C"} fill="url(#colorHourlyHealthSmall)" name="Calls" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
@@ -2082,20 +1983,21 @@ function HealthManagerDashboard({ currentUser }) {
           {/* Row 4: Weekly Comparison */}
           <Grid item xs={12} md={6}>
             <ChartCard
+              colors={colors}
               title="Weekly Performance Comparison"
               chartData={analyticsData.weeklyComparison}
               columns={["week", "totalCalls", "connected", "rate"]}
-              height={280}
+              height={300}
               chartElement={
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.weeklyComparison}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend />
-                    <Bar dataKey="totalCalls" fill={HEALTH_THEME.primary} name="Total Calls" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="connected" fill={HEALTH_THEME.success} name="Connected" radius={[6, 6, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="week" tick={{ fontSize: 12, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 12, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Bar dataKey="totalCalls" fill={"#D97706"} name="Total Calls" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="connected" fill={"#059669"} name="Connected" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               }
@@ -2103,18 +2005,18 @@ function HealthManagerDashboard({ currentUser }) {
               {analyticsData.weeklyComparison.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.weeklyComparison}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={`${HEALTH_THEME.primary}20`} />
-                    <XAxis dataKey="week" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <RechartsTooltip content={<CustomChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
-                    <Bar dataKey="totalCalls" fill={HEALTH_THEME.primary} name="Total" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="connected" fill={HEALTH_THEME.success} name="Connected" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                    <XAxis dataKey="week" tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <YAxis tick={{ fontSize: 10, fill: colors.chartTick }} />
+                    <RechartsTooltip content={<CustomChartTooltip colors={colors} />} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} formatter={(value) => <span style={{ color: colors.chartLegend }}>{value}</span>} />
+                    <Bar dataKey="totalCalls" fill={"#D97706"} name="Total" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="connected" fill={"#059669"} name="Connected" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                  <Typography color="text.secondary">No data available</Typography>
+                  <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                 </Box>
               )}
             </ChartCard>
@@ -2125,19 +2027,14 @@ function HealthManagerDashboard({ currentUser }) {
             <Card
               elevation={0}
               sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 3,
+                border: `1px solid ${colors.border}`,
+                bgcolor: colors.bgPaper,
+                borderRadius: '12px',
                 height: "100%",
-                transition: "all 0.3s ease",
-                "&:hover": {
-                  boxShadow: `0 12px 40px ${HEALTH_THEME.primary}15`,
-                  transform: "translateY(-4px)",
-                },
               }}
             >
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={700} color={HEALTH_THEME.primary} sx={{ mb: 3 }}>
+              <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.text, mb: 2 }}>
                   Top Performers Summary
                 </Typography>
                 {analyticsData.topAgents.length > 0 ? (
@@ -2148,58 +2045,37 @@ function HealthManagerDashboard({ currentUser }) {
                         sx={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 2,
-                          mb: 2,
+                          gap: 1.5,
+                          mb: 1,
                           p: 1.5,
-                          borderRadius: "12px",
-                          bgcolor: index === 0 ? `${HEALTH_THEME.accent}15` : `${HEALTH_THEME.primary}08`,
-                          border: index === 0 ? `1px solid ${HEALTH_THEME.accent}40` : "none",
+                          borderRadius: "8px",
+                          bgcolor: index === 0 ? (colors.primarySoft || '#FFFBEB') : 'transparent',
+                          borderBottom: index < analyticsData.topAgents.length - 1 && index !== 0 ? `1px solid ${colors.border}` : 'none',
                         }}
                       >
-                        <Avatar
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            background: index === 0 ? `linear-gradient(135deg, ${HEALTH_THEME.accent} 0%, #fbbf24 100%)` : HEALTH_THEME.gradient,
-                            fontSize: "0.85rem",
-                            fontWeight: 700,
-                          }}
-                        >
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: colors.textMuted, width: 20, textAlign: 'center' }}>
                           {index + 1}
+                        </Typography>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: colors.primary || '#D97706', fontSize: "0.8rem", fontWeight: 600 }}>
+                          {(agent.fullName || agent.name)?.charAt(0) || "A"}
                         </Avatar>
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="subtitle1" fontWeight={600} color="text.primary">
+                          <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.text }}>
                             {agent.fullName || agent.name}
                           </Typography>
-                          <Box sx={{ display: "flex", gap: 2 }}>
-                            <Typography variant="caption" color="text.secondary">
-                              {agent.totalCalls} calls
-                            </Typography>
-                            <Typography variant="caption" color={HEALTH_THEME.success}>
-                              {agent.connectedCalls} connected
-                            </Typography>
-                            <Typography variant="caption" color={HEALTH_THEME.accent}>
-                              {agent.successRate}% rate
-                            </Typography>
-                          </Box>
+                          <Typography sx={{ fontSize: 11, color: colors.textMuted }}>
+                            {agent.totalCalls} calls &middot; {agent.connectedCalls} connected
+                          </Typography>
                         </Box>
-                        {index === 0 && (
-                          <Chip
-                            label="Top"
-                            size="small"
-                            sx={{
-                              background: `linear-gradient(135deg, ${HEALTH_THEME.accent} 0%, #fbbf24 100%)`,
-                              color: "#fff",
-                              fontWeight: 600,
-                            }}
-                          />
-                        )}
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: colors.primary || '#D97706' }}>
+                          {agent.successRate}%
+                        </Typography>
                       </Box>
                     ))}
                   </Box>
                 ) : (
                   <Box sx={{ textAlign: "center", py: 8 }}>
-                    <Typography color="text.secondary">No data available</Typography>
+                    <Typography sx={{ color: colors.textSec }}>No data available</Typography>
                   </Box>
                 )}
               </CardContent>
@@ -2209,47 +2085,47 @@ function HealthManagerDashboard({ currentUser }) {
       )}
 
       {activeTab === 2 && (
-        <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+        <TableContainer component={Paper} elevation={0} sx={{ borderRadius: '12px', border: `1px solid ${colors.border}`, bgcolor: colors.bgPaper }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Client Number</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Call Type</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Timestamp</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="center">Duration</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="center">Status</TableCell>
+              <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }}>Agent</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }}>Designation</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }}>Client Number</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }}>Call Type</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }}>Timestamp</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }} align="center">Duration</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: 12, color: colors.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottomColor: colors.border }} align="center">Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {applyFilters(filteredCallLogs).slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((log) => (
-                <TableRow key={log.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight={500}>{log.agentName}</Typography>
+                <TableRow key={log.id} hover sx={{ "&:hover": { bgcolor: colors.bgCardHover } }}>
+                  <TableCell sx={{ color: colors.text }}>
+                    <Typography variant="body2" fontWeight={500} sx={{ color: colors.text }}>{log.agentName}</Typography>
                   </TableCell>
                   <TableCell>
                     <Chip
                       label={log.agentDesignation || "N/A"}
                       size="small"
                       sx={{
-                        bgcolor: isPEAgent(log.agentDesignation) ? "#fef3c7" : isREAgent(log.agentDesignation) ? "#dbeafe" : "#f1f5f9",
-                        color: isPEAgent(log.agentDesignation) ? "#d97706" : isREAgent(log.agentDesignation) ? "#2563eb" : "#64748b",
+                        bgcolor: isPEAgent(log.agentDesignation) ? colors.statusBreak.bg : isREAgent(log.agentDesignation) ? colors.statusOnCall.bg : colors.statusOffline.bg,
+                        color: isPEAgent(log.agentDesignation) ? colors.statusBreak.color : isREAgent(log.agentDesignation) ? colors.statusOnCall.color : colors.statusOffline.color,
                         fontWeight: 500,
                       }}
                     />
                   </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{log.clientNumber || "N/A"}</Typography>
+                  <TableCell sx={{ color: colors.text }}>
+                    <Typography variant="body2" sx={{ color: colors.text }}>{log.clientNumber || "N/A"}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip label={log.callType || "N/A"} size="small" sx={{ bgcolor: "#eff6ff", color: "#3b82f6" }} />
+                    <Chip label={log.callType || "N/A"} size="small" sx={{ bgcolor: colors.isDark ? "rgba(59,130,246,0.08)" : "#eff6ff", color: "#3b82f6" }} />
                   </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{formatTimestamp(log.timestamp)}</Typography>
+                  <TableCell sx={{ color: colors.text }}>
+                    <Typography variant="body2" sx={{ color: colors.text }}>{formatTimestamp(log.timestamp)}</Typography>
                   </TableCell>
-                  <TableCell align="center">
-                    <Typography variant="body2">
+                  <TableCell align="center" sx={{ color: colors.text }}>
+                    <Typography variant="body2" sx={{ color: colors.text }}>
                       {log.callConnected ? calculateActualDuration(log.startTime, log.endTime) : "-"}
                     </Typography>
                   </TableCell>
@@ -2259,8 +2135,8 @@ function HealthManagerDashboard({ currentUser }) {
                       label={log.callConnected ? "Connected" : "Not Connected"}
                       size="small"
                       sx={{
-                        bgcolor: log.callConnected ? "#dcfce7" : "#fee2e2",
-                        color: log.callConnected ? "#16a34a" : "#dc2626",
+                        bgcolor: log.callConnected ? colors.statusAvailable.bg : colors.statusError.bg,
+                        color: log.callConnected ? colors.statusAvailable.color : colors.statusError.color,
                       }}
                     />
                   </TableCell>
@@ -2279,16 +2155,38 @@ function HealthManagerDashboard({ currentUser }) {
               setRowsPerPage(parseInt(e.target.value, 10));
               setPage(0);
             }}
+            sx={{
+              color: colors.text,
+              borderTop: `1px solid ${colors.border}`,
+              ".MuiTablePagination-selectLabel": { color: colors.textSec },
+              ".MuiTablePagination-displayedRows": { color: colors.textSec },
+              ".MuiTablePagination-selectIcon": { color: colors.textMuted },
+              ".MuiTablePagination-select": { color: colors.text },
+              ".MuiIconButton-root": { color: colors.textSec },
+            }}
           />
         </TableContainer>
       )}
 
       {/* Filter Dialog */}
-      <Dialog open={filterDialogOpen} onClose={() => setFilterDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ bgcolor: "#11998e", color: "white" }}>
+      <Dialog
+        open={filterDialogOpen}
+        onClose={() => setFilterDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            bgcolor: colors.dialogBg,
+            color: colors.text,
+            border: `1px solid ${colors.dialogBorder}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ borderBottom: `1px solid ${colors.border}`, py: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <FilterList />
-            <Typography variant="h6">Filter Options</Typography>
+            <FilterList sx={{ color: colors.textSec, fontSize: 20 }} />
+            <Typography sx={{ fontSize: 15, fontWeight: 600, color: colors.text }}>Filter Options</Typography>
           </Box>
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -2358,21 +2256,29 @@ function HealthManagerDashboard({ currentUser }) {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button onClick={handleResetFilters} sx={{ color: "#64748b" }}>
+        <DialogActions sx={{ p: 2, gap: 1, borderTop: `1px solid ${colors.border}` }}>
+          <Button size="small" onClick={handleResetFilters} sx={{ color: colors.textSec, textTransform: "none" }}>
             Reset
           </Button>
-          <Button onClick={() => setFilterDialogOpen(false)} variant="outlined">
+          <Button size="small" onClick={() => setFilterDialogOpen(false)} sx={{ color: colors.textSec, textTransform: "none" }}>
             Cancel
           </Button>
           <Button
+            size="small"
             onClick={() => {
               setFilterDialogOpen(false);
               handleExportCSV();
             }}
-            variant="contained"
-            sx={{ bgcolor: "#11998e", "&:hover": { bgcolor: "#0d7d71" } }}
-            startIcon={<FileDownload />}
+            variant="outlined"
+            sx={{
+              borderColor: colors.primary || '#D97706',
+              color: colors.primary || '#D97706',
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: "8px",
+              "&:hover": { bgcolor: colors.primarySoft || 'rgba(217,119,6,0.08)' },
+            }}
+            startIcon={<FileDownload sx={{ fontSize: 16 }} />}
           >
             Export Filtered
           </Button>

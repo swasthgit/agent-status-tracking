@@ -10,6 +10,9 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  Divider,
+  Collapse,
+  IconButton,
 } from "@mui/material";
 import {
   DirectionsWalk,
@@ -21,9 +24,16 @@ import {
   OpenInNew,
   BarChart,
   Map,
+  Route,
+  AccountBalanceWallet,
+  AccessTime,
+  ExpandMore,
+  ExpandLess,
+  ArrowForward,
 } from "@mui/icons-material";
 import { collection, doc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { REIMBURSEMENT_CONFIG } from "../config/reimbursementConfig";
 import DCOfflineVisitRecord from "./DCOfflineVisitRecord";
 import DCCustomVisit from "./DCCustomVisit";
 import ManualLeads from "./ManualLeads";
@@ -142,14 +152,53 @@ const DCDashboard = ({ userId, userRole, userData: initialUserData }) => {
 
   const activeTrips = tripLogs.filter((trip) => trip.status === "active").length;
 
-  const totalDistanceThisMonth = tripLogs
-    .filter((trip) => {
-      if (!trip.endTime) return false;
-      const tripDate = trip.endTime.toDate();
-      const now = new Date();
-      return tripDate.getMonth() === now.getMonth() && tripDate.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, trip) => sum + (trip.totalDistance || 0), 0);
+  const thisMonthTrips = tripLogs.filter((trip) => {
+    if (!trip.endTime) return false;
+    const tripDate = trip.endTime.toDate();
+    const now = new Date();
+    return tripDate.getMonth() === now.getMonth() && tripDate.getFullYear() === now.getFullYear();
+  });
+
+  const totalDistanceThisMonth = thisMonthTrips.reduce((sum, trip) => sum + (trip.totalDistance || 0), 0);
+
+  // Enhanced stats for road distance & reimbursement
+  const totalRoadDistanceThisMonth = thisMonthTrips
+    .filter(t => t.distanceSummary?.roadTotalKm != null)
+    .reduce((sum, t) => sum + (t.distanceSummary.roadTotalKm || 0), 0);
+
+  const totalReimbursementThisMonth = thisMonthTrips
+    .filter(t => t.reimbursement?.calculatedAmount != null)
+    .reduce((sum, t) => sum + (t.reimbursement.calculatedAmount || 0), 0);
+
+  const completedTrips = tripLogs
+    .filter(t => t.status === "completed")
+    .sort((a, b) => {
+      const ta = b.endTime?.toDate?.()?.getTime() || 0;
+      const tb = a.endTime?.toDate?.()?.getTime() || 0;
+      return ta - tb;
+    });
+
+  const [expandedTripId, setExpandedTripId] = useState(null);
+
+  // Format helpers for trip history
+  const formatTripDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+    const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+  };
+
+  const formatTripTime = (timestamp) => {
+    if (!timestamp) return "";
+    const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  };
+
+  const formatTripDuration = (ms) => {
+    if (!ms) return "N/A";
+    const hours = Math.floor(ms / 3600000);
+    const minutes = Math.floor((ms % 3600000) / 60000);
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
 
   if (loading) {
     return (
@@ -303,18 +352,18 @@ const DCDashboard = ({ userId, userRole, userData: initialUserData }) => {
           >
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
-                <LocationOn sx={{ color: "white", fontSize: 36 }} />
+                <Route sx={{ color: "white", fontSize: 36 }} />
                 <Box sx={{ flexGrow: 1 }}>
                   <Typography variant="h3" sx={{ color: "white", fontWeight: 700 }}>
-                    {activeTrips}
+                    {totalRoadDistanceThisMonth > 0 ? totalRoadDistanceThisMonth.toFixed(1) : totalDistanceThisMonth.toFixed(1)}
                   </Typography>
                   <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.95)" }}>
-                    Active Trips
+                    {totalRoadDistanceThisMonth > 0 ? "Road km (month)" : "km (month)"}
                   </Typography>
                 </Box>
               </Box>
               <Chip
-                label={`${totalDistanceThisMonth.toFixed(1)} km this month`}
+                label={totalReimbursementThisMonth > 0 ? `${REIMBURSEMENT_CONFIG.currencySymbol}${totalReimbursementThisMonth.toFixed(0)} reimbursement` : `${activeTrips} active trip${activeTrips !== 1 ? 's' : ''}`}
                 size="small"
                 sx={{ bgcolor: "rgba(255,255,255,0.3)", color: "white", fontWeight: 600 }}
               />
@@ -677,11 +726,205 @@ const DCDashboard = ({ userId, userRole, userData: initialUserData }) => {
         }}
       >
         {activeTab === 0 && (
-          FEATURE_FLAGS.USE_SNAPSHOT_TRIP_TRACKER ? (
-            <TripTrackerSnapshot agentId={userId} agentCollection="offlineVisits" />
-          ) : (
-            <TripTrackerEnhanced agentId={userId} agentCollection="offlineVisits" />
-          )
+          <>
+            {FEATURE_FLAGS.USE_SNAPSHOT_TRIP_TRACKER ? (
+              <TripTrackerSnapshot agentId={userId} agentCollection="offlineVisits" />
+            ) : (
+              <TripTrackerEnhanced agentId={userId} agentCollection="offlineVisits" />
+            )}
+
+            {/* Trip History Section */}
+            {completedTrips.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: 1 }}>
+                    <AccessTime sx={{ fontSize: 22, color: "#667eea" }} />
+                    Recent Trips
+                  </Typography>
+                  <Chip label={`${completedTrips.length} total`} size="small" sx={{ bgcolor: "#f1f5f9", color: "#64748b", fontWeight: 600 }} />
+                </Box>
+
+                {/* Monthly Summary */}
+                {(totalRoadDistanceThisMonth > 0 || totalReimbursementThisMonth > 0) && (
+                  <Card elevation={0} sx={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", borderRadius: 3, mb: 2, overflow: "hidden" }}>
+                    <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+                      <Typography variant="caption" sx={{ color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600, fontSize: "0.6rem" }}>
+                        This Month's Summary
+                      </Typography>
+                      <Box sx={{ display: "flex", gap: 3, mt: 1.5, flexWrap: "wrap" }}>
+                        <Box>
+                          <Typography variant="h5" sx={{ color: "#34d399", fontWeight: 800 }}>
+                            {totalRoadDistanceThisMonth.toFixed(1)} km
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "#64748b" }}>Road Distance</Typography>
+                        </Box>
+                        <Divider orientation="vertical" flexItem sx={{ borderColor: "#334155" }} />
+                        <Box>
+                          <Typography variant="h5" sx={{ color: "#fbbf24", fontWeight: 800 }}>
+                            {REIMBURSEMENT_CONFIG.currencySymbol}{totalReimbursementThisMonth.toFixed(0)}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "#64748b" }}>Reimbursement</Typography>
+                        </Box>
+                        <Divider orientation="vertical" flexItem sx={{ borderColor: "#334155" }} />
+                        <Box>
+                          <Typography variant="h5" sx={{ color: "#60a5fa", fontWeight: 800 }}>
+                            {thisMonthTrips.length}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "#64748b" }}>Trips</Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Trip Cards */}
+                {completedTrips.slice(0, 10).map((trip) => {
+                  const roadKm = trip.distanceSummary?.roadTotalKm;
+                  const hasRoad = roadKm != null;
+                  const reimb = trip.reimbursement?.calculatedAmount;
+                  const clinics = trip.visitLocations || [];
+                  const segments = trip.routeSegments || [];
+                  const isExpanded = expandedTripId === trip.id;
+
+                  return (
+                    <Card
+                      key={trip.id}
+                      elevation={0}
+                      sx={{
+                        mb: 1.5,
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        transition: "all 0.2s",
+                        "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" },
+                      }}
+                    >
+                      <Box
+                        onClick={() => setExpandedTripId(isExpanded ? null : trip.id)}
+                        sx={{ display: "flex", alignItems: "center", p: 2, cursor: "pointer", gap: 2 }}
+                      >
+                        {/* Date badge */}
+                        <Box sx={{ bgcolor: "#f8fafc", borderRadius: 2, p: 1, textAlign: "center", minWidth: 52 }}>
+                          <Typography variant="caption" sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.6rem", display: "block", lineHeight: 1 }}>
+                            {formatTripDate(trip.startTime)?.split(" ")[1] || ""}
+                          </Typography>
+                          <Typography variant="h6" sx={{ color: "#1e293b", fontWeight: 800, lineHeight: 1.2 }}>
+                            {formatTripDate(trip.startTime)?.split(" ")[0] || ""}
+                          </Typography>
+                        </Box>
+
+                        {/* Trip details */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ color: "#64748b", fontSize: "0.75rem" }}>
+                              {formatTripTime(trip.startTime)} - {formatTripTime(trip.endTime)}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                              ({formatTripDuration(trip.totalDuration)})
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+                            {hasRoad ? (
+                              <Chip icon={<Route sx={{ fontSize: 14 }} />} label={`${roadKm.toFixed(1)} km`} size="small"
+                                sx={{ bgcolor: "#dcfce7", color: "#16a34a", fontWeight: 700, fontSize: "0.7rem", height: 24, "& .MuiChip-icon": { color: "#16a34a" } }} />
+                            ) : (
+                              <Chip label={`${(trip.totalDistance || 0).toFixed(1)} km`} size="small"
+                                sx={{ bgcolor: "#f1f5f9", color: "#64748b", fontSize: "0.7rem", height: 24 }} />
+                            )}
+                            {reimb != null && (
+                              <Chip icon={<AccountBalanceWallet sx={{ fontSize: 14 }} />} label={`${REIMBURSEMENT_CONFIG.currencySymbol}${reimb.toFixed(0)}`} size="small"
+                                sx={{ bgcolor: "#fffbeb", color: "#d97706", fontWeight: 700, fontSize: "0.7rem", height: 24, "& .MuiChip-icon": { color: "#d97706" } }} />
+                            )}
+                            {clinics.length > 0 && (
+                              <Chip icon={<LocalHospital sx={{ fontSize: 14 }} />} label={`${clinics.length} clinic${clinics.length > 1 ? 's' : ''}`} size="small"
+                                sx={{ bgcolor: "#dbeafe", color: "#2563eb", fontSize: "0.7rem", height: 24, "& .MuiChip-icon": { color: "#2563eb" } }} />
+                            )}
+                          </Box>
+                        </Box>
+
+                        {/* Expand icon */}
+                        {(segments.length > 0 || clinics.length > 0) && (
+                          <IconButton size="small" sx={{ color: "#94a3b8" }}>
+                            {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                          </IconButton>
+                        )}
+                      </Box>
+
+                      {/* Expandable detail section */}
+                      <Collapse in={isExpanded}>
+                        <Box sx={{ px: 2, pb: 2, pt: 0 }}>
+                          <Divider sx={{ mb: 1.5 }} />
+
+                          {/* Route Segments */}
+                          {segments.length > 0 && (
+                            <Box sx={{ mb: 1.5 }}>
+                              <Typography variant="caption" sx={{ color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", fontSize: "0.6rem" }}>
+                                Route
+                              </Typography>
+                              {segments.map((seg, i) => (
+                                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: i === 0 ? "#10b981" : "#0ea5e9", flexShrink: 0 }} />
+                                  <Typography variant="caption" sx={{ color: "#475569", fontSize: "0.7rem" }}>
+                                    {seg.from?.label} <ArrowForward sx={{ fontSize: 10, mx: 0.5, verticalAlign: "middle", color: "#94a3b8" }} /> {seg.to?.label}
+                                  </Typography>
+                                  {seg.roadDistanceKm != null && (
+                                    <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700, fontSize: "0.7rem", ml: "auto" }}>
+                                      {seg.roadDistanceKm} km
+                                    </Typography>
+                                  )}
+                                </Box>
+                              ))}
+                            </Box>
+                          )}
+
+                          {/* Clinics */}
+                          {clinics.length > 0 && (
+                            <Box>
+                              <Typography variant="caption" sx={{ color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", fontSize: "0.6rem" }}>
+                                Clinics Visited
+                              </Typography>
+                              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
+                                {clinics.map((c, i) => (
+                                  <Chip key={i} label={c.clinicCode || "Visit"} size="small"
+                                    sx={{ bgcolor: "#eff6ff", color: "#1d4ed8", fontSize: "0.65rem", height: 22, fontWeight: 600 }} />
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
+
+                          {/* Distance comparison */}
+                          {hasRoad && (
+                            <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "#f8fafc", borderRadius: 2 }}>
+                              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                <Box>
+                                  <Typography variant="caption" sx={{ color: "#94a3b8", fontSize: "0.6rem" }}>Straight-line</Typography>
+                                  <Typography variant="body2" sx={{ color: "#64748b", fontWeight: 600 }}>{(trip.totalDistance || 0).toFixed(2)} km</Typography>
+                                </Box>
+                                <Box sx={{ textAlign: "center" }}>
+                                  <Typography variant="caption" sx={{ color: "#94a3b8", fontSize: "0.6rem" }}>Road</Typography>
+                                  <Typography variant="body2" sx={{ color: "#059669", fontWeight: 700 }}>{roadKm.toFixed(2)} km</Typography>
+                                </Box>
+                                <Box sx={{ textAlign: "right" }}>
+                                  <Typography variant="caption" sx={{ color: "#94a3b8", fontSize: "0.6rem" }}>Reimbursement</Typography>
+                                  <Typography variant="body2" sx={{ color: "#d97706", fontWeight: 700 }}>{REIMBURSEMENT_CONFIG.currencySymbol}{reimb?.toFixed(2) || "0.00"}</Typography>
+                                </Box>
+                              </Box>
+                            </Box>
+                          )}
+                        </Box>
+                      </Collapse>
+                    </Card>
+                  );
+                })}
+
+                {completedTrips.length > 10 && (
+                  <Typography variant="caption" sx={{ color: "#94a3b8", textAlign: "center", display: "block", mt: 1 }}>
+                    Showing 10 of {completedTrips.length} trips
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </>
         )}
 
         {activeTab === 1 && (

@@ -31,6 +31,7 @@ import {
   Group,
   Circle,
 } from "@mui/icons-material";
+import { useThemeMode } from "../context/ThemeContext";
 
 // ⚠️ TEMPORARY OVERRIDE FOR MEETING - REMOVE AFTER MEETING ⚠️
 // Set to null to use actual count, or a number to override display
@@ -41,6 +42,7 @@ const TEMPORARY_DC_COUNT_OVERRIDE = 67; // Change back to null after meeting
  * Displays all offline visits users, their visit logs, and manual call logs
  */
 function OfflineVisitsManager({ offlineVisitsData }) {
+  const { colors } = useThemeMode();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState(0); // 0 = Manual Call Logs, 1 = Offline Visits, 2 = Trip Tracking
 
@@ -272,8 +274,10 @@ function OfflineVisitsManager({ offlineVisitsData }) {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        bgcolor: colors.bg,
+        color: colors.text,
         p: 3,
+        transition: "background-color 0.3s ease",
       }}
     >
       {/* Header Section */}
@@ -281,7 +285,7 @@ function OfflineVisitsManager({ offlineVisitsData }) {
         <Typography
           variant="h4"
           sx={{
-            color: "white",
+            color: colors.text,
             fontWeight: 700,
             mb: 1,
             display: "flex",
@@ -292,7 +296,7 @@ function OfflineVisitsManager({ offlineVisitsData }) {
           <DirectionsWalk sx={{ fontSize: 40 }} />
           Offline Visits Management
         </Typography>
-        <Typography variant="body1" sx={{ color: "rgba(255,255,255,0.9)" }}>
+        <Typography variant="body1" sx={{ color: colors.textSec }}>
           View and manage all offline visits users and their activity
         </Typography>
       </Box>
@@ -305,7 +309,7 @@ function OfflineVisitsManager({ offlineVisitsData }) {
             sx={{
               background: "linear-gradient(135deg, #667eea, #764ba2)",
               borderRadius: "16px",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+              boxShadow: colors.shadow,
             }}
           >
             <CardContent>
@@ -330,7 +334,7 @@ function OfflineVisitsManager({ offlineVisitsData }) {
             sx={{
               background: "linear-gradient(135deg, #22c55e, #16a34a)",
               borderRadius: "16px",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+              boxShadow: colors.shadow,
             }}
           >
             <CardContent>
@@ -355,7 +359,7 @@ function OfflineVisitsManager({ offlineVisitsData }) {
             sx={{
               background: "linear-gradient(135deg, #f093fb, #f5576c)",
               borderRadius: "16px",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+              boxShadow: colors.shadow,
             }}
           >
             <CardContent>
@@ -380,7 +384,7 @@ function OfflineVisitsManager({ offlineVisitsData }) {
             sx={{
               background: "linear-gradient(135deg, #4facfe, #00f2fe)",
               borderRadius: "16px",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+              boxShadow: colors.shadow,
             }}
           >
             <CardContent>
@@ -409,11 +413,13 @@ function OfflineVisitsManager({ offlineVisitsData }) {
           sx={{
             flexGrow: 1,
             minWidth: 300,
-            bgcolor: "white",
+            bgcolor: colors.bgPaper,
             borderRadius: "12px",
             "& .MuiOutlinedInput-root": {
-              "& fieldset": { border: "none" },
+              "& fieldset": { border: `1px solid ${colors.border}` },
+              color: colors.text,
             },
+            "& .MuiInputBase-input::placeholder": { color: colors.textMuted, opacity: 1 },
           }}
           InputProps={{
             startAdornment: (
@@ -428,11 +434,11 @@ function OfflineVisitsManager({ offlineVisitsData }) {
           startIcon={<Refresh />}
           onClick={() => window.location.reload()}
           sx={{
-            borderColor: "white",
-            color: "white",
+            borderColor: colors.border,
+            color: colors.textSec,
             "&:hover": {
-              borderColor: "#e2e8f0",
-              bgcolor: "rgba(255, 255, 255, 0.1)",
+              borderColor: colors.borderHover,
+              bgcolor: colors.white08,
             },
             borderRadius: "12px",
             px: 3,
@@ -459,13 +465,14 @@ function OfflineVisitsManager({ offlineVisitsData }) {
       <Paper
         elevation={0}
         sx={{
-          bgcolor: "white",
+          bgcolor: colors.bgPaper,
           borderRadius: "16px",
+          border: `1px solid ${colors.border}`,
           p: 3,
           mb: 3,
         }}
       >
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: colors.text }}>
           Offline Visits Users
         </Typography>
         <Grid container spacing={2}>
@@ -474,24 +481,26 @@ function OfflineVisitsManager({ offlineVisitsData }) {
               <Card
                 sx={{
                   borderRadius: "12px",
-                  border: "1px solid #e2e8f0",
+                  bgcolor: colors.bgPaper,
+                  border: `1px solid ${colors.border}`,
                   transition: "all 0.2s",
                   "&:hover": {
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    boxShadow: colors.shadow,
                     transform: "translateY(-2px)",
+                    borderColor: colors.borderHover,
                   },
                 }}
               >
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-                    <Avatar sx={{ bgcolor: "#667eea" }}>
+                    <Avatar sx={{ bgcolor: colors.purpleSolid }}>
                       <Person />
                     </Avatar>
                     <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.text }}>
                         {user.name}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "#64748b" }}>
+                      <Typography variant="caption" sx={{ color: colors.textSec }}>
                         {user.empId}
                       </Typography>
                     </Box>
@@ -499,15 +508,15 @@ function OfflineVisitsManager({ offlineVisitsData }) {
                       label={user.status || "Offline"}
                       size="small"
                       sx={{
-                        bgcolor: user.status === "Login" ? "#dcfce7" : "#fee2e2",
-                        color: user.status === "Login" ? "#16a34a" : "#dc2626",
+                        bgcolor: user.status === "Login" ? colors.statusAvailable.bg : colors.statusError.bg,
+                        color: user.status === "Login" ? colors.statusAvailable.color : colors.statusError.color,
                       }}
                     />
                   </Box>
-                  <Typography variant="body2" sx={{ color: "#64748b", mb: 0.5 }}>
+                  <Typography variant="body2" sx={{ color: colors.textSec, mb: 0.5 }}>
                     {user.email}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "#64748b" }}>
+                  <Typography variant="body2" sx={{ color: colors.textSec }}>
                     {user.mobile}
                   </Typography>
                   <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
@@ -535,7 +544,9 @@ function OfflineVisitsManager({ offlineVisitsData }) {
       <Paper
         elevation={0}
         sx={{
-          bgcolor: "white",
+          bgcolor: colors.bgPaper,
+          border: `1px solid ${colors.border}`,
+          borderBottom: "none",
           borderRadius: "16px 16px 0 0",
           mb: 0,
         }}
@@ -549,9 +560,13 @@ function OfflineVisitsManager({ offlineVisitsData }) {
               fontSize: "1rem",
               fontWeight: 600,
               minHeight: 64,
+              color: colors.textSec,
             },
             "& .Mui-selected": {
-              color: "#667eea !important",
+              color: `${colors.purpleSolid} !important`,
+            },
+            "& .MuiTabs-indicator": {
+              bgcolor: colors.purpleSolid,
             },
           }}
         >
@@ -565,7 +580,9 @@ function OfflineVisitsManager({ offlineVisitsData }) {
       <Paper
         elevation={0}
         sx={{
-          bgcolor: "white",
+          bgcolor: colors.bgPaper,
+          border: `1px solid ${colors.border}`,
+          borderTop: "none",
           borderRadius: "0 0 16px 16px",
           minHeight: "400px",
           p: 3,
@@ -574,25 +591,25 @@ function OfflineVisitsManager({ offlineVisitsData }) {
         {activeTab === 0 && (
           // Manual Call Logs Table
           <TableContainer>
-            <Table>
+            <Table sx={{ "& .MuiTableCell-root": { color: colors.text, borderBottomColor: colors.border } }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                  <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Emp ID</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Timestamp</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Client Number</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Call Type</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Partner</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Remarks</TableCell>
+                <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>User</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Emp ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Timestamp</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Client Number</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Call Type</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Partner</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Duration</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Remarks</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredManualLogs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                      <Typography variant="body1" sx={{ color: "#64748b" }}>
+                      <Typography variant="body1" sx={{ color: colors.textSec }}>
                         No manual call logs found
                       </Typography>
                     </TableCell>
@@ -610,8 +627,8 @@ function OfflineVisitsManager({ offlineVisitsData }) {
                           label={log.callConnected ? "Connected" : "Not Connected"}
                           size="small"
                           sx={{
-                            bgcolor: log.callConnected ? "#dcfce7" : "#fee2e2",
-                            color: log.callConnected ? "#16a34a" : "#dc2626",
+                            bgcolor: log.callConnected ? colors.statusAvailable.bg : colors.statusError.bg,
+                            color: log.callConnected ? colors.statusAvailable.color : colors.statusError.color,
                           }}
                         />
                       </TableCell>
@@ -631,30 +648,30 @@ function OfflineVisitsManager({ offlineVisitsData }) {
         {activeTab === 1 && (
           // Offline Visits Table
           <TableContainer>
-            <Table>
+            <Table sx={{ "& .MuiTableCell-root": { color: colors.text, borderBottomColor: colors.border } }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                  <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Emp ID</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Clinic Code</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Branch Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Partner</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>BM Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Contact</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>State</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Visit Type</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Images</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Location</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Remarks</TableCell>
+                <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>User</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Emp ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Clinic Code</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Branch Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Partner</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>BM Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Contact</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>State</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Visit Type</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Duration</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Images</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Location</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Remarks</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredVisits.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
-                      <Typography variant="body1" sx={{ color: "#64748b" }}>
+                      <Typography variant="body1" sx={{ color: colors.textSec }}>
                         No offline visits found
                       </Typography>
                     </TableCell>
@@ -687,8 +704,8 @@ function OfflineVisitsManager({ offlineVisitsData }) {
                           label={visit.punchInData?.durationFormatted || visit.durationFormatted || "N/A"}
                           size="small"
                           sx={{
-                            bgcolor: (visit.punchInData || visit.durationFormatted) ? "#dcfce7" : "#fee2e2",
-                            color: (visit.punchInData || visit.durationFormatted) ? "#16a34a" : "#dc2626",
+                            bgcolor: (visit.punchInData || visit.durationFormatted) ? colors.statusAvailable.bg : colors.statusError.bg,
+                            color: (visit.punchInData || visit.durationFormatted) ? colors.statusAvailable.color : colors.statusError.color,
                           }}
                         />
                       </TableCell>
@@ -717,8 +734,8 @@ function OfflineVisitsManager({ offlineVisitsData }) {
                             label="No images"
                             size="small"
                             sx={{
-                              bgcolor: "#fee2e2",
-                              color: "#dc2626",
+                              bgcolor: colors.statusError.bg,
+                              color: colors.statusError.color,
                             }}
                           />
                         )}
@@ -748,25 +765,25 @@ function OfflineVisitsManager({ offlineVisitsData }) {
         {activeTab === 2 && (
           // Trip Tracking Table
           <TableContainer>
-            <Table>
+            <Table sx={{ "& .MuiTableCell-root": { color: colors.text, borderBottomColor: colors.border } }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                  <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Emp ID</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Start Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>End Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Distance (km)</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Start Location</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>End Location</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>User</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Emp ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Start Time</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>End Time</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Distance (km)</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Duration</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Start Location</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>End Location</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: colors.text }}>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredTrips.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                      <Typography variant="body1" sx={{ color: "#64748b" }}>
+                      <Typography variant="body1" sx={{ color: colors.textSec }}>
                         {searchQuery ? "No trips found matching your search" : "Trip data will appear here once agents start tracking trips"}
                       </Typography>
                     </TableCell>
@@ -776,7 +793,7 @@ function OfflineVisitsManager({ offlineVisitsData }) {
                     <TableRow key={trip.id} hover>
                       <TableCell>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <Avatar sx={{ width: 32, height: 32, bgcolor: "#667eea" }}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: colors.purpleSolid }}>
                             {trip.userName?.charAt(0).toUpperCase()}
                           </Avatar>
                           <Typography variant="body2" sx={{ fontWeight: 500 }}>

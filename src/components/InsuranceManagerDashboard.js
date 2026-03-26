@@ -109,6 +109,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { useThemeMode } from "../context/ThemeContext";
 
 // Animated Counter Hook
 const useAnimatedCounter = (end, duration = 1500) => {
@@ -149,104 +150,71 @@ const useAnimatedCounter = (end, duration = 1500) => {
   return count;
 };
 
-// Animated Stat Card
-const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue, onClick, isActive }) => {
+// Animated Stat Card — Premium redesign with icon pill + sparkline
+const AnimatedStatCard = ({ title, value, icon, gradient, subtitle, trend, trendValue, onClick, isActive, colors }) => {
   const animatedValue = useAnimatedCounter(value);
+  const c = colors || {};
 
   return (
     <Card
       elevation={0}
       onClick={onClick}
       sx={{
-        background: gradient,
-        color: "white",
-        borderRadius: 3,
+        bgcolor: c.bgCard || '#fff',
+        border: `1px solid ${isActive ? (c.primary || '#4F46E5') : (c.border || '#e2e8f0')}`,
+        borderRadius: '12px',
         overflow: "hidden",
-        position: "relative",
-        transition: "all 0.3s ease",
+        transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
         cursor: onClick ? "pointer" : "default",
-        border: isActive ? "3px solid #fff" : "3px solid transparent",
-        boxShadow: isActive ? "0 0 20px rgba(255,255,255,0.4)" : "none",
         "&:hover": {
-          transform: "translateY(-8px)",
-          boxShadow: isActive ? "0 0 25px rgba(255,255,255,0.5)" : "0 20px 40px rgba(0,0,0,0.15)",
+          transform: "translateY(-2px)",
+          borderColor: c.borderHover || '#818CF8',
+          boxShadow: c.shadowCard || '0 4px 12px rgba(0,0,0,0.08)',
         },
       }}
     >
-      <CardContent sx={{ p: 3, position: "relative", zIndex: 1 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <CardContent sx={{ p: 2.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+          <Box sx={{ width: 32, height: 32, borderRadius: '8px', bgcolor: c.primarySoft || '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {React.cloneElement(icon, { sx: { fontSize: 17, color: c.primary || '#4F46E5' } })}
+          </Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 500, color: c.textMuted || '#94A3B8' }}>
+            {title}
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: 'space-between' }}>
           <Box>
-            <Typography variant="body2" sx={{ opacity: 0.9, mb: 1, fontWeight: 500 }}>
-              {title}
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
+            <Typography sx={{ fontSize: 28, fontWeight: 700, color: c.text || '#0F172A', lineHeight: 1, letterSpacing: '-0.02em' }}>
               {animatedValue}
             </Typography>
-            {subtitle && (
-              <Chip
-                label={subtitle}
-                size="small"
-                sx={{
-                  bgcolor: "rgba(255,255,255,0.2)",
-                  color: "white",
-                  fontWeight: 600,
-                  fontSize: "0.7rem",
-                }}
-              />
-            )}
             {trend && (
-              <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
                 {trend === "up" ? (
-                  <ArrowUpward sx={{ fontSize: 16, mr: 0.5 }} />
+                  <ArrowUpward sx={{ fontSize: 14, color: '#10B981', mr: 0.3 }} />
                 ) : (
-                  <ArrowDownward sx={{ fontSize: 16, mr: 0.5 }} />
+                  <ArrowDownward sx={{ fontSize: 14, color: '#F43F5E', mr: 0.3 }} />
                 )}
-                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: trend === "up" ? '#10B981' : '#F43F5E' }}>
                   {trendValue}
                 </Typography>
               </Box>
             )}
           </Box>
-          <Avatar
-            sx={{
-              bgcolor: "rgba(255,255,255,0.2)",
-              width: 56,
-              height: 56,
-            }}
-          >
-            {icon}
-          </Avatar>
+          <Box sx={{ width: 60, height: 24 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={SPARKLINE_DATA}>
+                <Line type="monotone" dataKey="v" stroke="#818CF8" strokeWidth={1.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
         </Box>
       </CardContent>
-      {/* Decorative circles */}
-      <Box
-        sx={{
-          position: "absolute",
-          top: -30,
-          right: -30,
-          width: 120,
-          height: 120,
-          borderRadius: "50%",
-          bgcolor: "rgba(255,255,255,0.1)",
-        }}
-      />
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: -40,
-          right: 40,
-          width: 80,
-          height: 80,
-          borderRadius: "50%",
-          bgcolor: "rgba(255,255,255,0.08)",
-        }}
-      />
     </Card>
   );
 };
 
 // Agent Card Component
-const AgentCard = ({ agent, onDownload, onClick }) => {
+const AgentCard = ({ agent, onDownload, onClick, colors, getStatusConfig }) => {
   const successRate = agent.totalCalls > 0
     ? Math.round((agent.connectedCalls / agent.totalCalls) * 100)
     : 0;
@@ -255,15 +223,15 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
     <Card
       elevation={0}
       sx={{
-        border: "1px solid",
-        borderColor: "divider",
+        border: `1px solid ${colors.border}`,
         borderRadius: 3,
         cursor: "pointer",
-        transition: "all 0.3s ease",
+        bgcolor: colors.bgPaper,
+        transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
         "&:hover": {
-          transform: "translateY(-6px)",
-          boxShadow: "0 12px 24px rgba(0,0,0,0.1)",
-          borderColor: "#667eea",
+          transform: "translateY(-2px)",
+          boxShadow: colors.shadowHover,
+          borderColor: colors.primary || "#4F46E5",
         },
       }}
       onClick={onClick}
@@ -286,7 +254,7 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
               sx={{
                 width: 56,
                 height: 56,
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                background: colors.gradientPrimary || "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
                 fontSize: "1.5rem",
                 fontWeight: 600,
               }}
@@ -295,10 +263,10 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
             </Avatar>
           </Badge>
           <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }} noWrap>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5, color: colors.text }} noWrap>
               {agent.name}
             </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+            <Typography variant="caption" sx={{ color: colors.textSec, display: "block" }}>
               {agent.id} {agent.department === "Team Lead" && "(TL)"}
             </Typography>
             <Chip
@@ -322,10 +290,10 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
                 onDownload(e, agent);
               }}
               sx={{
-                bgcolor: "#f0f9ff",
-                color: "#667eea",
+                bgcolor: colors.isDark ? "rgba(102,126,234,0.08)" : "#f0f9ff",
+                color: colors.primary || "#4F46E5",
                 "&:hover": {
-                  bgcolor: "#e0e7ff",
+                  bgcolor: colors.isDark ? "rgba(102,126,234,0.15)" : "#e0e7ff",
                   transform: "scale(1.1)",
                 },
               }}
@@ -335,30 +303,30 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
           </Tooltip>
         </Box>
 
-        <Divider sx={{ my: 2 }} />
+        <Divider sx={{ my: 2, borderColor: colors.border }} />
 
         <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-          <Box sx={{ flex: 1, textAlign: "center", p: 1, bgcolor: "#f8fafc", borderRadius: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: "#667eea" }}>
+          <Box sx={{ flex: 1, textAlign: "center", p: 1, bgcolor: colors.bgTableHeader, borderRadius: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: colors.primary || "#4F46E5" }}>
               {agent.totalCalls || 0}
             </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography variant="caption" sx={{ color: colors.textSec }}>
               Total Calls
             </Typography>
           </Box>
-          <Box sx={{ flex: 1, textAlign: "center", p: 1, bgcolor: "#f0fdf4", borderRadius: 2 }}>
+          <Box sx={{ flex: 1, textAlign: "center", p: 1, bgcolor: colors.isDark ? "rgba(34,197,94,0.08)" : "#f0fdf4", borderRadius: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#22c55e" }}>
               {agent.connectedCalls || 0}
             </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography variant="caption" sx={{ color: colors.textSec }}>
               Connected
             </Typography>
           </Box>
-          <Box sx={{ flex: 1, textAlign: "center", p: 1, bgcolor: "#fef2f2", borderRadius: 2 }}>
+          <Box sx={{ flex: 1, textAlign: "center", p: 1, bgcolor: colors.isDark ? "rgba(239,68,68,0.08)" : "#fef2f2", borderRadius: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#ef4444" }}>
               {agent.disconnectedCalls || 0}
             </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography variant="caption" sx={{ color: colors.textSec }}>
               Missed
             </Typography>
           </Box>
@@ -366,10 +334,10 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
 
         <Box>
           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
+            <Typography variant="caption" sx={{ color: colors.textSec, fontWeight: 500 }}>
               Success Rate
             </Typography>
-            <Typography variant="caption" sx={{ fontWeight: 700, color: "#667eea" }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: colors.primary || "#4F46E5" }}>
               {successRate}%
             </Typography>
           </Box>
@@ -379,7 +347,7 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
             sx={{
               height: 8,
               borderRadius: 4,
-              bgcolor: "#e2e8f0",
+              bgcolor: colors.border,
               "& .MuiLinearProgress-bar": {
                 borderRadius: 4,
                 background: successRate >= 70
@@ -396,17 +364,9 @@ const AgentCard = ({ agent, onDownload, onClick }) => {
   );
 };
 
-// Insurance gradient color scheme (Purple/Indigo theme for Insurance)
-const INSURANCE_GRADIENTS = {
-  primary: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-  secondary: "linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)",
-  accent: "linear-gradient(135deg, #9f7aea 0%, #805ad5 100%)",
-  success: "linear-gradient(135deg, #48bb78 0%, #38a169 100%)",
-  warning: "linear-gradient(135deg, #ed8936 0%, #dd6b20 100%)",
-  error: "linear-gradient(135deg, #fc8181 0%, #f56565 100%)",
-};
-
-const CHART_COLORS = ["#667eea", "#764ba2", "#9f7aea", "#48bb78", "#ed8936", "#fc8181"];
+// Monochromatic indigo chart palette
+const CHART_COLORS = ['#4F46E5', '#6366F1', '#818CF8', '#A5B4FC', '#C7D2FE'];
+const SPARKLINE_DATA = [{v:30},{v:45},{v:35},{v:50},{v:42},{v:55},{v:48}];
 
 // Helper function to check if agent is active/online
 const isAgentActive = (status) => {
@@ -414,24 +374,28 @@ const isAgentActive = (status) => {
          status === "Login" || status === "Idle" || status === "Busy";
 };
 
-// Helper function to get status display config (supports both old and new status values)
-const getStatusConfig = (status) => {
-  const configs = {
-    "Available": { label: "Available", color: "#16a34a", bgColor: "#dcfce7" },
-    "On Call": { label: "On Call", color: "#2563eb", bgColor: "#dbeafe" },
-    "Unavailable": { label: "Offline", color: "#64748b", bgColor: "#f1f5f9" },
-    // Legacy status backwards compatibility
-    "Idle": { label: "Available", color: "#16a34a", bgColor: "#dcfce7" },
-    "Busy": { label: "On Call", color: "#2563eb", bgColor: "#dbeafe" },
-    "Break": { label: "On Break", color: "#d97706", bgColor: "#fef3c7" },
-    "Login": { label: "Available", color: "#16a34a", bgColor: "#dcfce7" },
-    "Logout": { label: "Offline", color: "#64748b", bgColor: "#f1f5f9" },
-    "Logged Out": { label: "Offline", color: "#64748b", bgColor: "#f1f5f9" },
-  };
-  return configs[status] || configs["Unavailable"];
-};
+// getStatusConfig is now inside the component to use theme colors
 
 function InsuranceManagerDashboard({ currentUser }) {
+  const { colors } = useThemeMode();
+
+  // Helper function to get status display config (moved inside component to use theme colors)
+  const getStatusConfig = (status) => {
+    const configs = {
+      "Available": { label: "Available", color: colors.statusAvailable.color, bgColor: colors.statusAvailable.bg },
+      "On Call": { label: "On Call", color: colors.statusOnCall.color, bgColor: colors.statusOnCall.bg },
+      "Unavailable": { label: "Offline", color: colors.statusOffline.color, bgColor: colors.statusOffline.bg },
+      // Legacy status backwards compatibility
+      "Idle": { label: "Available", color: colors.statusAvailable.color, bgColor: colors.statusAvailable.bg },
+      "Busy": { label: "On Call", color: colors.statusOnCall.color, bgColor: colors.statusOnCall.bg },
+      "Break": { label: "On Break", color: colors.statusBreak.color, bgColor: colors.statusBreak.bg },
+      "Login": { label: "Available", color: colors.statusAvailable.color, bgColor: colors.statusAvailable.bg },
+      "Logout": { label: "Offline", color: colors.statusOffline.color, bgColor: colors.statusOffline.bg },
+      "Logged Out": { label: "Offline", color: colors.statusOffline.color, bgColor: colors.statusOffline.bg },
+    };
+    return configs[status] || configs["Unavailable"];
+  };
+
   const [agents, setAgents] = useState([]);
   const [callLogs, setCallLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -600,7 +564,7 @@ function InsuranceManagerDashboard({ currentUser }) {
   // Prepare chart data - memoized
   const statusDistribution = useMemo(() => [
     { name: "Available", value: stats.availableAgents, color: "#48bb78" },
-    { name: "On Call", value: stats.onCallAgents, color: "#667eea" },
+    { name: "On Call", value: stats.onCallAgents, color: colors.primary || "#4F46E5" },
     { name: "On Break", value: stats.onBreakAgents, color: "#ed8936" },
     { name: "Logged Out", value: stats.loggedOutAgents, color: "#a0aec0" },
   ].filter(item => item.value > 0), [stats]);
@@ -1003,8 +967,9 @@ function InsuranceManagerDashboard({ currentUser }) {
         }
       }
 
+      const isConnected = log.callConnected === true || log.callConnected === "true";
       return [
-        agent?.name || "N/A",
+        (agent?.name || "N/A").replace(/"/g, ""),
         log.callId || "N/A",
         log.sid || "N/A",
         log.clientNumber || "N/A",
@@ -1016,9 +981,9 @@ function InsuranceManagerDashboard({ currentUser }) {
         log.partner || "N/A",
         log.timestamp ? formatTimestamp(log.timestamp) : "N/A",
         formatDuration(log.duration),
-        log.callConnected ? "Connected" : "Not Connected",
-        log.callConnected ? log.callStatus || "N/A" : "N/A",
-        log.callConnected ? "N/A" : log.notConnectedReason || "N/A",
+        isConnected ? "Connected" : "Not Connected",
+        isConnected ? (log.callStatus || "N/A") : "N/A",
+        isConnected ? "" : (log.notConnectedReason || "N/A"),
         remarksText,
       ];
     });
@@ -1068,21 +1033,22 @@ function InsuranceManagerDashboard({ currentUser }) {
         }
       }
 
+      const isConnected = log.callConnected === true || log.callConnected === "true";
       return [
-        agent.name || "N/A",
+        (agent.name || "N/A").replace(/"/g, ""),
         agent.empId || agent.id || "N/A",
         log.sid || "N/A",
         log.callId || "N/A",
         log.clientNumber || "N/A",
         log.callType || "N/A",
         log.agentType || "N/A",
-        log.escalation ? "Yes" : "No",
+        log.escalation || "N/A",
         log.callCategory || "N/A",
         log.partner || "N/A",
         log.timestamp ? formatTimestamp(log.timestamp) : "N/A",
         formatDuration(log.duration),
-        log.callConnected ? "Yes" : "No",
-        log.callConnected ? "N/A" : log.notConnectedReason || "N/A",
+        isConnected ? "Connected" : "Not Connected",
+        isConnected ? "" : (log.notConnectedReason || "N/A"),
         remarksText,
       ];
     });
@@ -1366,7 +1332,7 @@ function InsuranceManagerDashboard({ currentUser }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          background: colors.gradientPrimary || "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
         }}
       >
         <Box sx={{ textAlign: "center" }}>
@@ -1380,12 +1346,12 @@ function InsuranceManagerDashboard({ currentUser }) {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f8fafc" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: colors.bg, color: colors.text }}>
       {/* Header */}
       <Paper
         elevation={0}
         sx={{
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          background: colors.gradientPrimary || "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
           color: "white",
           p: 3,
           borderRadius: 0,
@@ -1460,8 +1426,8 @@ function InsuranceManagerDashboard({ currentUser }) {
       <Box sx={{ p: 3 }}>
         {/* Global Time Filter */}
         <Box sx={{ display: "flex", justifyContent: "flex-start", alignItems: "center", mb: 2, gap: 1 }}>
-          <FilterList sx={{ color: "#667eea", fontSize: 20 }} />
-          <Typography variant="body2" sx={{ fontWeight: 600, color: "#475569", mr: 1 }}>
+          <FilterList sx={{ color: colors.primary || "#4F46E5", fontSize: 20 }} />
+          <Typography variant="body2" sx={{ fontWeight: 600, color: colors.textSec, mr: 1 }}>
             Showing data for:
           </Typography>
           {[
@@ -1479,11 +1445,11 @@ function InsuranceManagerDashboard({ currentUser }) {
                 fontWeight: 600,
                 fontSize: "0.8rem",
                 cursor: "pointer",
-                bgcolor: globalTimeFilter === option.value ? "#667eea" : "#f1f5f9",
-                color: globalTimeFilter === option.value ? "#fff" : "#475569",
-                border: globalTimeFilter === option.value ? "none" : "1px solid #e2e8f0",
+                bgcolor: globalTimeFilter === option.value ? colors.primary || "#4F46E5" : colors.bgCardHover,
+                color: globalTimeFilter === option.value ? "#fff" : colors.textSec,
+                border: globalTimeFilter === option.value ? "none" : `1px solid ${colors.border}`,
                 "&:hover": {
-                  bgcolor: globalTimeFilter === option.value ? "#5a67d8" : "#e2e8f0",
+                  bgcolor: globalTimeFilter === option.value ? colors.primaryDark || "#3730A3" : colors.bgTableHeader,
                 },
               }}
             />
@@ -1497,7 +1463,7 @@ function InsuranceManagerDashboard({ currentUser }) {
             sx={{
               p: 2,
               mb: 2,
-              bgcolor: "#e0e7ff",
+              bgcolor: colors.isDark ? "rgba(102,126,234,0.15)" : "#e0e7ff",
               borderRadius: 2,
               display: "flex",
               alignItems: "center",
@@ -1526,7 +1492,7 @@ function InsuranceManagerDashboard({ currentUser }) {
               title="Total Team Members"
               value={stats.totalAgents}
               icon={<Group sx={{ fontSize: 28 }} />}
-              gradient={INSURANCE_GRADIENTS.primary}
+              colors={colors}
               subtitle={`${stats.teamLeads} Team Leads`}
               onClick={() => {
                 setScorecardFilter(scorecardFilter === "totalAgents" ? null : "totalAgents");
@@ -1540,7 +1506,7 @@ function InsuranceManagerDashboard({ currentUser }) {
               title="Available"
               value={stats.availableAgents}
               icon={<CheckCircle sx={{ fontSize: 28 }} />}
-              gradient={INSURANCE_GRADIENTS.success}
+              colors={colors}
               subtitle="Ready to take calls"
               onClick={() => {
                 setScorecardFilter(scorecardFilter === "available" ? null : "available");
@@ -1554,7 +1520,7 @@ function InsuranceManagerDashboard({ currentUser }) {
               title="Total Calls"
               value={stats.totalCalls}
               icon={<Phone sx={{ fontSize: 28 }} />}
-              gradient={INSURANCE_GRADIENTS.secondary}
+              colors={colors}
               subtitle={`${stats.connectedCalls} connected`}
               onClick={() => {
                 setScorecardFilter(scorecardFilter === "totalCalls" ? null : "totalCalls");
@@ -1568,7 +1534,7 @@ function InsuranceManagerDashboard({ currentUser }) {
               title="Success Rate"
               value={stats.totalCalls > 0 ? Math.round((stats.connectedCalls / stats.totalCalls) * 100) : 0}
               icon={<TrendingUp sx={{ fontSize: 28 }} />}
-              gradient={INSURANCE_GRADIENTS.accent}
+              colors={colors}
               subtitle="Connection rate"
               onClick={() => {
                 setScorecardFilter(scorecardFilter === "successRate" ? null : "successRate");
@@ -1580,8 +1546,8 @@ function InsuranceManagerDashboard({ currentUser }) {
         </Grid>
 
         {/* Tabs */}
-        <Paper elevation={0} sx={{ borderRadius: 3, overflow: "hidden", mb: 3 }}>
-          <Box sx={{ borderBottom: 1, borderColor: "divider", px: 2, bgcolor: "#f8fafc" }}>
+        <Paper elevation={0} sx={{ borderRadius: 3, overflow: "hidden", mb: 3, bgcolor: colors.bgPaper, border: `1px solid ${colors.border}` }}>
+          <Box sx={{ borderBottom: 1, borderColor: colors.border, px: 2, bgcolor: colors.bgTableHeader }}>
             <Tabs
               value={tabValue}
               onChange={(e, newValue) => setTabValue(newValue)}
@@ -1592,8 +1558,8 @@ function InsuranceManagerDashboard({ currentUser }) {
                   fontSize: "0.95rem",
                   minHeight: 56,
                 },
-                "& .Mui-selected": { color: "#667eea" },
-                "& .MuiTabs-indicator": { backgroundColor: "#667eea", height: 3 },
+                "& .Mui-selected": { color: colors.primary || "#4F46E5" },
+                "& .MuiTabs-indicator": { backgroundColor: colors.primary || "#4F46E5", height: 3 },
               }}
             >
               <Tab icon={<Group sx={{ mr: 1 }} />} iconPosition="start" label="Team Members" />
@@ -1608,7 +1574,7 @@ function InsuranceManagerDashboard({ currentUser }) {
             {tabValue === 0 && (
               <Box>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: colors.text }}>
                     Team Members ({filteredAgents.length})
                   </Typography>
                   <Box sx={{ display: "flex", gap: 1 }}>
@@ -1616,8 +1582,8 @@ function InsuranceManagerDashboard({ currentUser }) {
                       <IconButton
                         onClick={() => setOpenFilterDialog(true)}
                         sx={{
-                          bgcolor: statusFilter !== "all" ? "#e0e7ff" : "#f1f5f9",
-                          color: statusFilter !== "all" ? "#667eea" : "#64748b",
+                          bgcolor: statusFilter !== "all" ? (colors.isDark ? "rgba(102,126,234,0.15)" : "#e0e7ff") : colors.bgCardHover,
+                          color: statusFilter !== "all" ? colors.primary || "#4F46E5" : colors.textSec,
                         }}
                       >
                         <FilterList />
@@ -1626,7 +1592,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                     <Tooltip title={viewMode === "grid" ? "List View" : "Grid View"}>
                       <IconButton
                         onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-                        sx={{ bgcolor: "#f1f5f9" }}
+                        sx={{ bgcolor: colors.bgCardHover, color: colors.textSec }}
                       >
                         {viewMode === "grid" ? <ViewList /> : <GridView />}
                       </IconButton>
@@ -1636,11 +1602,11 @@ function InsuranceManagerDashboard({ currentUser }) {
                       startIcon={<FileDownload />}
                       onClick={handleDownloadCSV}
                       sx={{
-                        borderColor: "#667eea",
-                        color: "#667eea",
+                        borderColor: colors.primary || "#4F46E5",
+                        color: colors.primary || "#4F46E5",
                         textTransform: "none",
                         borderRadius: 2,
-                        "&:hover": { bgcolor: "#f0f9ff", borderColor: "#5a67d8" },
+                        "&:hover": { bgcolor: colors.isDark ? "rgba(102,126,234,0.08)" : "#f0f9ff", borderColor: colors.primaryDark || "#3730A3" },
                       }}
                     >
                       Export All
@@ -1658,6 +1624,8 @@ function InsuranceManagerDashboard({ currentUser }) {
                             agent={agent}
                             onDownload={handleDownloadAgentCSV}
                             onClick={() => handleCardClick(agent.id, agent.collection)}
+                            colors={colors}
+                            getStatusConfig={getStatusConfig}
                           />
                         </Grid>
                       ))}
@@ -1666,13 +1634,13 @@ function InsuranceManagerDashboard({ currentUser }) {
                   <TableContainer>
                     <Table>
                       <TableHead>
-                        <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                          <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
-                          <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                          <TableCell sx={{ fontWeight: 600 }} align="center">Total Calls</TableCell>
-                          <TableCell sx={{ fontWeight: 600 }} align="center">Connected</TableCell>
-                          <TableCell sx={{ fontWeight: 600 }} align="center">Performance</TableCell>
-                          <TableCell sx={{ fontWeight: 600 }} align="center">Actions</TableCell>
+                        <TableRow sx={{ bgcolor: colors.bgTableHeader }}>
+                          <TableCell sx={{ fontWeight: 600, color: colors.text }}>Agent</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: colors.text }}>Status</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: colors.text }} align="center">Total Calls</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: colors.text }} align="center">Connected</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: colors.text }} align="center">Performance</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: colors.text }} align="center">Actions</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1682,7 +1650,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                             <TableRow
                               key={`${agent.collection}-${agent.id}`}
                               hover
-                              sx={{ cursor: "pointer" }}
+                              sx={{ cursor: "pointer", "&:hover": { bgcolor: colors.bgCardHover } }}
                               onClick={() => handleCardClick(agent.id, agent.collection)}
                             >
                               <TableCell>
@@ -1691,16 +1659,16 @@ function InsuranceManagerDashboard({ currentUser }) {
                                     sx={{
                                       width: 40,
                                       height: 40,
-                                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                      background: colors.gradientPrimary || "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
                                     }}
                                   >
                                     {agent.avatar}
                                   </Avatar>
                                   <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: colors.text }}>
                                       {agent.name}
                                     </Typography>
-                                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                    <Typography variant="caption" sx={{ color: colors.textSec }}>
                                       {agent.id}
                                     </Typography>
                                   </Box>
@@ -1717,8 +1685,8 @@ function InsuranceManagerDashboard({ currentUser }) {
                                   }}
                                 />
                               </TableCell>
-                              <TableCell align="center">{agent.totalCalls || 0}</TableCell>
-                              <TableCell align="center">{agent.connectedCalls || 0}</TableCell>
+                              <TableCell align="center" sx={{ color: colors.text }}>{agent.totalCalls || 0}</TableCell>
+                              <TableCell align="center" sx={{ color: colors.text }}>{agent.connectedCalls || 0}</TableCell>
                               <TableCell align="center">
                                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
                                   <LinearProgress
@@ -1728,7 +1696,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                                       width: 60,
                                       height: 6,
                                       borderRadius: 3,
-                                      bgcolor: "#e2e8f0",
+                                      bgcolor: colors.border,
                                       "& .MuiLinearProgress-bar": {
                                         borderRadius: 3,
                                         bgcolor: agent.performance >= 70 ? "#22c55e" :
@@ -1736,7 +1704,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                                       },
                                     }}
                                   />
-                                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                  <Typography variant="caption" sx={{ fontWeight: 600, color: colors.text }}>
                                     {agent.performance || 0}%
                                   </Typography>
                                 </Box>
@@ -1745,7 +1713,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                                 <IconButton
                                   size="small"
                                   onClick={(e) => handleDownloadAgentCSV(e, agent)}
-                                  sx={{ color: "#667eea" }}
+                                  sx={{ color: colors.primary || "#4F46E5" }}
                                 >
                                   <FileDownload fontSize="small" />
                                 </IconButton>
@@ -1768,6 +1736,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                     setPage(0);
                   }}
                   rowsPerPageOptions={[8, 12, 24, 48]}
+                  sx={{ color: colors.text, "& .MuiTablePagination-selectIcon": { color: colors.textSec } }}
                 />
               </Box>
             )}
@@ -1778,31 +1747,31 @@ function InsuranceManagerDashboard({ currentUser }) {
                 <Grid container spacing={3}>
                   {/* Daily Call Trend */}
                   <Grid item xs={12} lg={8}>
-                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${colors.border}`, bgcolor: colors.bgPaper }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: colors.text }}>
                         Weekly Call Trend
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
                         <AreaChart data={dailyTrendData}>
                           <defs>
                             <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#667eea" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
+                              <stop offset="5%" stopColor={colors.primary || "#4F46E5"} stopOpacity={0.3} />
+                              <stop offset="95%" stopColor={colors.primary || "#4F46E5"} stopOpacity={0.02} />
                             </linearGradient>
                             <linearGradient id="colorConnected" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#48bb78" stopOpacity={0.3} />
                               <stop offset="95%" stopColor="#48bb78" stopOpacity={0} />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="day" stroke="#64748b" />
-                          <YAxis stroke="#64748b" />
-                          <RechartsTooltip />
-                          <Legend />
+                          <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                          <XAxis dataKey="day" stroke={colors.chartTick} tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                          <YAxis stroke={colors.chartTick} tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                          <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText }} />
+                          <Legend wrapperStyle={{ color: colors.chartLegend }} />
                           <Area
                             type="monotone"
                             dataKey="total"
-                            stroke="#667eea"
+                            stroke={colors.primary || "#4F46E5"}
                             fill="url(#colorTotal)"
                             strokeWidth={2}
                             name="Total Calls"
@@ -1822,8 +1791,8 @@ function InsuranceManagerDashboard({ currentUser }) {
 
                   {/* Agent Status Distribution */}
                   <Grid item xs={12} lg={4}>
-                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider", height: "100%" }}>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${colors.border}`, bgcolor: colors.bgPaper, height: "100%" }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: colors.text }}>
                         Team Status
                       </Typography>
                       <ResponsiveContainer width="100%" height={250}>
@@ -1841,8 +1810,8 @@ function InsuranceManagerDashboard({ currentUser }) {
                               <Cell key={`cell-${index}`} fill={entry.color} />
                             ))}
                           </Pie>
-                          <RechartsTooltip />
-                          <Legend />
+                          <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText }} />
+                          <Legend wrapperStyle={{ color: colors.chartLegend }} />
                         </PieChart>
                       </ResponsiveContainer>
                     </Card>
@@ -1850,17 +1819,17 @@ function InsuranceManagerDashboard({ currentUser }) {
 
                   {/* Top Performers */}
                   <Grid item xs={12} md={6}>
-                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${colors.border}`, bgcolor: colors.bgPaper }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: colors.text }}>
                         Top Performers
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={topPerformers} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis type="number" stroke="#64748b" />
-                          <YAxis dataKey="name" type="category" stroke="#64748b" width={80} />
-                          <RechartsTooltip />
-                          <Bar dataKey="connected" fill="#667eea" name="Connected Calls" radius={[0, 4, 4, 0]} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                          <XAxis type="number" stroke={colors.chartTick} tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                          <YAxis dataKey="name" type="category" stroke={colors.chartTick} width={80} tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                          <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText }} />
+                          <Bar dataKey="connected" fill={colors.primary || "#4F46E5"} name="Connected Calls" radius={[0, 4, 4, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </Card>
@@ -1868,8 +1837,8 @@ function InsuranceManagerDashboard({ currentUser }) {
 
                   {/* Call Coordinator Distribution */}
                   <Grid item xs={12} md={6}>
-                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${colors.border}`, bgcolor: colors.bgPaper }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: colors.text }}>
                         Call Coordinator Distribution
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
@@ -1884,21 +1853,21 @@ function InsuranceManagerDashboard({ currentUser }) {
                               paddingAngle={2}
                               dataKey="value"
                               label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                              labelLine={{ stroke: "#64748b", strokeWidth: 1 }}
+                              labelLine={{ stroke: colors.chartTick, strokeWidth: 1 }}
                             >
                               {callTypeData.map((entry, index) => (
                                 <Cell key={`cell-coordinator-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
-                            <RechartsTooltip />
-                            <Legend />
+                            <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText }} />
+                            <Legend wrapperStyle={{ color: colors.chartLegend }} />
                           </PieChart>
                         ) : (
                           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
-                            <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                            <Typography variant="body2" sx={{ color: colors.textMuted }}>
                               No coordinator data available yet
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "#cbd5e1", textAlign: "center", maxWidth: 200 }}>
+                            <Typography variant="caption" sx={{ color: colors.textMuted, textAlign: "center", maxWidth: 200 }}>
                               Data will appear as new calls are logged with coordinator selection
                             </Typography>
                           </Box>
@@ -1909,17 +1878,17 @@ function InsuranceManagerDashboard({ currentUser }) {
 
                   {/* Call Category Distribution */}
                   <Grid item xs={12} md={6}>
-                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+                    <Card elevation={0} sx={{ p: 3, borderRadius: 3, border: `1px solid ${colors.border}`, bgcolor: colors.bgPaper }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: colors.text }}>
                         Call Category Distribution
                       </Typography>
                       <ResponsiveContainer width="100%" height={300}>
                         {callCategoryData.length > 0 ? (
                           <BarChart data={callCategoryData} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis type="number" stroke="#64748b" />
-                            <YAxis dataKey="name" type="category" stroke="#64748b" width={100} tick={{ fontSize: 11 }} />
-                            <RechartsTooltip />
+                            <CartesianGrid strokeDasharray="3 3" stroke={colors.chartGrid} />
+                            <XAxis type="number" stroke={colors.chartTick} tick={{ fill: colors.chartTick, fontSize: 12 }} />
+                            <YAxis dataKey="name" type="category" stroke={colors.chartTick} width={100} tick={{ fill: colors.chartTick, fontSize: 11 }} />
+                            <RechartsTooltip contentStyle={{ backgroundColor: colors.chartTooltipBg, border: `1px solid ${colors.chartTooltipBorder}`, color: colors.chartTooltipText }} />
                             <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                               {callCategoryData.map((entry, index) => (
                                 <Cell key={`cell-category-${index}`} fill={entry.color} />
@@ -1928,10 +1897,10 @@ function InsuranceManagerDashboard({ currentUser }) {
                           </BarChart>
                         ) : (
                           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 1 }}>
-                            <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                            <Typography variant="body2" sx={{ color: colors.textMuted }}>
                               No category data available yet
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "#cbd5e1", textAlign: "center", maxWidth: 200 }}>
+                            <Typography variant="caption" sx={{ color: colors.textMuted, textAlign: "center", maxWidth: 200 }}>
                               Data will appear as calls are logged with category selection
                             </Typography>
                           </Box>
@@ -1947,16 +1916,17 @@ function InsuranceManagerDashboard({ currentUser }) {
             {tabValue === 2 && (
               <Box>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: colors.text }}>
                     Recent Call Logs ({filteredCallLogs.length})
                   </Typography>
                   <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
                     <FormControl size="small" sx={{ minWidth: 150 }}>
-                      <InputLabel>Export Filter</InputLabel>
+                      <InputLabel sx={{ color: colors.textSec }}>Export Filter</InputLabel>
                       <Select
                         value={csvFilter}
                         onChange={(e) => setCsvFilter(e.target.value)}
                         label="Export Filter"
+                        sx={{ color: colors.text, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
                       >
                         <MenuItem value="all">All Time</MenuItem>
                         <MenuItem value="daily">Last 24h</MenuItem>
@@ -1974,7 +1944,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                           value={customDateFrom}
                           onChange={(e) => setCustomDateFrom(e.target.value)}
                           InputLabelProps={{ shrink: true }}
-                          sx={{ minWidth: 150 }}
+                          sx={{ minWidth: 150, "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
                         />
                         <TextField
                           type="date"
@@ -1983,7 +1953,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                           value={customDateTo}
                           onChange={(e) => setCustomDateTo(e.target.value)}
                           InputLabelProps={{ shrink: true }}
-                          sx={{ minWidth: 150 }}
+                          sx={{ minWidth: 150, "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
                         />
                       </>
                     )}
@@ -1992,10 +1962,10 @@ function InsuranceManagerDashboard({ currentUser }) {
                       startIcon={<FileDownload />}
                       onClick={handleDownloadCSV}
                       sx={{
-                        bgcolor: "#667eea",
+                        bgcolor: colors.primary || "#4F46E5",
                         textTransform: "none",
                         borderRadius: 2,
-                        "&:hover": { bgcolor: "#5a67d8" },
+                        "&:hover": { bgcolor: colors.primaryDark || "#3730A3" },
                       }}
                     >
                       Export CSV
@@ -2006,7 +1976,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                 <TableContainer>
                   <Table>
                     <TableHead>
-                      <TableRow sx={{ bgcolor: "#667eea" }}>
+                      <TableRow sx={{ bgcolor: colors.primary || "#4F46E5" }}>
                         <TableCell sx={{ color: "white", fontWeight: 600 }}>Date/Time</TableCell>
                         <TableCell sx={{ color: "white", fontWeight: 600 }}>Agent</TableCell>
                         <TableCell sx={{ color: "white", fontWeight: 600 }}>Client</TableCell>
@@ -2021,42 +1991,42 @@ function InsuranceManagerDashboard({ currentUser }) {
                       {filteredCallLogs
                         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                         .map((log, index) => (
-                          <TableRow key={`${log.id}-${index}`} hover>
+                          <TableRow key={`${log.id}-${index}`} hover sx={{ "&:hover": { bgcolor: colors.bgCardHover } }}>
                             <TableCell>
-                              <Typography variant="body2">
+                              <Typography variant="body2" sx={{ color: colors.text }}>
                                 {formatTimestamp(log.timestamp)}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500, color: colors.text }}>
                                 {log.agentName || "N/A"}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                              <Typography variant="body2" sx={{ fontFamily: "monospace", color: colors.text }}>
                                 {log.clientNumber || "N/A"}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2">{log.callType || "N/A"}</Typography>
+                              <Typography variant="body2" sx={{ color: colors.text }}>{log.callType || "N/A"}</Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2">{log.partner || "N/A"}</Typography>
+                              <Typography variant="body2" sx={{ color: colors.text }}>{log.partner || "N/A"}</Typography>
                             </TableCell>
                             <TableCell>
                               <Chip
                                 label={log.callConnected ? "Connected" : "Not Connected"}
                                 size="small"
                                 sx={{
-                                  bgcolor: log.callConnected ? "#dcfce7" : "#fee2e2",
-                                  color: log.callConnected ? "#16a34a" : "#dc2626",
+                                  bgcolor: log.callConnected ? colors.statusAvailable.bg : colors.statusError.bg,
+                                  color: log.callConnected ? colors.statusAvailable.color : colors.statusError.color,
                                   fontWeight: 600,
                                   fontSize: "0.7rem",
                                 }}
                               />
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2">
+                              <Typography variant="body2" sx={{ color: colors.text }}>
                                 {formatDuration(log.duration)}
                               </Typography>
                             </TableCell>
@@ -2067,9 +2037,9 @@ function InsuranceManagerDashboard({ currentUser }) {
                                   onClick={() => fetchRecording(log.sid)}
                                   disabled={loadingRecordings[log.sid]}
                                   sx={{
-                                    bgcolor: "#667eea",
+                                    bgcolor: colors.primary || "#4F46E5",
                                     color: "white",
-                                    "&:hover": { bgcolor: "#5a67d8" },
+                                    "&:hover": { bgcolor: colors.primaryDark || "#3730A3" },
                                   }}
                                 >
                                   {loadingRecordings[log.sid] ? (
@@ -2079,7 +2049,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                                   )}
                                 </IconButton>
                               ) : (
-                                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                <Typography variant="caption" sx={{ color: colors.textSec }}>
                                   N/A
                                 </Typography>
                               )}
@@ -2101,6 +2071,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                     setPage(0);
                   }}
                   rowsPerPageOptions={[10, 25, 50, 100]}
+                  sx={{ color: colors.text, "& .MuiTablePagination-selectIcon": { color: colors.textSec } }}
                 />
               </Box>
             )}
@@ -2112,16 +2083,17 @@ function InsuranceManagerDashboard({ currentUser }) {
       <Dialog
         open={openFilterDialog}
         onClose={() => setOpenFilterDialog(false)}
-        PaperProps={{ sx: { borderRadius: 3, minWidth: 300 } }}
+        PaperProps={{ sx: { borderRadius: 3, minWidth: 300, bgcolor: colors.dialogBg, border: `1px solid ${colors.dialogBorder}`, color: colors.text } }}
       >
-        <DialogTitle sx={{ fontWeight: 600 }}>Filter Agents</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, color: colors.text }}>Filter Agents</DialogTitle>
         <DialogContent>
           <FormControl fullWidth sx={{ mt: 1 }}>
-            <InputLabel>Status</InputLabel>
+            <InputLabel sx={{ color: colors.textSec }}>Status</InputLabel>
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               label="Status"
+              sx={{ color: colors.text, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
             >
               <MenuItem value="all">All Statuses</MenuItem>
               <MenuItem value="Idle">Available</MenuItem>
@@ -2138,7 +2110,7 @@ function InsuranceManagerDashboard({ currentUser }) {
           <Button
             variant="contained"
             onClick={() => setOpenFilterDialog(false)}
-            sx={{ bgcolor: "#667eea", "&:hover": { bgcolor: "#5a67d8" } }}
+            sx={{ bgcolor: colors.primary || "#4F46E5", "&:hover": { bgcolor: colors.primaryDark || "#3730A3" } }}
           >
             Apply
           </Button>
@@ -2151,9 +2123,9 @@ function InsuranceManagerDashboard({ currentUser }) {
         onClose={() => !creating && !bulkCreating && setOpenAddUserDialog(false)}
         maxWidth="md"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        PaperProps={{ sx: { borderRadius: 3, bgcolor: colors.dialogBg, border: `1px solid ${colors.dialogBorder}`, color: colors.text } }}
       >
-        <DialogTitle sx={{ fontWeight: 600, borderBottom: 1, borderColor: "divider", pb: 0 }}>
+        <DialogTitle sx={{ fontWeight: 600, borderBottom: 1, borderColor: colors.border, pb: 0, color: colors.text }}>
           Add New User
           <Tabs
             value={dialogTabValue}
@@ -2174,6 +2146,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                 fullWidth
                 required
                 disabled={creating}
+                sx={{ "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
               />
               <TextField
                 label="Email"
@@ -2183,6 +2156,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                 fullWidth
                 required
                 disabled={creating}
+                sx={{ "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
               />
               <TextField
                 label="Password"
@@ -2193,6 +2167,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                 required
                 disabled={creating}
                 helperText="Minimum 6 characters"
+                sx={{ "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
@@ -2210,6 +2185,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                 fullWidth
                 required
                 disabled={creating}
+                sx={{ "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
               />
               <TextField
                 label="Mobile Number"
@@ -2218,6 +2194,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                 fullWidth
                 required
                 disabled={creating}
+                sx={{ "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
               />
               <TextField
                 label="Agent Collection ID"
@@ -2228,6 +2205,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                 disabled={creating || newUserData.role !== "agent"}
                 placeholder="e.g., agent1, agent12"
                 helperText={newUserData.role === "agent" ? "Format: agent1, agent2, etc." : "Only for Agents"}
+                sx={{ "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
               />
               <TextField
                 label="Designation"
@@ -2236,9 +2214,10 @@ function InsuranceManagerDashboard({ currentUser }) {
                 fullWidth
                 disabled={creating}
                 placeholder="e.g., RE, SE, TL"
+                sx={{ "& .MuiInputBase-input": { color: colors.text }, "& .MuiInputLabel-root": { color: colors.textSec }, "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.border } }}
               />
               <FormControl component="fieldset" disabled={creating}>
-                <FormLabel>Role</FormLabel>
+                <FormLabel sx={{ color: colors.textSec }}>Role</FormLabel>
                 <RadioGroup
                   value={newUserData.role}
                   onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
@@ -2265,7 +2244,7 @@ function InsuranceManagerDashboard({ currentUser }) {
                 component="label"
                 startIcon={<Upload />}
                 disabled={bulkCreating}
-                sx={{ bgcolor: "#667eea", "&:hover": { bgcolor: "#5a67d8" } }}
+                sx={{ bgcolor: colors.primary || "#4F46E5", "&:hover": { bgcolor: colors.primaryDark || "#3730A3" } }}
               >
                 {csvFile ? `Selected: ${csvFile.name}` : "Select CSV File"}
                 <input
@@ -2279,7 +2258,7 @@ function InsuranceManagerDashboard({ currentUser }) {
 
               {bulkCreating && (
                 <Box>
-                  <Typography variant="body2" sx={{ mb: 1 }}>
+                  <Typography variant="body2" sx={{ mb: 1, color: colors.text }}>
                     Creating users: {bulkProgress}%
                   </Typography>
                   <LinearProgress variant="determinate" value={bulkProgress} />
@@ -2287,13 +2266,13 @@ function InsuranceManagerDashboard({ currentUser }) {
               )}
 
               {bulkResults.length > 0 && (
-                <Box sx={{ maxHeight: 300, overflowY: "auto", border: 1, borderColor: "divider", borderRadius: 2, p: 1 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                <Box sx={{ maxHeight: 300, overflowY: "auto", border: `1px solid ${colors.border}`, borderRadius: 2, p: 1 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: colors.text }}>
                     Results:
                   </Typography>
                   <List dense>
                     {bulkResults.map((result, index) => (
-                      <ListItem key={index} sx={{ borderBottom: 1, borderColor: "divider" }}>
+                      <ListItem key={index} sx={{ borderBottom: 1, borderColor: colors.border }}>
                         <ListItemText
                           primary={
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -2320,7 +2299,7 @@ function InsuranceManagerDashboard({ currentUser }) {
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
+        <DialogActions sx={{ p: 2, borderTop: 1, borderColor: colors.border }}>
           <Button
             onClick={() => {
               setOpenAddUserDialog(false);
@@ -2337,7 +2316,7 @@ function InsuranceManagerDashboard({ currentUser }) {
               variant="contained"
               onClick={handleCreateUser}
               disabled={creating}
-              sx={{ bgcolor: "#667eea", "&:hover": { bgcolor: "#5a67d8" } }}
+              sx={{ bgcolor: colors.primary || "#4F46E5", "&:hover": { bgcolor: colors.primaryDark || "#3730A3" } }}
             >
               {creating ? "Creating..." : "Create User"}
             </Button>
@@ -2346,7 +2325,7 @@ function InsuranceManagerDashboard({ currentUser }) {
               variant="contained"
               onClick={handleBulkCreateUsers}
               disabled={bulkCreating || !csvFile}
-              sx={{ bgcolor: "#667eea", "&:hover": { bgcolor: "#5a67d8" } }}
+              sx={{ bgcolor: colors.primary || "#4F46E5", "&:hover": { bgcolor: colors.primaryDark || "#3730A3" } }}
             >
               {bulkCreating ? "Creating Users..." : "Create All Users"}
             </Button>

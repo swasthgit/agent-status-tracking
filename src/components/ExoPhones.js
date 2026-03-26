@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import API_BASE_URL from "../config/api";
+import "../styles/animations.css";
 import "./ExoPhones.css";
 
 const ACCOUNT_SID = process.env.REACT_APP_ACCOUNT_SID;
@@ -30,11 +31,12 @@ function ExoPhones({ agentId, agentCollection }) {
   const [agentTypes, setAgentTypes] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("assigned");
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (isDropdownOpen && !event.target.closest('.select-box')) {
+      if (isDropdownOpen && !event.target.closest('.exo-select-group')) {
         setIsDropdownOpen(false);
       }
     };
@@ -283,250 +285,419 @@ function ExoPhones({ agentId, agentCollection }) {
     setSelectedExotelPhoneInput(value);
   };
 
+  const formatTimestamp = (timeStr) => {
+    if (!timeStr) return "—";
+    try {
+      const date = new Date(timeStr);
+      return date.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return timeStr;
+    }
+  };
+
   if (loading)
     return (
-      <div className="container mt-5">
-        <p>Loading assigned calls...</p>
+      <div className="exo-container">
+        <div className="exo-loading-container">
+          <div className="exo-loading-spinner" />
+          <span className="exo-loading-text">Loading assigned calls...</span>
+        </div>
       </div>
     );
   if (error && assignedCalls.length === 0)
     return (
-      <div className="container mt-5">
-        <div className="alert alert-danger">{error}</div>
+      <div className="exo-container" style={{ padding: "32px 24px" }}>
+        <div className="exo-error-alert">
+          <span className="exo-error-icon">!</span>
+          {error}
+        </div>
       </div>
     );
 
   return (
     <div className="exo-container">
-      <h2 className="title">Assigned Calls for {agentCollection}</h2>
-      <div className="global-settings">
-        <div className="input-box">
-          <label htmlFor="global-yournumber" className="text-sm text-gray-600">
-            Your Number
-          </label>
-          <input
-            type="number"
-            id="global-yournumber"
-            placeholder="e.g., 8700612665"
-            value={manualNumberInput}
-            onChange={(e) => handleManualNumberChange(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+      {/* ── Welcome card ────────────────────────────────────────────────────── */}
+      <div className="exo-welcome-card">
+        <div className="exo-welcome-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+          </svg>
         </div>
-        <div className="select-box" style={{ position: "relative" }}>
-          <label
-            htmlFor="global-exotelSelect"
-            className="text-sm text-gray-600"
-          >
-            Caller ID (ExoPhone)
-          </label>
-          <input
-            type="text"
-            placeholder="Search by partner name or number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onFocus={() => setIsDropdownOpen(true)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {selectedExotelPhoneInput && (
-            <div style={{
-              padding: "0.5rem",
-              backgroundColor: "#e0f2fe",
-              borderRadius: "6px",
-              marginBottom: "0.5rem",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}>
-              <span style={{ fontWeight: "600", color: "#0f172a" }}>
-                Selected: {selectedExotelPhoneInput}
-              </span>
-              <button
-                onClick={() => {
-                  setSelectedExotelPhoneInput("");
-                  setSearchTerm("");
-                }}
-                style={{
-                  background: "#ef4444",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  padding: "0.25rem 0.75rem",
-                  cursor: "pointer"
-                }}
-              >
-                Clear
-              </button>
-            </div>
+        <div className="exo-welcome-text">Welcome, {agentName}</div>
+        <div className="exo-welcome-subtext">
+          Exotel Phone Integration — {agentCollection}
+        </div>
+      </div>
+
+      {/* ── Tab navigation ──────────────────────────────────────────────────── */}
+      <div className="exo-tabs">
+        <button
+          className={`exo-tab ${activeTab === "assigned" ? "active" : ""}`}
+          onClick={() => setActiveTab("assigned")}
+        >
+          <span className="exo-tab-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
+          </span>
+          Assigned Calls
+          {assignedCalls.length > 0 && (
+            <span className="exo-history-count" style={{ marginLeft: 6, fontSize: "0.6875rem", minWidth: 20, height: 20 }}>
+              {assignedCalls.length}
+            </span>
           )}
-          {isDropdownOpen && (
-            <div style={{
-              position: "absolute",
-              top: "100%",
-              left: 0,
-              right: 0,
-              maxHeight: "300px",
-              overflowY: "auto",
-              backgroundColor: "white",
-              border: "1px solid #d1d5db",
-              borderRadius: "6px",
-              boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-              zIndex: 1000
-            }}>
-              {/* Assigned Numbers */}
-              <div style={{ padding: "0.5rem", backgroundColor: "#f3f4f6", fontWeight: "600", fontSize: "0.875rem" }}>
-                📋 Assigned Partner Numbers
-              </div>
-              {exotelPhones
-                .filter((phone) => phone.isAssigned)
-                .filter((phone) =>
-                  phone.phone_number.includes(searchTerm) ||
-                  phone.partnerName.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-                .map((phone, index) => (
-                  <div
-                    key={index}
+        </button>
+        <button
+          className={`exo-tab ${activeTab === "history" ? "active" : ""}`}
+          onClick={() => setActiveTab("history")}
+        >
+          <span className="exo-tab-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </span>
+          Call History
+          {callHistory.length > 0 && (
+            <span className="exo-history-count" style={{ marginLeft: 6, fontSize: "0.6875rem", minWidth: 20, height: 20 }}>
+              {callHistory.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Assigned Calls tab content ──────────────────────────────────────── */}
+      {activeTab === "assigned" && (
+        <div className="page-enter">
+          {/* Settings card */}
+          <div className="exo-settings-card">
+            <div className="exo-input-group">
+              <label htmlFor="global-yournumber" className="exo-input-label">
+                Your Number
+              </label>
+              <input
+                type="number"
+                id="global-yournumber"
+                placeholder="e.g., 8700612665"
+                value={manualNumberInput}
+                onChange={(e) => handleManualNumberChange(e.target.value)}
+                className={`exo-input exo-input-phone${manualNumberInput.length >= 10 ? " is-valid" : ""}`}
+              />
+            </div>
+            <div className="exo-select-group" style={{ position: "relative" }}>
+              <label
+                htmlFor="global-exotelSelect"
+                className="exo-input-label"
+              >
+                Caller ID (ExoPhone)
+              </label>
+              <input
+                type="text"
+                placeholder="Search by partner name or number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={() => setIsDropdownOpen(true)}
+                className="exo-input"
+              />
+              {selectedExotelPhoneInput && (
+                <div className="exo-selected-chip">
+                  <span className="exo-selected-chip-text">
+                    Selected: {selectedExotelPhoneInput}
+                  </span>
+                  <button
                     onClick={() => {
-                      handleExotelPhoneChange(phone.phone_number);
-                      setIsDropdownOpen(false);
+                      setSelectedExotelPhoneInput("");
                       setSearchTerm("");
                     }}
-                    style={{
-                      padding: "0.75rem",
-                      cursor: "pointer",
-                      borderBottom: "1px solid #e5e7eb",
-                      backgroundColor: selectedExotelPhoneInput === phone.phone_number ? "#dbeafe" : "white"
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = "#f3f4f6"}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = selectedExotelPhoneInput === phone.phone_number ? "#dbeafe" : "white"}
+                    className="exo-selected-chip-clear"
                   >
-                    <div style={{ fontWeight: "600", color: "#0f172a" }}>{phone.phone_number}</div>
-                    <div style={{ fontSize: "0.875rem", color: "#64748b" }}>{phone.partnerName}</div>
+                    Clear
+                  </button>
+                </div>
+              )}
+              {isDropdownOpen && (
+                <div className="exo-dropdown-panel">
+                  {/* Assigned Numbers */}
+                  <div className="exo-dropdown-group-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    </svg>
+                    Assigned Partner Numbers
                   </div>
-                ))}
+                  {exotelPhones
+                    .filter((phone) => phone.isAssigned)
+                    .filter((phone) =>
+                      phone.phone_number.includes(searchTerm) ||
+                      phone.partnerName.toLowerCase().includes(searchTerm.toLowerCase())
+                    )
+                    .map((phone, index) => (
+                      <div
+                        key={index}
+                        onClick={() => {
+                          handleExotelPhoneChange(phone.phone_number);
+                          setIsDropdownOpen(false);
+                          setSearchTerm("");
+                        }}
+                        className={`exo-dropdown-option${selectedExotelPhoneInput === phone.phone_number ? " selected" : ""}`}
+                      >
+                        <div>
+                          <div className="exo-dropdown-option-number">{phone.phone_number}</div>
+                          <div className="exo-dropdown-option-partner">{phone.partnerName}</div>
+                        </div>
+                        {selectedExotelPhoneInput === phone.phone_number && (
+                          <span className="exo-dropdown-checkmark">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                    ))}
 
-              {/* Available Numbers */}
-              <div style={{ padding: "0.5rem", backgroundColor: "#f3f4f6", fontWeight: "600", fontSize: "0.875rem", marginTop: "0.5rem" }}>
-                📞 Available Numbers (Others/Extras)
-              </div>
-              {exotelPhones
-                .filter((phone) => !phone.isAssigned)
-                .filter((phone) => phone.phone_number.includes(searchTerm))
-                .map((phone, index) => (
-                  <div
-                    key={index}
-                    onClick={() => {
-                      handleExotelPhoneChange(phone.phone_number);
-                      setIsDropdownOpen(false);
-                      setSearchTerm("");
-                    }}
-                    style={{
-                      padding: "0.75rem",
-                      cursor: "pointer",
-                      borderBottom: "1px solid #e5e7eb",
-                      backgroundColor: selectedExotelPhoneInput === phone.phone_number ? "#dbeafe" : "white"
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = "#f3f4f6"}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = selectedExotelPhoneInput === phone.phone_number ? "#dbeafe" : "white"}
-                  >
-                    <div style={{ fontWeight: "600", color: "#0f172a" }}>{phone.phone_number}</div>
+                  {/* Available Numbers */}
+                  <div className="exo-dropdown-group-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                    Available Numbers
                   </div>
-                ))}
+                  {exotelPhones
+                    .filter((phone) => !phone.isAssigned)
+                    .filter((phone) => phone.phone_number.includes(searchTerm))
+                    .map((phone, index) => (
+                      <div
+                        key={index}
+                        onClick={() => {
+                          handleExotelPhoneChange(phone.phone_number);
+                          setIsDropdownOpen(false);
+                          setSearchTerm("");
+                        }}
+                        className={`exo-dropdown-option${selectedExotelPhoneInput === phone.phone_number ? " selected" : ""}`}
+                      >
+                        <div>
+                          <div className="exo-dropdown-option-number">{phone.phone_number}</div>
+                        </div>
+                        {selectedExotelPhoneInput === phone.phone_number && (
+                          <span className="exo-dropdown-checkmark">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                    ))}
 
-              {/* No results */}
-              {exotelPhones.filter((phone) =>
-                phone.phone_number.includes(searchTerm) ||
-                (phone.partnerName && phone.partnerName.toLowerCase().includes(searchTerm.toLowerCase()))
-              ).length === 0 && (
-                <div style={{ padding: "1rem", textAlign: "center", color: "#64748b" }}>
-                  No numbers found
+                  {/* No results */}
+                  {exotelPhones.filter((phone) =>
+                    phone.phone_number.includes(searchTerm) ||
+                    (phone.partnerName && phone.partnerName.toLowerCase().includes(searchTerm.toLowerCase()))
+                  ).length === 0 && (
+                    <div className="exo-dropdown-empty">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8, display: "block", margin: "0 auto 8px" }}>
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      No numbers found
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
-        <button
-          onClick={handleAddSettings}
-          className="ml-2 p-2 bg-blue-500 text-white rounded-md"
-          disabled={!manualNumberInput || !selectedExotelPhoneInput}
-        >
-          Add
-        </button>
-      </div>
-      {error && <div className="alert alert-danger mt-3">{error}</div>}
-      <div className="call-list">
-        {assignedCalls.map((item) => (
-          <div key={item.id} className="lead-call-card">
-            <div className="lead-info">
-              <small className="text-gray-500 uppercase text-xs font-medium">
-                LEAD TO CALL
-              </small>
-              <a
-                href={`tel:${item.clientNumber}`}
-                className="text-blue-600 font-medium text-lg hover:underline"
-              >
-                {item.clientNumber}
-              </a>
-            </div>
-            <div className="select-box" style={{ marginBottom: "1rem" }}>
-              <label
-                htmlFor={`agentType-${item.id}`}
-                className="text-sm text-gray-600"
-              >
-                Agent Type (Optional)
-              </label>
-              <select
-                id={`agentType-${item.id}`}
-                value={agentTypes[item.id] || ""}
-                onChange={(e) =>
-                  handleAgentTypeChange(item.id, e.target.value)
-                }
-                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                style={{
-                  color: "#0f172a",
-                  fontWeight: "500",
-                  fontSize: "0.95rem"
-                }}
-              >
-                <option value="">-- Select Type --</option>
-                <option value="Insurance">Insurance</option>
-                <option value="Health">Health</option>
-              </select>
-            </div>
-            <div className="call-settings">
-              <p>
-                Your Number: {globalManualNumber || "Not set"} | ExoPhone:{" "}
-                {globalSelectedExotelPhone || "Not set"}
-              </p>
-            </div>
             <button
-              className="call-btn"
-              onClick={() => handleMakeCall(item.id)}
-              disabled={!globalManualNumber || !globalSelectedExotelPhone}
+              onClick={handleAddSettings}
+              className="exo-add-btn"
+              disabled={!manualNumberInput || !selectedExotelPhoneInput}
             >
-              📞
+              Save Settings
             </button>
           </div>
-        ))}
-      </div>
-      {exotelPhones.length === 0 && (
-        <p className="mt-3 text-red-500">No Exotel phones available.</p>
-      )}
-      {assignedCalls.length === 0 && (
-        <p className="mt-3 text-red-500">No assigned calls found.</p>
+
+          {/* Error alert */}
+          {error && (
+            <div className="exo-error-alert">
+              <span className="exo-error-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </span>
+              {error}
+            </div>
+          )}
+
+          {/* Call list */}
+          <div className="exo-call-list">
+            {assignedCalls.map((item, index) => (
+              <div
+                key={item.id}
+                className="exo-call-card"
+                style={{ "--stagger": index + 1 }}
+              >
+                <div className="exo-lead-info">
+                  <span className="exo-lead-label">Lead to Call</span>
+                  <a
+                    href={`tel:${item.clientNumber}`}
+                    className="exo-lead-number"
+                  >
+                    {item.clientNumber}
+                  </a>
+                </div>
+                <div className="exo-agent-type-group">
+                  <label
+                    htmlFor={`agentType-${item.id}`}
+                    className="exo-input-label"
+                  >
+                    Agent Type
+                  </label>
+                  <select
+                    id={`agentType-${item.id}`}
+                    value={agentTypes[item.id] || ""}
+                    onChange={(e) =>
+                      handleAgentTypeChange(item.id, e.target.value)
+                    }
+                    className="exo-agent-type-select"
+                  >
+                    <option value="">-- Select Type --</option>
+                    <option value="Insurance">Insurance</option>
+                    <option value="Health">Health</option>
+                  </select>
+                </div>
+                <div className="exo-call-settings-strip">
+                  <span>Your Number:</span>
+                  <span className="exo-settings-value">
+                    {globalManualNumber || "Not set"}
+                  </span>
+                  <span className="exo-settings-separator">|</span>
+                  <span>ExoPhone:</span>
+                  <span className="exo-settings-value">
+                    {globalSelectedExotelPhone || "Not set"}
+                  </span>
+                </div>
+                <button
+                  className="exo-call-btn"
+                  onClick={() => handleMakeCall(item.id)}
+                  disabled={!globalManualNumber || !globalSelectedExotelPhone}
+                  title="Make Call"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "relative", zIndex: 1 }}>
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Empty states */}
+          {exotelPhones.length === 0 && (
+            <div className="exo-empty-state">
+              <span className="exo-empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              </span>
+              <div className="exo-empty-title">No Exotel phones available</div>
+              <div className="exo-empty-subtitle">
+                Phone numbers will appear here once configured
+              </div>
+            </div>
+          )}
+          {assignedCalls.length === 0 && (
+            <div className="exo-empty-state">
+              <span className="exo-empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </span>
+              <div className="exo-empty-title">No assigned calls found</div>
+              <div className="exo-empty-subtitle">
+                Assigned calls will show up here when available
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {callHistory.length > 0 && (
-        <div className="call-history mt-5">
-          <h3 className="title">Call History</h3>
-          <ul>
-            {callHistory.map((call, index) => (
-              <li key={index}>
-                SID: {call.sid}, Agent: {call.agent}, Lead: {call.lead},
-                ExoPhone: {call.exophone}, Time: {call.time}
-              </li>
-            ))}
-          </ul>
+      {/* ── Call History tab content ─────────────────────────────────────────── */}
+      {activeTab === "history" && (
+        <div className="page-enter">
+          {callHistory.length > 0 ? (
+            <div className="exo-history-section">
+              <div className="exo-history-header">
+                <span className="exo-history-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                </span>
+                <span className="exo-history-header-text">Call History</span>
+                <span className="exo-history-count">{callHistory.length}</span>
+              </div>
+              <ul className="exo-history-list">
+                {callHistory.map((call, index) => (
+                  <li
+                    key={index}
+                    className="exo-history-item animate-card-entrance-fast"
+                    style={{ "--stagger": index + 1 }}
+                  >
+                    <div className="exo-history-field">
+                      <span className="exo-history-field-label">SID</span>
+                      <span className="exo-history-field-value mono">
+                        {call.sid ? (call.sid.length > 16 ? call.sid.slice(0, 16) + "..." : call.sid) : "—"}
+                      </span>
+                    </div>
+                    <div className="exo-history-field">
+                      <span className="exo-history-field-label">Agent</span>
+                      <span className="exo-history-field-value">
+                        {call.agent || "—"}
+                      </span>
+                    </div>
+                    <div className="exo-history-field">
+                      <span className="exo-history-field-label">Lead</span>
+                      <span className="exo-history-field-value mono">
+                        {call.lead || "—"}
+                      </span>
+                    </div>
+                    <div className="exo-history-field">
+                      <span className="exo-history-field-label">ExoPhone</span>
+                      <span className="exo-history-field-value mono">
+                        {call.exophone || "—"}
+                      </span>
+                    </div>
+                    <div className="exo-history-field">
+                      <span className="exo-history-field-label">Time</span>
+                      <span className="exo-history-time">
+                        {formatTimestamp(call.time)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="exo-empty-state">
+              <span className="exo-empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </span>
+              <div className="exo-empty-title">No call history yet</div>
+              <div className="exo-empty-subtitle">
+                Your call records will appear here after making calls
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -33,6 +33,7 @@ import {
   addDoc,
   doc,
   updateDoc,
+  getDocs,
   serverTimestamp,
   query,
   where,
@@ -42,6 +43,8 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { calculateChainDistance, calculateHaversine } from "../services/googleMapsService";
+import { REIMBURSEMENT_CONFIG, calculateReimbursement } from "../config/reimbursementConfig";
 
 /**
  * Enhanced Trip Tracker Component with Stops/Milestones
@@ -235,11 +238,75 @@ function TripTrackerEnhanced({ agentId, agentCollection }) {
   };
 
   // Start trip
+  // Auto-close any orphaned active trips (e.g., agent forgot to end trip yesterday)
+  const autoCloseOrphanedTrips = async (currentLocation) => {
+    try {
+      const tripsRef = collection(db, agentCollection, agentId, "trips");
+      const activeTripsQuery = query(tripsRef, where("status", "==", "active"));
+      const activeTripsSnap = await getDocs(activeTripsQuery);
+
+      if (activeTripsSnap.empty) return 0;
+
+      let closedCount = 0;
+      for (const tripDoc of activeTripsSnap.docs) {
+        const tripData = tripDoc.data();
+        const startTime = tripData.startTime?.toDate?.() || new Date();
+        const endTime = new Date();
+        const totalDuration = endTime - startTime;
+
+        // Calculate haversine distance from start to current location
+        let totalDistance = 0;
+        if (tripData.startLocation?.latitude && currentLocation?.latitude) {
+          const locations = [
+            tripData.startLocation,
+            ...(tripData.stops || []).map((s) => s.location),
+            currentLocation,
+          ];
+          for (let i = 0; i < locations.length - 1; i++) {
+            if (locations[i]?.latitude && locations[i + 1]?.latitude) {
+              totalDistance += parseFloat(
+                calculateDistance(
+                  locations[i].latitude,
+                  locations[i].longitude,
+                  locations[i + 1].latitude,
+                  locations[i + 1].longitude
+                )
+              );
+            }
+          }
+        }
+
+        const tripRef = doc(db, agentCollection, agentId, "trips", tripDoc.id);
+        await updateDoc(tripRef, {
+          endLocation: currentLocation,
+          endTime: serverTimestamp(),
+          totalDistance: parseFloat(totalDistance.toFixed(2)),
+          totalDuration,
+          status: "completed",
+          autoEnded: true,
+          autoEndReason: "New trip started without ending previous trip",
+          updatedAt: serverTimestamp(),
+        });
+        closedCount++;
+      }
+      return closedCount;
+    } catch (error) {
+      console.error("Error auto-closing orphaned trips:", error);
+      return 0;
+    }
+  };
+
   const handleStartTrip = async () => {
     try {
       setLocationError(null);
       setLoading(true);
       const location = await getCurrentLocation();
+
+      // Auto-close any previous active trips before starting a new one
+      const closedCount = await autoCloseOrphanedTrips(location);
+      if (closedCount > 0) {
+        console.log(`Auto-closed ${closedCount} orphaned active trip(s)`);
+      }
 
       const tripData = {
         agentId,
@@ -253,7 +320,11 @@ function TripTrackerEnhanced({ agentId, agentCollection }) {
 
       await addDoc(collection(db, agentCollection, agentId, "trips"), tripData);
 
-      alert("Trip started! You can now add stops during your journey.");
+      alert(
+        closedCount > 0
+          ? `Previous trip was auto-ended. New trip started! You can now add stops during your journey.`
+          : "Trip started! You can now add stops during your journey."
+      );
     } catch (error) {
       console.error("Error starting trip:", error);
       setLocationError(error.message);
@@ -324,7 +395,7 @@ function TripTrackerEnhanced({ agentId, agentCollection }) {
       setLoading(true);
       const endLocation = await getCurrentLocation();
 
-      // Calculate total distance (including all stops)
+      // Calculate total Haversine distance (including all stops) - kept for backward compatibility
       let totalDistance = 0;
       const locations = [
         activeTrip.startLocation,
@@ -348,25 +419,132 @@ function TripTrackerEnhanced({ agentId, agentCollection }) {
       const endTime = new Date();
       const totalDuration = endTime - startTime;
 
+      // --- ENHANCED: Fetch clinic visits during this trip and calculate road distance ---
+      let visitLocations = [];
+      let routeResult = null;
+      let reimbursementData = null;
+
+      try {
+        // Fetch visitLogs that occurred during this trip
+        const visitLogsRef = collection(db, agentCollection, agentId, "visitLogs");
+        const visitLogsSnap = await getDocs(visitLogsRef);
+
+        // Filter visits that occurred during this trip's time window
+        const tripStartMs = startTime.getTime();
+        const tripEndMs = endTime.getTime();
+
+        const tripsVisits = visitLogsSnap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((visit) => {
+            const visitTime = visit.punchInTime
+              ? new Date(visit.punchInTime).getTime()
+              : visit.createdAt?.toDate?.()
+              ? visit.createdAt.toDate().getTime()
+              : 0;
+            return visitTime >= tripStartMs && visitTime <= tripEndMs;
+          })
+          .sort((a, b) => {
+            const timeA = new Date(a.punchInTime || 0).getTime();
+            const timeB = new Date(b.punchInTime || 0).getTime();
+            return timeA - timeB;
+          });
+
+        visitLocations = tripsVisits
+          .filter((v) => v.punchInLocation?.latitude && v.punchInLocation?.longitude)
+          .map((v) => ({
+            visitLogId: v.id,
+            clinicCode: v.clinicCode || v.partnerName || "Visit",
+            punchInLocation: v.punchInLocation,
+            punchInTime: v.punchInTime,
+          }));
+
+        // Build waypoints chain: Start → Clinic1 → Clinic2 → ... → End
+        const waypoints = [
+          {
+            lat: activeTrip.startLocation.latitude,
+            lng: activeTrip.startLocation.longitude,
+            label: "Trip Start",
+          },
+          ...visitLocations.map((v) => ({
+            lat: v.punchInLocation.latitude,
+            lng: v.punchInLocation.longitude,
+            label: v.clinicCode,
+          })),
+          {
+            lat: endLocation.latitude,
+            lng: endLocation.longitude,
+            label: "Trip End",
+          },
+        ];
+
+        // Calculate road distance via Google Maps API (chain calculation)
+        if (waypoints.length >= 2) {
+          routeResult = await calculateChainDistance(waypoints);
+
+          // Calculate reimbursement based on road distance
+          const roadDistance = routeResult.allSegmentsSuccess
+            ? routeResult.summary.roadTotalKm
+            : null;
+
+          reimbursementData = {
+            ratePerKm: REIMBURSEMENT_CONFIG.ratePerKm,
+            calculatedAmount: roadDistance ? calculateReimbursement(roadDistance) : null,
+            calculatedAt: new Date().toISOString(),
+            status: "calculated",
+          };
+        }
+      } catch (routeError) {
+        console.error("Error calculating road distance (trip will still be saved):", routeError);
+      }
+
+      // Save trip with both Haversine and road distance data
       const tripRef = doc(db, agentCollection, agentId, "trips", activeTrip.id);
-      await updateDoc(tripRef, {
+      const updateData = {
         endLocation,
         endTime: serverTimestamp(),
-        totalDistance: parseFloat(totalDistance.toFixed(2)),
+        totalDistance: parseFloat(totalDistance.toFixed(2)), // Haversine (backward compatible)
         totalDuration: totalDuration,
         status: "completed",
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      // Add enhanced route data if available
+      if (visitLocations.length > 0) {
+        updateData.visitLocations = visitLocations;
+      }
+      if (routeResult) {
+        updateData.routeSegments = routeResult.segments;
+        updateData.distanceSummary = routeResult.summary;
+        updateData.googleMapsStatus = routeResult.allSegmentsSuccess ? "success" : "partial";
+      }
+      if (reimbursementData) {
+        updateData.reimbursement = reimbursementData;
+      }
+
+      await updateDoc(tripRef, updateData);
 
       setActiveTrip(null);
       setElapsedTime(0);
       setConfirmDialog(false);
 
-      alert(
-        `Trip completed!\n\nTotal Distance: ${totalDistance.toFixed(2)} km\nTotal Stops: ${
-          activeTrip.stops?.length || 0
-        }\nDuration: ${formatTime(totalDuration)}`
-      );
+      // Build completion message
+      const roadDistanceKm = routeResult?.allSegmentsSuccess
+        ? routeResult.summary.roadTotalKm
+        : null;
+      const reimbursementAmt = reimbursementData?.calculatedAmount;
+      const clinicCount = visitLocations.length;
+
+      let message = `Trip completed!\n\n`;
+      message += `Straight-line Distance: ${totalDistance.toFixed(2)} km\n`;
+      if (roadDistanceKm !== null) {
+        message += `Road Distance: ${roadDistanceKm} km\n`;
+        message += `Estimated Reimbursement: ${REIMBURSEMENT_CONFIG.currencySymbol}${reimbursementAmt}\n`;
+      }
+      message += `Clinics Visited: ${clinicCount}\n`;
+      message += `Total Stops: ${activeTrip.stops?.length || 0}\n`;
+      message += `Duration: ${formatTime(totalDuration)}`;
+
+      alert(message);
     } catch (error) {
       console.error("Error ending trip:", error);
       setLocationError(error.message);

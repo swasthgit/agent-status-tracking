@@ -26,6 +26,11 @@ import {
   RateReview,
   OpenInNew,
   Coffee,
+  History as HistoryIcon,
+  PhoneInTalk,
+  EditNote,
+  CallReceived,
+  TaskAlt,
 } from "@mui/icons-material";
 import {
   doc,
@@ -36,26 +41,57 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
-import { THEME } from "../theme/theme";
+import { THEME, GRADIENTS, SHADOWS, TYPOGRAPHY, ANIMATIONS, GLASS, STATUS_COLORS, RADIUS, SPACING } from "../theme/theme";
 import { useAgentStatus, AGENT_STATUS } from "../hooks/useAgentStatus";
+import styles from "./AgentView.module.css";
+import "../styles/animations.css";
 
-// Status color mapping
+// Status color mapping using new design tokens
 const getStatusColor = (status) => {
   switch (status) {
     case AGENT_STATUS.LOGIN:
     case AGENT_STATUS.AVAILABLE:
-    case "Idle": // Legacy status - treat as active
-    case "Available": // Legacy status
-      return "#22c55e"; // Green
+    case "Idle":
+    case "Available":
+      return STATUS_COLORS.available.color;
     case AGENT_STATUS.ON_CALL:
-      return "#f59e0b"; // Orange/Amber
+      return STATUS_COLORS.onCall.color;
     case AGENT_STATUS.BREAK:
-      return "#f97316"; // Orange for break
+      return STATUS_COLORS.break.color;
     case AGENT_STATUS.LOGOUT:
     case AGENT_STATUS.UNAVAILABLE:
     default:
-      return "#ef4444"; // Red
+      return STATUS_COLORS.offline.color;
   }
+};
+
+// Map agent status to CSS class suffix
+const getStatusClassName = (status) => {
+  switch (status) {
+    case AGENT_STATUS.LOGIN:
+    case AGENT_STATUS.AVAILABLE:
+    case "Idle":
+    case "Available":
+      return "Available";
+    case AGENT_STATUS.ON_CALL:
+      return "OnCall";
+    case AGENT_STATUS.BREAK:
+      return "Break";
+    case AGENT_STATUS.LOGOUT:
+    case AGENT_STATUS.UNAVAILABLE:
+    default:
+      return "Offline";
+  }
+};
+
+// Tab icons for the premium tab bar
+const TAB_ICONS = {
+  0: <HistoryIcon sx={{ fontSize: 18 }} />,
+  1: <PhoneInTalk sx={{ fontSize: 18 }} />,
+  2: <EditNote sx={{ fontSize: 18 }} />,
+  3: <CallReceived sx={{ fontSize: 18 }} />,
+  4: <TaskAlt sx={{ fontSize: 18 }} />,
+  5: <RateReview sx={{ fontSize: 18 }} />,
 };
 
 const AgentView = ({ currentUser, onStatusChange }) => {
@@ -299,375 +335,281 @@ const AgentView = ({ currentUser, onStatusChange }) => {
     );
   }, [currentUser]);
 
+  // Branded skeleton loading state
   if (loading) {
-    return <Typography>Loading agent data...</Typography>;
+    return (
+      <Box className={styles.pageWrapper}>
+        <Box className={styles.skeletonPage}>
+          <Box className={styles.skeletonBanner} />
+          <Box className={styles.skeletonTabs} />
+          <Box className={styles.skeletonContent} />
+        </Box>
+      </Box>
+    );
   }
 
   if (!agent) {
-    return <Typography>No agent data available</Typography>;
+    return (
+      <Box className={styles.pageWrapper}>
+        <Box className={styles.noDataContainer}>
+          <Typography className={styles.noDataText}>No agent data available</Typography>
+        </Box>
+      </Box>
+    );
   }
 
+  const statusClass = getStatusClassName(agentStatus);
+
   return (
-    <Box
-      sx={{
-        background: THEME.background,
-        minHeight: "100vh",
-        padding: "24px",
-      }}
-    >
-      {/* Loading overlay while checking login status */}
-      {isStatusLoading && (
-        <Box
-          sx={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: "rgba(0, 0, 0, 0.7)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-          }}
-        >
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              border: "4px solid rgba(255,255,255,0.3)",
-              borderTop: "4px solid #fff",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              "@keyframes spin": {
-                "0%": { transform: "rotate(0deg)" },
-                "100%": { transform: "rotate(360deg)" },
-              },
-            }}
-          />
-          <Typography sx={{ color: "#fff", mt: 2 }}>
-            Checking status...
-          </Typography>
-        </Box>
-      )}
+    <Box className={styles.pageWrapper}>
+      <Box className={styles.pageContent}>
+        {/* Premium loading overlay while checking login status */}
+        {isStatusLoading && (
+          <Box className={styles.loadingOverlay}>
+            <Box className={styles.loadingSpinnerContainer}>
+              <Box className={styles.loadingSpinnerOuter} />
+              <Box className={styles.loadingSpinnerInner} />
+            </Box>
+            <Typography className={styles.loadingText}>
+              Checking status...
+            </Typography>
+          </Box>
+        )}
 
-      {/* Status Login Modal - Blocks dashboard until agent starts their day */}
-      {/* Only show modal AFTER status check is complete to prevent flash/delay issues */}
-      <StatusLoginModal
-        open={!isStatusLoading && !isLoggedInToday}
-        agentName={agent?.name}
-        onStartDay={startDay}
-      />
-
-      {/* Status Header with controls - Only shown when logged in */}
-      {isLoggedInToday && (
-        <StatusHeader
-          status={agentStatus}
-          workingDuration={workingDuration}
-          breakTimeRemaining={breakTimeRemaining}
-          onStartBreak={startBreak}
-          onEndBreak={endBreak}
-          onLogout={() => endDay("manual")}
+        {/* Status Login Modal - Blocks dashboard until agent starts their day */}
+        {/* Only show modal AFTER status check is complete to prevent flash/delay issues */}
+        <StatusLoginModal
+          open={!isStatusLoading && !isLoggedInToday}
+          agentName={agent?.name}
+          onStartDay={startDay}
         />
-      )}
 
-      {/* Break Message Overlay */}
-      {isOnBreak && (
-        <Paper
-          elevation={3}
-          sx={{
-            bgcolor: "warning.light",
-            color: "warning.contrastText",
-            p: 3,
-            mb: 2,
-            borderRadius: 2,
-            textAlign: "center",
-          }}
-        >
-          <Coffee sx={{ fontSize: 48, mb: 1 }} />
-          <Typography variant="h6" fontWeight="bold">
-            You are currently on break
-          </Typography>
-          <Typography variant="body2">
-            Dashboard features are disabled during break. Click "End Break" to resume work.
-          </Typography>
-        </Paper>
-      )}
-      {/* Modern Header Section */}
-      <Paper
-        elevation={0}
-        sx={{
-          background: `linear-gradient(135deg, ${THEME.primary} 0%, #1e8a7f 100%)`,
-          color: "#fff",
-          padding: "32px",
-          borderRadius: "16px",
-          marginBottom: "24px",
-          border: "none",
-          boxShadow: `0 4px 20px ${THEME.primary}33`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "20px",
-          flexWrap: "wrap",
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <Avatar
-            sx={{
-              width: 64,
-              height: 64,
-              background: "rgba(255, 255, 255, 0.2)",
-              backdropFilter: "blur(10px)",
-              border: "2px solid rgba(255, 255, 255, 0.3)",
-            }}
-          >
-            <Person sx={{ fontSize: "32px", color: "#fff" }} />
-          </Avatar>
-          <Box>
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 700,
-                color: "#fff",
-                margin: 0,
-                fontSize: { xs: "1.5rem", md: "2rem" },
-              }}
-            >
-              Welcome back, {agent.name}
+        {/* Status Header with controls - Only shown when logged in */}
+        {isLoggedInToday && (
+          <StatusHeader
+            status={agentStatus}
+            workingDuration={workingDuration}
+            breakTimeRemaining={breakTimeRemaining}
+            onStartBreak={startBreak}
+            onEndBreak={endBreak}
+            onLogout={() => endDay("manual")}
+          />
+        )}
+
+        {/* Break Message Overlay - Premium amber gradient design */}
+        {isOnBreak && (
+          <Box className={styles.breakOverlay}>
+            <Box className={styles.breakIconWrapper}>
+              <Coffee sx={{ fontSize: 32, color: "#fff" }} />
+            </Box>
+            <Typography className={styles.breakTitle}>
+              You are currently on break
             </Typography>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                color: "rgba(255, 255, 255, 0.9)",
-                margin: "4px 0 0 0",
-                fontWeight: 500,
-              }}
-            >
-              Ready to make some calls today?
+            <Typography className={styles.breakSubtitle}>
+              Dashboard features are disabled during break. Click "End Break" to resume work.
             </Typography>
+          </Box>
+        )}
+
+        {/* ── Welcome Banner / Header ──────────────────────────────────────── */}
+        <Box className={styles.welcomeBanner}>
+          {/* Floating decorative shapes */}
+          <Box className={`${styles.bannerDecor} ${styles.bannerDecor1}`} />
+          <Box className={`${styles.bannerDecor} ${styles.bannerDecor2}`} />
+          <Box className={`${styles.bannerDecor} ${styles.bannerDecor3}`} />
+
+          <Box className={styles.bannerLeft}>
+            {/* Avatar with animated gradient ring */}
+            <Box className={styles.avatarWrapper}>
+              <Box className={styles.avatarRing} />
+              <Box className={styles.avatarInner}>
+                <Person sx={{ fontSize: 32, color: "#fff" }} />
+              </Box>
+            </Box>
+            <Box className={styles.bannerInfo}>
+              <Typography className={styles.welcomeText}>
+                Welcome back, {agent.name}
+              </Typography>
+              <Typography className={styles.welcomeSubText}>
+                Ready to make some calls today?
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box className={styles.bannerRight}>
+            {/* Today's Call Stats - Glassmorphism chips - Only for Health Agents */}
+            {isHealthAgent && (
+              <Tooltip title="Today's Calls" arrow>
+                <Box className={styles.statChipGroup}>
+                  <Today sx={{ fontSize: 20, color: "rgba(255,255,255,0.9)" }} />
+                  <Box className={styles.statChipPills}>
+                    <Tooltip title="Connected Calls" arrow>
+                      <Box className={styles.statPillConnected}>
+                        <Phone className={styles.statPillIconConnected} sx={{ fontSize: 15 }} />
+                        <span className={styles.statPillLabel}>{todayCallStats.connected}</span>
+                      </Box>
+                    </Tooltip>
+                    <Tooltip title="Not Connected Calls" arrow>
+                      <Box className={styles.statPillNotConnected}>
+                        <PhoneDisabled className={styles.statPillIconNotConnected} sx={{ fontSize: 15 }} />
+                        <span className={styles.statPillLabel}>{todayCallStats.notConnected}</span>
+                      </Box>
+                    </Tooltip>
+                  </Box>
+                  <Typography className={styles.statTotalLabel}>
+                    Total: {todayCallStats.total}
+                  </Typography>
+                </Box>
+              </Tooltip>
+            )}
+
+            {/* Status Badge with glowing pulse dot */}
+            <Box
+              className={`${styles.statusBadge} ${styles[`status${statusClass}`]}`}
+              sx={{ borderColor: `${getStatusColor(agentStatus)}80` }}
+            >
+              <Box
+                className={styles.statusDot}
+                sx={{ background: getStatusColor(agentStatus) }}
+              />
+              <span>{agentStatus}</span>
+            </Box>
           </Box>
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-          {/* Today's Call Stats - Only for Health Agents */}
-          {isHealthAgent && (
-            <Tooltip title="Today's Calls" arrow>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  bgcolor: "rgba(255, 255, 255, 0.15)",
-                  backdropFilter: "blur(10px)",
-                  borderRadius: "12px",
-                  padding: "8px 16px",
-                  border: "1px solid rgba(255, 255, 255, 0.2)",
-                }}
-              >
-                <Today sx={{ color: "#fff", fontSize: 20 }} />
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Tooltip title="Connected Calls" arrow>
-                    <Chip
-                      icon={<Phone sx={{ fontSize: "16px !important" }} />}
-                      label={todayCallStats.connected}
-                      size="small"
-                      sx={{
-                        bgcolor: "rgba(34, 197, 94, 0.3)",
-                        color: "#fff",
-                        fontWeight: 700,
-                        "& .MuiChip-icon": { color: "#22c55e" },
-                      }}
-                    />
-                  </Tooltip>
-                  <Tooltip title="Not Connected Calls" arrow>
-                    <Chip
-                      icon={<PhoneDisabled sx={{ fontSize: "16px !important" }} />}
-                      label={todayCallStats.notConnected}
-                      size="small"
-                      sx={{
-                        bgcolor: "rgba(239, 68, 68, 0.3)",
-                        color: "#fff",
-                        fontWeight: 700,
-                        "& .MuiChip-icon": { color: "#ef4444" },
-                      }}
-                    />
-                  </Tooltip>
-                </Box>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "rgba(255, 255, 255, 0.8)",
-                    fontWeight: 500,
-                    ml: 0.5,
-                  }}
-                >
-                  Total: {todayCallStats.total}
-                </Typography>
-              </Box>
-            </Tooltip>
-          )}
-
-          {/* Real-time Status Indicator */}
-          <Chip
-            icon={<Circle sx={{ fontSize: "12px !important", color: getStatusColor(agentStatus) }} />}
-            label={agentStatus}
+        {/* ── Modern Pill-style Tab Navigation ─────────────────────────────── */}
+        <Paper
+          elevation={0}
+          className={`${styles.tabContainer} ${isOnBreak ? styles.tabContainerDisabled : ""}`}
+        >
+          <Tabs
+            value={tabValue}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
             sx={{
-              bgcolor: "rgba(255, 255, 255, 0.15)",
-              backdropFilter: "blur(10px)",
-              color: "#fff",
-              fontWeight: 600,
-              fontSize: "14px",
-              padding: "8px 4px",
-              height: "auto",
-              border: `2px solid ${getStatusColor(agentStatus)}`,
-              "& .MuiChip-icon": {
-                color: getStatusColor(agentStatus),
-                animation: agentStatus === AGENT_STATUS.ON_CALL ? "pulse 1.5s infinite" : "none",
+              minHeight: "60px",
+              px: 1,
+              "& .MuiTab-root": {
+                color: THEME.textSecondary,
+                fontWeight: 600,
+                fontSize: TYPOGRAPHY.size.base,
+                fontFamily: TYPOGRAPHY.fontFamily,
+                textTransform: "none",
+                minHeight: "52px",
+                borderRadius: RADIUS.lg,
+                margin: "4px 3px",
+                padding: "8px 18px",
+                transition: ANIMATIONS.transition.all,
+                letterSpacing: TYPOGRAPHY.tracking.tight,
+                gap: "6px",
+                "&:hover": {
+                  color: THEME.primary,
+                  backgroundColor: `${THEME.primary}0A`,
+                  transform: "translateY(-1px)",
+                },
+                "&.Mui-selected": {
+                  color: "#fff",
+                  background: GRADIENTS.primary,
+                  fontWeight: 700,
+                  boxShadow: SHADOWS.primary,
+                },
+                "&.Mui-disabled": {
+                  opacity: 0.4,
+                },
               },
-              "@keyframes pulse": {
-                "0%": { opacity: 1 },
-                "50%": { opacity: 0.4 },
-                "100%": { opacity: 1 },
+              "& .MuiTabs-indicator": {
+                display: "none", // hidden since we use pill-style active bg
+              },
+              "& .MuiTabs-flexContainer": {
+                gap: "2px",
+                padding: "4px 0",
               },
             }}
-          />
-        </Box>
-      </Paper>
+          >
+            <Tab icon={TAB_ICONS[0]} iconPosition="start" label="Call History" disabled={isOnBreak} />
+            <Tab icon={TAB_ICONS[1]} iconPosition="start" label="ExoPhones" disabled={isOnBreak} />
+            <Tab icon={TAB_ICONS[2]} iconPosition="start" label="Manual Leads" disabled={isOnBreak} />
+            <Tab icon={TAB_ICONS[3]} iconPosition="start" label="Inbound Calls" disabled={isOnBreak} />
+            {/* Daily Task tab - Only for Health Agents */}
+            {(currentUser?.role === "Health Agent" ||
+              currentUser?.role === "healthAgent" ||
+              currentUser?.collection === "healthAgents") && (
+              <Tab icon={TAB_ICONS[4]} iconPosition="start" label="Daily Task" disabled={isOnBreak} />
+            )}
+            {/* BM Review tab - Only for Health Agents */}
+            {(currentUser?.role === "Health Agent" ||
+              currentUser?.role === "healthAgent" ||
+              currentUser?.collection === "healthAgents") && (
+              <Tab icon={TAB_ICONS[5]} iconPosition="start" label="BM Review" disabled={isOnBreak} />
+            )}
+          </Tabs>
+        </Paper>
 
-      {/* Modern Tabs */}
-      <Paper
-        elevation={0}
-        sx={{
-          backgroundColor: THEME.cardBg,
-          borderRadius: "16px",
-          marginBottom: "24px",
-          border: `1px solid ${THEME.primary}20`,
-          overflow: "hidden",
-          opacity: isOnBreak ? 0.5 : 1,
-          pointerEvents: isOnBreak ? "none" : "auto",
-        }}
-      >
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{
-            "& .MuiTab-root": {
-              color: THEME.textSecondary,
-              fontWeight: 600,
-              fontSize: "14px",
-              textTransform: "none",
-              minHeight: "64px",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                color: THEME.primary,
-                backgroundColor: `${THEME.primary}10`,
-              },
-              "&.Mui-selected": {
-                color: THEME.primary,
-                fontWeight: 700,
-              },
-            },
-            "& .MuiTabs-indicator": {
-              backgroundColor: THEME.primary,
-              height: "3px",
-              borderRadius: "3px 3px 0 0",
-            },
-          }}
-        >
-          <Tab label="Call History" disabled={isOnBreak} />
-          <Tab label="ExoPhones" disabled={isOnBreak} />
-          <Tab label="Manual Leads" disabled={isOnBreak} />
-          <Tab label="Inbound Calls" disabled={isOnBreak} />
-          {/* Daily Task tab - Only for Health Agents */}
-          {(currentUser?.role === "Health Agent" ||
-            currentUser?.role === "healthAgent" ||
-            currentUser?.collection === "healthAgents") && (
-            <Tab label="Daily Task" disabled={isOnBreak} />
+        {/* Tab Content - Disabled when on break */}
+        <Box className={`${styles.tabContent} ${isOnBreak ? styles.tabContentDisabled : ""}`}>
+          {tabValue === 0 && !isOnBreak && (
+            <CallHistory callLogs={callLog} agentName={agent.name} />
           )}
-          {/* BM Review tab - Only for Health Agents */}
-          {(currentUser?.role === "Health Agent" ||
-            currentUser?.role === "healthAgent" ||
-            currentUser?.collection === "healthAgents") && (
-            <Tab label="BM Review" icon={<RateReview />} iconPosition="start" disabled={isOnBreak} />
-          )}
-        </Tabs>
-      </Paper>
 
-      {/* Tab Content - Disabled when on break */}
-      <Box sx={{ marginTop: "24px", opacity: isOnBreak ? 0.5 : 1, pointerEvents: isOnBreak ? "none" : "auto" }}>
-        {tabValue === 0 && !isOnBreak && (
-          <CallHistory callLogs={callLog} agentName={agent.name} />
-        )}
-
-        {tabValue === 1 && agent && currentUser && !isOnBreak && (
-          <ExoPhones
-            agentId={agent.id}
-            agentCollection={getCollectionName()}
-            onStartCall={startCall}
-            onEndCall={endCall}
-          />
-        )}
-
-        {tabValue === 2 && agent && currentUser && !isOnBreak && (
-          <ManualLeads
-            agentId={agent.id}
-            agentCollection={getCollectionName()}
-            onStartCall={startCall}
-            onEndCall={endCall}
-          />
-        )}
-
-        {tabValue === 3 && agent && currentUser && !isOnBreak && (
-          <InboundCalls
-            agentId={agent.id}
-            agentCollection={getCollectionName()}
-            agentName={agent.name}
-          />
-        )}
-
-        {/* Daily Task tab content - Only for Health Agents */}
-        {tabValue === 4 &&
-          agent &&
-          currentUser &&
-          !isOnBreak &&
-          (currentUser?.role === "Health Agent" ||
-            currentUser?.role === "healthAgent" ||
-            currentUser?.collection === "healthAgents") && (
-            <DailyTaskForm
+          {tabValue === 1 && agent && currentUser && !isOnBreak && (
+            <ExoPhones
               agentId={agent.id}
-              agentName={agent.name}
               agentCollection={getCollectionName()}
-              currentUser={currentUser}
+              onStartCall={startCall}
+              onEndCall={endCall}
             />
           )}
 
-        {/* BM Review tab content - Only for Health Agents */}
-        {tabValue === 5 &&
-          agent &&
-          currentUser &&
-          !isOnBreak &&
-          (currentUser?.role === "Health Agent" ||
-            currentUser?.role === "healthAgent" ||
-            currentUser?.collection === "healthAgents") && (
-            <Paper
-              elevation={0}
-              sx={{
-                bgcolor: "white",
-                borderRadius: "16px",
-                p: 4,
-                border: `1px solid ${THEME.primary}20`,
-                boxShadow: `0 4px 20px ${THEME.primary}10`,
-              }}
-            >
-              <Box sx={{ textAlign: "center", py: 6 }}>
-                <RateReview sx={{ fontSize: 80, color: THEME.primary, mb: 3 }} />
-                <Typography variant="h4" fontWeight={700} color={THEME.primary} gutterBottom>
+          {tabValue === 2 && agent && currentUser && !isOnBreak && (
+            <ManualLeads
+              agentId={agent.id}
+              agentCollection={getCollectionName()}
+              onStartCall={startCall}
+              onEndCall={endCall}
+            />
+          )}
+
+          {tabValue === 3 && agent && currentUser && !isOnBreak && (
+            <InboundCalls
+              agentId={agent.id}
+              agentCollection={getCollectionName()}
+              agentName={agent.name}
+            />
+          )}
+
+          {/* Daily Task tab content - Only for Health Agents */}
+          {tabValue === 4 &&
+            agent &&
+            currentUser &&
+            !isOnBreak &&
+            (currentUser?.role === "Health Agent" ||
+              currentUser?.role === "healthAgent" ||
+              currentUser?.collection === "healthAgents") && (
+              <DailyTaskForm
+                agentId={agent.id}
+                agentName={agent.name}
+                agentCollection={getCollectionName()}
+                currentUser={currentUser}
+              />
+            )}
+
+          {/* BM Review tab content - Premium redesigned card */}
+          {tabValue === 5 &&
+            agent &&
+            currentUser &&
+            !isOnBreak &&
+            (currentUser?.role === "Health Agent" ||
+              currentUser?.role === "healthAgent" ||
+              currentUser?.collection === "healthAgents") && (
+              <Box className={styles.bmReviewCard}>
+                <Box className={styles.bmReviewIcon}>
+                  <RateReview sx={{ fontSize: 44, color: THEME.primary }} />
+                </Box>
+                <Typography className={styles.bmReviewTitle}>
                   BM Review Portal
                 </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 600, mx: "auto" }}>
+                <Typography className={styles.bmReviewDescription}>
                   Access the Brand Manager Review system to track your performance, review metrics, and view evaluations.
                 </Typography>
                 <Button
@@ -676,28 +618,34 @@ const AgentView = ({ currentUser, onStatusChange }) => {
                   endIcon={<OpenInNew />}
                   onClick={() => window.open("https://bm-review-agentstatus.web.app", "_blank")}
                   sx={{
-                    bgcolor: THEME.primary,
-                    color: "white",
+                    background: GRADIENTS.primary,
+                    color: "#fff",
                     px: 4,
                     py: 1.5,
-                    fontSize: "16px",
+                    fontSize: "1rem",
                     fontWeight: 600,
-                    borderRadius: "12px",
+                    fontFamily: TYPOGRAPHY.fontFamily,
+                    borderRadius: RADIUS.lg,
                     textTransform: "none",
-                    boxShadow: `0 4px 12px ${THEME.primary}40`,
+                    letterSpacing: TYPOGRAPHY.tracking.tight,
+                    boxShadow: SHADOWS.primary,
+                    border: "none",
                     "&:hover": {
-                      bgcolor: THEME.primaryDark,
-                      boxShadow: `0 6px 16px ${THEME.primary}60`,
-                      transform: "translateY(-2px)",
+                      background: GRADIENTS.primary,
+                      boxShadow: SHADOWS.primaryLg,
+                      transform: ANIMATIONS.hover.liftSm,
                     },
-                    transition: "all 0.3s ease",
+                    "&:active": {
+                      transform: "translateY(0) scale(0.98)",
+                    },
+                    transition: ANIMATIONS.transition.all,
                   }}
                 >
                   Open BM Review Portal
                 </Button>
               </Box>
-            </Paper>
-          )}
+            )}
+        </Box>
       </Box>
     </Box>
   );

@@ -73,6 +73,15 @@ const CallLogForm = ({ onSubmit }) => {
       } else {
         setClientNumberError("");
       }
+    } else if (field === "callConnected") {
+      setFormData((prev) => ({
+        ...prev,
+        callConnected: value,
+        // Clear notConnectedReason when switching to Connected
+        ...(value === true && { notConnectedReason: "" }),
+        // Clear connected-only fields when switching to Not Connected
+        ...(value === false && { callStatus: "", callRating: "", callRatingNumeric: "" }),
+      }));
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -129,6 +138,10 @@ const CallLogForm = ({ onSubmit }) => {
         return;
       }
     } else {
+      if (!formData.callCategory) {
+        alert("Please select a Call Category");
+        return;
+      }
       if (!formData.notConnectedReason) {
         alert("Please select a Not Connected Reason");
         return;
@@ -575,84 +588,84 @@ const CallLogForm = ({ onSubmit }) => {
           </FormControl>
         </Grid>
 
-        {formData.callConnected ? (
-          <>
-            {/* Call Category Dropdown */}
-            <Grid item xs={12}>
-              <FormControl fullWidth variant="outlined" required>
-                <InputLabel
-                  id="call-category-label"
-                  shrink={true}
-                  sx={{
-                    fontSize: "1rem",
-                    fontWeight: 600,
-                    color: formData.callCategory ? "#d1d5db" : "#ff9800",
-                    "&.Mui-focused": {
-                      color: formData.callCategory ? "#3b82f6" : "#ff9800",
-                    },
-                  }}
-                >
-                  Call Category *
-                </InputLabel>
-                <Select
-                  labelId="call-category-label"
-                  value={formData.callCategory}
-                  onChange={(e) =>
-                    handleInputChange("callCategory", e.target.value)
-                  }
-                  label="Call Category *"
-                  required
-                  sx={{
-                    borderRadius: "6px",
-                    backgroundColor: "rgba(17, 24, 39, 0.5)",
-                    color: "#f8fafc",
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: formData.callCategory
-                        ? "rgba(75, 85, 99, 0.6)"
-                        : "#ff9800",
-                    },
-                    "&:hover .MuiOutlinedInput-notchedOutline": {
-                      borderColor: formData.callCategory
-                        ? "rgba(156, 163, 175, 0.8)"
-                        : "#ff9800",
-                    },
-                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                      borderColor: "#3b82f6",
-                    },
-                    "& .MuiSelect-icon": {
-                      color: "#d1d5db",
-                    },
-                  }}
-                  MenuProps={{
-                    PaperProps: {
-                      sx: {
-                        backgroundColor: "#374151",
-                        "& .MuiMenuItem-root": {
-                          color: "#f8fafc",
-                          "&:hover": {
-                            backgroundColor: "rgba(59, 130, 246, 0.1)",
-                          },
-                          "&.Mui-disabled": {
-                            color: "#9ca3af",
-                          },
-                        },
+        {/* Call Category Dropdown - Always visible */}
+        <Grid item xs={12}>
+          <FormControl fullWidth variant="outlined" required>
+            <InputLabel
+              id="call-category-label"
+              shrink={true}
+              sx={{
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: formData.callCategory ? "#d1d5db" : "#ff9800",
+                "&.Mui-focused": {
+                  color: formData.callCategory ? "#3b82f6" : "#ff9800",
+                },
+              }}
+            >
+              Call Category *
+            </InputLabel>
+            <Select
+              labelId="call-category-label"
+              value={formData.callCategory}
+              onChange={(e) =>
+                handleInputChange("callCategory", e.target.value)
+              }
+              label="Call Category *"
+              required
+              sx={{
+                borderRadius: "6px",
+                backgroundColor: "rgba(17, 24, 39, 0.5)",
+                color: "#f8fafc",
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.callCategory
+                    ? "rgba(75, 85, 99, 0.6)"
+                    : "#ff9800",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: formData.callCategory
+                    ? "rgba(156, 163, 175, 0.8)"
+                    : "#ff9800",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#3b82f6",
+                },
+                "& .MuiSelect-icon": {
+                  color: "#d1d5db",
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: "#374151",
+                    "& .MuiMenuItem-root": {
+                      color: "#f8fafc",
+                      "&:hover": {
+                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      },
+                      "&.Mui-disabled": {
+                        color: "#9ca3af",
                       },
                     },
-                  }}
-                  displayEmpty
-                >
-                  <MenuItem value="" disabled>
-                    Select Category
-                  </MenuItem>
-                  {callCategories.map((category) => (
-                    <MenuItem key={category} value={category}>
-                      {category}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+                  },
+                },
+              }}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Category
+              </MenuItem>
+              {callCategories.map((category) => (
+                <MenuItem key={category} value={category}>
+                  {category}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
 
+        {formData.callConnected ? (
+          <>
             <Grid item xs={12}>
               <FormControl fullWidth variant="outlined" required>
                 <InputLabel

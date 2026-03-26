@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import "../styles/animations.css";
 import "./ManualLeads.css";
 import ManualCallLogForm from "./ManualCallLogForm";
 import { db } from "../firebaseConfig";
@@ -267,7 +268,7 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
       // Store SID, callerId, and agentType for later use in form submission
       setCurrentCallSid(callSid);
       setCurrentCallerId(callerId);
-      setCurrentAgentType(agentType || "N/A");
+      setCurrentAgentType(agentType);
       setCurrentLeadNumber(toNumber);
       setCallStartTime(new Date());
       if (onStartCall) onStartCall(toNumber);
@@ -279,7 +280,7 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
         agentName,
         leadToCallNumber: toNumber,
         callerId,
-        agentType: agentType || "N/A",
+        agentType: agentType,
         timestamp: new Date().toISOString(),
       };
       setCallHistory((prevHistory) => [...prevHistory, newCallRecord]);
@@ -314,6 +315,11 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
         endTime: new Date().toISOString(),
       });
       setShowCallForm(false);
+
+      // Remove the completed lead from the list so the screen resets properly
+      setManualLeads((prev) => prev.filter((lead) => lead.clientNumber !== currentLeadNumber));
+
+      // Clean up state for the removed lead
       setCurrentLeadNumber("");
       setCallStartTime(null);
       setCurrentCallSid("");
@@ -341,77 +347,142 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
 
   return (
     <div className="exo-container">
-      {/* Phone Number Display */}
-      <div className="welcome-card" style={{ marginTop: "0", padding: "1.5rem", backgroundColor: "#f8fafc" }}>
-        <h3 style={{ marginBottom: "0.75rem", color: "#0f172a", fontSize: "1.1rem", fontWeight: "600" }}>
-          📱 Your Contact Number
-        </h3>
+      {/* ── Phone Number Display Card ────────────────────────────────── */}
+      <div className="welcome-card" style={{ marginTop: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+          <span style={{
+            width: "36px",
+            height: "36px",
+            borderRadius: "10px",
+            background: "linear-gradient(135deg, #06B6D4 0%, #6366F1 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1rem",
+            flexShrink: 0,
+            boxShadow: "0 4px 14px rgba(6,182,212,0.25)"
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </span>
+          <h3 style={{
+            margin: 0,
+            color: "#0F172A",
+            fontSize: "1.1rem",
+            fontWeight: 700,
+            letterSpacing: "-0.02em"
+          }}>
+            Your Contact Number
+          </h3>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
           <span style={{
-            fontSize: "1.3rem",
-            fontWeight: "600",
-            color: "#0f172a",
-            backgroundColor: "#e0f2fe",
-            padding: "0.5rem 1rem",
-            borderRadius: "8px",
-            border: "2px solid #0ea5e9"
+            fontSize: "1.25rem",
+            fontWeight: 700,
+            fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+            letterSpacing: "0.04em",
+            color: "#4F46E5",
+            backgroundColor: "#EEF2FF",
+            padding: "10px 18px",
+            borderRadius: "12px",
+            border: "1.5px solid rgba(79, 70, 229, 0.15)",
+            boxShadow: "0 2px 8px rgba(79, 70, 229, 0.08)"
           }}>
             {agentPhoneNumber || "Not set"}
           </span>
         </div>
-        <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "#64748b", lineHeight: "1.4" }}>
+        <p style={{
+          marginTop: "12px",
+          fontSize: "0.8125rem",
+          color: "#64748B",
+          lineHeight: 1.5,
+          marginBottom: 0
+        }}>
           This number will be auto-filled when making calls. Contact your Team Leader if you need to change it.
         </p>
       </div>
 
-      <h2 className="title">Manual Leads</h2>
-      <div className="add-lead-form">
-        <input
-          type="tel"
-          pattern="\d{10}"
-          maxLength="10"
-          placeholder="Enter 10-digit lead number (e.g., 1234567890)"
-          value={newLeadNumber}
-          onChange={(e) => setNewLeadNumber(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          onClick={handleAddLead}
-          className="ml-2 p-2 bg-blue-500 text-white rounded-md"
-        >
+      {/* ── Section Header ───────────────────────────────────────────── */}
+      <div style={{ marginBottom: "20px" }}>
+        <h2 className="title">Manual Leads</h2>
+        <p style={{ color: "#64748B", fontSize: "0.8125rem", margin: 0, lineHeight: 1.5 }}>
+          Add a lead number and make outbound calls directly
+        </p>
+      </div>
+
+      {/* ── Add Lead Form ────────────────────────────────────────────── */}
+      <div className="add-lead-form" style={{ position: "relative" }}>
+        {/* Phone icon inside input */}
+        <div style={{ position: "relative", flex: 1 }}>
+          <span style={{
+            position: "absolute",
+            left: "14px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "#94A3B8",
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center"
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </span>
+          <input
+            type="tel"
+            pattern="\d{10}"
+            maxLength="10"
+            placeholder="Enter 10-digit lead number"
+            value={newLeadNumber}
+            onChange={(e) => setNewLeadNumber(e.target.value)}
+          />
+        </div>
+        <button onClick={handleAddLead}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add Lead
         </button>
       </div>
-      {error && <div className="alert alert-danger mt-3">{error}</div>}
+
+      {/* ── Error Alert ──────────────────────────────────────────────── */}
+      {error && (
+        <div className="alert alert-danger" style={{ marginBottom: "16px" }}>
+          {error}
+        </div>
+      )}
+
+      {/* ── Lead Cards ───────────────────────────────────────────────── */}
       <div className="call-list">
-        {manualLeads.map((item) => (
-          <div key={item.id} className="lead-call-card" style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 2fr 60px",
-            gap: "14px",
-            alignItems: "start",
-            overflow: "visible"
-          }}>
+        {manualLeads.map((item, cardIndex) => (
+          <div
+            key={item.id}
+            className={`lead-call-card animate-card-entrance stagger-${Math.min(cardIndex + 1, 12)}`}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 2fr 60px",
+              gap: "14px",
+              alignItems: "start",
+              overflow: "visible"
+            }}
+          >
+            {/* Lead phone number */}
             <div className="lead-info" style={{ gridColumn: "1 / -1" }}>
-              <small className="text-gray-500 uppercase text-xs font-medium">
-                LEAD TO CALL
-              </small>
-              <a
-                href={`tel:${item.clientNumber}`}
-                className="text-blue-600 font-medium text-lg hover:underline"
-              >
+              <small>LEAD TO CALL</small>
+              <a href={`tel:${item.clientNumber}`}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                 {item.clientNumber}
               </a>
             </div>
+
+            {/* Your Number input */}
             <div className="input-box">
-              <label
-                htmlFor={`yournumber-${item.id}`}
-                className="text-sm text-gray-600"
-              >
+              <label htmlFor={`yournumber-${item.id}`}>
                 Your Number (10 digits)
                 {manualNumbers[item.id] === agentPhoneNumber && agentPhoneNumber && (
-                  <span style={{ marginLeft: "0.5rem", color: "#22c55e", fontSize: "0.75rem" }}>
-                    ✓ Auto-filled
+                  <span className="ml-badge-success" style={{
+                    marginLeft: "8px",
+                    padding: "2px 8px",
+                    fontSize: "0.625rem",
+                    borderRadius: "9999px",
+                    verticalAlign: "middle"
+                  }}>
+                    Auto-filled
                   </span>
                 )}
               </label>
@@ -425,37 +496,44 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
                 onChange={(e) =>
                   handleManualNumberChange(item.id, e.target.value)
                 }
-                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 style={{
-                  backgroundColor: manualNumbers[item.id] === agentPhoneNumber && agentPhoneNumber ? "#f0fdf4" : "white",
-                  color: "#0f172a",
-                  fontWeight: "500",
-                  fontSize: "1rem"
+                  backgroundColor: manualNumbers[item.id] === agentPhoneNumber && agentPhoneNumber ? "#ECFDF5" : "#FFFFFF",
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  letterSpacing: "0.02em"
                 }}
               />
             </div>
+
+            {/* Exophone select */}
             <div className="select-box exophone-select-wrapper" style={{ position: "relative", zIndex: 10 }}>
-              <label
-                htmlFor={`exotelSelect-${item.id}`}
-                className="text-sm text-gray-600"
-              >
+              <label htmlFor={`exotelSelect-${item.id}`}>
                 Caller ID (ExoPhone)
               </label>
 
               {/* Selected Display Badge */}
               {selectedExotelPhones[item.id] && (
                 <div style={{
-                  padding: "10px 12px",
-                  backgroundColor: "rgba(38, 166, 154, 0.1)",
-                  borderRadius: "12px",
+                  padding: "10px 14px",
+                  background: "rgba(79, 70, 229, 0.06)",
+                  borderRadius: "10px",
                   marginBottom: "8px",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  border: "1px solid rgba(38, 166, 154, 0.3)"
+                  border: "1.5px solid rgba(79, 70, 229, 0.12)"
                 }}>
-                  <span style={{ fontWeight: "600", color: "#26a69a", fontSize: "0.95rem" }}>
-                    ✓ {selectedExotelPhones[item.id]}
+                  <span style={{
+                    fontWeight: 600,
+                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                    color: "#4F46E5",
+                    fontSize: "0.9rem",
+                    letterSpacing: "0.02em",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    {selectedExotelPhones[item.id]}
                   </span>
                   <button
                     onClick={() => {
@@ -463,18 +541,26 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
                       setSearchTerms({ ...searchTerms, [item.id]: "" });
                     }}
                     style={{
-                      background: "#ff7043",
-                      color: "white",
+                      background: "linear-gradient(135deg, #F43F5E 0%, #BE123C 100%)",
+                      color: "#FFFFFF",
                       border: "none",
                       borderRadius: "8px",
                       padding: "4px 12px",
                       cursor: "pointer",
-                      fontSize: "0.75rem",
-                      fontWeight: "600",
-                      transition: "all 0.2s ease"
+                      fontSize: "0.6875rem",
+                      fontWeight: 600,
+                      letterSpacing: "0.02em",
+                      transition: "all 250ms cubic-bezier(0.4, 0, 0.2, 1)",
+                      boxShadow: "0 2px 8px rgba(244, 63, 94, 0.2)"
                     }}
-                    onMouseEnter={(e) => e.target.style.background = "#f4511e"}
-                    onMouseLeave={(e) => e.target.style.background = "#ff7043"}
+                    onMouseEnter={(e) => {
+                      e.target.style.transform = "translateY(-1px)";
+                      e.target.style.boxShadow = "0 4px 12px rgba(244, 63, 94, 0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = "translateY(0)";
+                      e.target.style.boxShadow = "0 2px 8px rgba(244, 63, 94, 0.2)";
+                    }}
                   >
                     Clear
                   </button>
@@ -484,34 +570,39 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
               {/* Search Input */}
               <input
                 type="text"
-                placeholder="🔍 Search by partner name or number..."
+                placeholder="Search by partner name or number..."
                 value={searchTerms[item.id] || ""}
                 onChange={(e) => setSearchTerms({ ...searchTerms, [item.id]: e.target.value })}
                 onFocus={() => setDropdownOpen({ ...dropdownOpen, [item.id]: true })}
                 style={{
                   width: "100%",
-                  padding: "10px 12px",
-                  border: "1px solid rgba(38, 166, 154, 0.3)",
+                  padding: "12px 14px",
+                  paddingLeft: "38px",
+                  border: "1.5px solid rgba(79, 70, 229, 0.12)",
                   borderRadius: "12px",
-                  background: "#ffffff",
-                  color: "#1e293b",
-                  fontWeight: "500",
-                  fontSize: "0.95rem",
-                  transition: "border 0.2s ease, box-shadow 0.2s ease",
-                  outline: "none"
+                  background: "#FFFFFF",
+                  color: "#0F172A",
+                  fontWeight: 500,
+                  fontSize: "0.9rem",
+                  fontFamily: "'Inter', sans-serif",
+                  transition: "all 250ms cubic-bezier(0.4, 0, 0.2, 1)",
+                  outline: "none",
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "14px center"
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "#26a69a";
-                  e.target.style.boxShadow = "0 0 8px rgba(38, 166, 154, 0.2)";
+                  e.target.style.borderColor = "#4F46E5";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(79, 70, 229, 0.12), 0 0 16px rgba(79, 70, 229, 0.08)";
                   setDropdownOpen({ ...dropdownOpen, [item.id]: true });
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(38, 166, 154, 0.3)";
+                  e.target.style.borderColor = "rgba(79, 70, 229, 0.12)";
                   e.target.style.boxShadow = "none";
                 }}
               />
 
-              {/* Dropdown */}
+              {/* Dropdown Panel */}
               {dropdownOpen[item.id] && (
                 <div
                   onClick={(e) => e.stopPropagation()}
@@ -520,28 +611,32 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
                     top: "100%",
                     left: 0,
                     right: 0,
-                    marginTop: "4px",
+                    marginTop: "6px",
                     maxHeight: "320px",
                     overflowY: "auto",
-                    backgroundColor: "#ffffff",
-                    border: "1px solid rgba(38, 166, 154, 0.3)",
+                    background: "rgba(255, 255, 255, 0.98)",
+                    border: "1px solid rgba(79, 70, 229, 0.1)",
                     borderRadius: "12px",
-                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+                    boxShadow: "0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06)",
                     zIndex: 9999
                   }}
                 >
                   {/* Assigned Numbers Section */}
                   <div style={{
-                    padding: "10px 12px",
-                    backgroundColor: "rgba(38, 166, 154, 0.1)",
-                    fontWeight: "700",
-                    fontSize: "0.85rem",
-                    color: "#26a69a",
-                    borderBottom: "1px solid rgba(38, 166, 154, 0.2)",
+                    padding: "10px 14px",
+                    background: "rgba(79, 70, 229, 0.05)",
+                    fontWeight: 700,
+                    fontSize: "0.6875rem",
+                    color: "#4F46E5",
+                    borderBottom: "1px solid rgba(79, 70, 229, 0.08)",
                     textTransform: "uppercase",
-                    letterSpacing: "0.5px"
+                    letterSpacing: "0.08em",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
                   }}>
-                    📋 Assigned Partner Numbers
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                    Assigned Partner Numbers
                   </div>
                   {exotelPhones
                     .filter((phone) => phone.isAssigned)
@@ -558,25 +653,43 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
                           setSearchTerms({ ...searchTerms, [item.id]: "" });
                         }}
                         style={{
-                          padding: "12px",
+                          padding: "12px 14px",
                           cursor: "pointer",
-                          borderBottom: "1px solid rgba(38, 166, 154, 0.1)",
-                          backgroundColor: selectedExotelPhones[item.id] === phone.phone_number ? "rgba(38, 166, 154, 0.15)" : "white",
-                          transition: "all 0.2s ease"
+                          borderBottom: "1px solid rgba(79, 70, 229, 0.04)",
+                          backgroundColor: selectedExotelPhones[item.id] === phone.phone_number
+                            ? "rgba(79, 70, 229, 0.08)"
+                            : "transparent",
+                          borderLeft: selectedExotelPhones[item.id] === phone.phone_number
+                            ? "3px solid #4F46E5"
+                            : "3px solid transparent",
+                          transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)"
                         }}
                         onMouseEnter={(e) => {
                           if (selectedExotelPhones[item.id] !== phone.phone_number) {
-                            e.currentTarget.style.backgroundColor = "rgba(38, 166, 154, 0.08)";
+                            e.currentTarget.style.backgroundColor = "#EEF2FF";
                           }
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = selectedExotelPhones[item.id] === phone.phone_number ? "rgba(38, 166, 154, 0.15)" : "white";
+                          e.currentTarget.style.backgroundColor = selectedExotelPhones[item.id] === phone.phone_number
+                            ? "rgba(79, 70, 229, 0.08)"
+                            : "transparent";
                         }}
                       >
-                        <div style={{ fontWeight: "700", color: "#26a69a", fontSize: "0.95rem" }}>
+                        <div style={{
+                          fontWeight: 700,
+                          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                          color: "#4F46E5",
+                          fontSize: "0.9rem",
+                          letterSpacing: "0.02em"
+                        }}>
                           {phone.phone_number}
                         </div>
-                        <div style={{ fontSize: "0.85rem", color: "#546e7a", marginTop: "2px" }}>
+                        <div style={{
+                          fontSize: "0.8rem",
+                          color: "#64748B",
+                          marginTop: "3px",
+                          fontWeight: 500
+                        }}>
                           {phone.partnerName}
                         </div>
                       </div>
@@ -584,17 +697,21 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
 
                   {/* Available Numbers Section */}
                   <div style={{
-                    padding: "10px 12px",
-                    backgroundColor: "rgba(102, 187, 106, 0.1)",
-                    fontWeight: "700",
-                    fontSize: "0.85rem",
-                    color: "#66bb6a",
-                    borderBottom: "1px solid rgba(102, 187, 106, 0.2)",
-                    marginTop: "4px",
+                    padding: "10px 14px",
+                    background: "rgba(16, 185, 129, 0.05)",
+                    fontWeight: 700,
+                    fontSize: "0.6875rem",
+                    color: "#059669",
+                    borderBottom: "1px solid rgba(16, 185, 129, 0.08)",
+                    marginTop: 0,
                     textTransform: "uppercase",
-                    letterSpacing: "0.5px"
+                    letterSpacing: "0.08em",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
                   }}>
-                    📞 Available Numbers
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    Available Numbers
                   </div>
                   {exotelPhones
                     .filter((phone) => !phone.isAssigned)
@@ -608,22 +725,35 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
                           setSearchTerms({ ...searchTerms, [item.id]: "" });
                         }}
                         style={{
-                          padding: "12px",
+                          padding: "12px 14px",
                           cursor: "pointer",
-                          borderBottom: "1px solid rgba(38, 166, 154, 0.1)",
-                          backgroundColor: selectedExotelPhones[item.id] === phone.phone_number ? "rgba(38, 166, 154, 0.15)" : "white",
-                          transition: "all 0.2s ease"
+                          borderBottom: "1px solid rgba(79, 70, 229, 0.04)",
+                          backgroundColor: selectedExotelPhones[item.id] === phone.phone_number
+                            ? "rgba(79, 70, 229, 0.08)"
+                            : "transparent",
+                          borderLeft: selectedExotelPhones[item.id] === phone.phone_number
+                            ? "3px solid #4F46E5"
+                            : "3px solid transparent",
+                          transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)"
                         }}
                         onMouseEnter={(e) => {
                           if (selectedExotelPhones[item.id] !== phone.phone_number) {
-                            e.currentTarget.style.backgroundColor = "rgba(38, 166, 154, 0.08)";
+                            e.currentTarget.style.backgroundColor = "#EEF2FF";
                           }
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = selectedExotelPhones[item.id] === phone.phone_number ? "rgba(38, 166, 154, 0.15)" : "white";
+                          e.currentTarget.style.backgroundColor = selectedExotelPhones[item.id] === phone.phone_number
+                            ? "rgba(79, 70, 229, 0.08)"
+                            : "transparent";
                         }}
                       >
-                        <div style={{ fontWeight: "700", color: "#26a69a", fontSize: "0.95rem" }}>
+                        <div style={{
+                          fontWeight: 700,
+                          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                          color: "#4F46E5",
+                          fontSize: "0.9rem",
+                          letterSpacing: "0.02em"
+                        }}>
                           {phone.phone_number}
                         </div>
                       </div>
@@ -635,10 +765,10 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
                     (phone.partnerName && phone.partnerName.toLowerCase().includes((searchTerms[item.id] || "").toLowerCase()))
                   ).length === 0 && (
                     <div style={{
-                      padding: "20px",
+                      padding: "24px",
                       textAlign: "center",
-                      color: "#546e7a",
-                      fontSize: "0.9rem"
+                      color: "#94A3B8",
+                      fontSize: "0.875rem"
                     }}>
                       No numbers found
                     </div>
@@ -646,26 +776,22 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
                 </div>
               )}
             </div>
+
+            {/* Call button */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", paddingTop: "20px" }}>
               <button
                 className="call-btn"
                 onClick={() => handleMakeCall(item.id)}
                 disabled={!manualNumbers[item.id] || isCallActive}
-                style={{
-                  width: "48px",
-                  height: "48px",
-                  flexShrink: 0
-                }}
+                title="Make call"
               >
-                📞
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
               </button>
             </div>
-            {/* Agent Type moved to second row */}
+
+            {/* Agent Type — full-width row */}
             <div className="select-box" style={{ gridColumn: "1 / -1" }}>
-              <label
-                htmlFor={`agentType-${item.id}`}
-                className="text-sm text-gray-600"
-              >
+              <label htmlFor={`agentType-${item.id}`}>
                 Agent Type
               </label>
               <select
@@ -674,11 +800,9 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
                 onChange={(e) =>
                   handleAgentTypeChange(item.id, e.target.value)
                 }
-                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 style={{
-                  color: "#0f172a",
-                  fontWeight: "500",
-                  fontSize: "0.95rem"
+                  fontFamily: "'Inter', sans-serif",
+                  cursor: "pointer"
                 }}
               >
                 <option value="">-- Select Type --</option>
@@ -689,15 +813,28 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
           </div>
         ))}
       </div>
+
+      {/* ── Empty States ─────────────────────────────────────────────── */}
       {exotelPhones.length === 0 && (
-        <p className="mt-3 text-red-500">No Exotel phones available.</p>
+        <div className="ml-empty-state" style={{ marginTop: "16px" }}>
+          <div className="ml-empty-state-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </div>
+          <p className="ml-empty-state-text">No Exotel phones available.</p>
+        </div>
       )}
       {manualLeads.length === 0 && (
-        <p className="mt-3 text-red-500">No manual leads added yet.</p>
+        <div className="ml-empty-state" style={{ marginTop: "16px" }}>
+          <div className="ml-empty-state-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          </div>
+          <p className="ml-empty-state-text">No manual leads added yet. Enter a number above to get started.</p>
+        </div>
       )}
 
+      {/* ── Call History ──────────────────────────────────────────────── */}
       {callHistory.length > 0 && (
-        <div className="call-history mt-5">
+        <div className="call-history">
           <h3 className="title">Call History</h3>
           <ul>
             {callHistory.map((call, index) => (
@@ -711,23 +848,30 @@ function ManualLeads({ agentId, userId, agentCollection, onStartCall, onEndCall 
         </div>
       )}
 
+      {/* ── Active Call Banner ────────────────────────────────────────── */}
       {isCallActive && (
         <div className="end-call-interface">
           <h3>Call in Progress</h3>
           <p>Stay focused and professional</p>
           <button onClick={handleEndCall} className="end-call-btn">
-            End Call
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              End Call
+            </span>
           </button>
         </div>
       )}
 
+      {/* ── Call Log Form (slide-in) ─────────────────────────────────── */}
       {showCallForm && (
-        <ManualCallLogForm
-          onSubmit={handleFormSubmit}
-          initialClientNumber={currentLeadNumber}
-          agentType={currentAgentType}
-          defaultPartner={agentDefaultPartner}
-        />
+        <div className="call-form-container">
+          <ManualCallLogForm
+            onSubmit={handleFormSubmit}
+            initialClientNumber={currentLeadNumber}
+            agentType={currentAgentType}
+            defaultPartner={agentDefaultPartner}
+          />
+        </div>
       )}
     </div>
   );

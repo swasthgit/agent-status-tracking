@@ -77,6 +77,10 @@ import {
   Person,
   Map,
   Description,
+  Route,
+  AccountBalanceWallet,
+  Navigation,
+  ArrowForward,
 } from "@mui/icons-material";
 import {
   BarChart,
@@ -99,6 +103,7 @@ import {
 } from "recharts";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { REIMBURSEMENT_CONFIG } from "../config/reimbursementConfig";
 
 // ⚠️ TEMPORARY OVERRIDE FOR MEETING - REMOVE AFTER MEETING ⚠️
 // Set to null to use actual count, or a number to override display
@@ -518,7 +523,7 @@ const CSVExportDialog = ({ open, onClose, visitLogs, trips, manualCallLogs, dcAg
       `Generated: ${new Date().toLocaleString()}`,
       `Total Records: ${filtered.length}`,
       "",
-      "Date,DC Name,Employee ID,Start Time,End Time,Duration,Distance (km),Start Location,End Location,Status"
+      "Date,DC Name,Employee ID,Start Time,End Time,Duration,Straight-line Distance (km),Road Distance (km),Reimbursement (INR),Clinics Visited,Start Location,End Location,Google Maps Status,Status"
     ];
 
     filtered.forEach(trip => {
@@ -527,9 +532,13 @@ const CSVExportDialog = ({ open, onClose, visitLogs, trips, manualCallLogs, dcAg
       const endTime = formatTimestamp(trip.endTime);
       const startLoc = trip.startLocation ? `${trip.startLocation.latitude?.toFixed(6)},${trip.startLocation.longitude?.toFixed(6)}` : "N/A";
       const endLoc = trip.endLocation ? `${trip.endLocation.latitude?.toFixed(6)},${trip.endLocation.longitude?.toFixed(6)}` : "N/A";
+      const roadKm = trip.distanceSummary?.roadTotalKm;
+      const reimbAmt = trip.reimbursement?.calculatedAmount;
+      const clinicCount = trip.visitLocations?.length || 0;
+      const clinicCodes = (trip.visitLocations || []).map(v => v.clinicCode).join("; ");
 
       rows.push(
-        `"${date}","${trip.userName || ""}","${trip.userEmpId || ""}","${startTime}","${endTime}","${formatDuration(trip.totalDuration)}","${trip.totalDistance?.toFixed(2) || 0}","${startLoc}","${endLoc}","${trip.status || ""}"`
+        `"${date}","${trip.userName || ""}","${trip.userEmpId || ""}","${startTime}","${endTime}","${formatDuration(trip.totalDuration)}","${trip.totalDistance?.toFixed(2) || 0}","${roadKm != null ? roadKm.toFixed(2) : "N/A"}","${reimbAmt != null ? reimbAmt.toFixed(2) : "N/A"}","${clinicCount}${clinicCodes ? ' (' + clinicCodes + ')' : ''}","${startLoc}","${endLoc}","${trip.googleMapsStatus || "N/A"}","${trip.status || ""}"`
       );
     });
 
@@ -1468,6 +1477,9 @@ function OfflineVisitsManagerDashboardEnhanced({ currentUser }) {
   const [visitDetailOpen, setVisitDetailOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
+  // Trip detail dialog state
+  const [selectedTripDetail, setSelectedTripDetail] = useState(null);
+
   // Calculate date range
   const dateRange = useMemo(() =>
     getDateRange(dateFilter, customStartDate, customEndDate),
@@ -2133,44 +2145,232 @@ function OfflineVisitsManagerDashboardEnhanced({ currentUser }) {
               </Box>
             )}
 
-            {/* Tab 2: Trips */}
-            {activeTab === 2 && (
+            {/* Tab 2: Trips - Enhanced with Road Distance & Reimbursement */}
+            {activeTab === 2 && (() => {
+              const completedTrips = filteredTrips.filter(t => t.status === "completed");
+              const tripsWithRoad = completedTrips.filter(t => t.distanceSummary?.roadTotalKm != null);
+              const totalRoadKm = tripsWithRoad.reduce((sum, t) => sum + (t.distanceSummary?.roadTotalKm || 0), 0);
+              const totalStraightKm = filteredTrips.reduce((sum, t) => sum + (t.totalDistance || 0), 0);
+              const totalReimbursement = tripsWithRoad.reduce((sum, t) => sum + (t.reimbursement?.calculatedAmount || 0), 0);
+              const totalClinicsVisited = completedTrips.reduce((sum, t) => sum + (t.visitLocations?.length || 0), 0);
+
+              return (
               <Box>
-                <TableContainer>
-                  <Table>
+                {/* Summary Stats Row */}
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={6} sm={3}>
+                    <Card elevation={0} sx={{ background: GRADIENTS.primary, borderRadius: 3, height: "100%" }}>
+                      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                          <Route sx={{ color: "rgba(255,255,255,0.85)", fontSize: 20 }} />
+                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 500, letterSpacing: "0.5px", textTransform: "uppercase", fontSize: "0.65rem" }}>
+                            Total Distance
+                          </Typography>
+                        </Box>
+                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800, lineHeight: 1.2 }}>
+                          {(totalRoadKm > 0 ? totalRoadKm : totalStraightKm).toFixed(1)} <Typography component="span" variant="body2" sx={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>km</Typography>
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem" }}>
+                          {totalRoadKm > 0 ? `Road: ${totalRoadKm.toFixed(1)} km` : `Straight-line`}{totalRoadKm > 0 ? ` | Straight: ${totalStraightKm.toFixed(1)} km` : ""}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Card elevation={0} sx={{ background: GRADIENTS.accent, borderRadius: 3, height: "100%" }}>
+                      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                          <AccountBalanceWallet sx={{ color: "rgba(255,255,255,0.85)", fontSize: 20 }} />
+                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 500, letterSpacing: "0.5px", textTransform: "uppercase", fontSize: "0.65rem" }}>
+                            Reimbursement
+                          </Typography>
+                        </Box>
+                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800, lineHeight: 1.2 }}>
+                          {REIMBURSEMENT_CONFIG.currencySymbol}{totalReimbursement.toFixed(0)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem" }}>
+                          @ {REIMBURSEMENT_CONFIG.currencySymbol}{REIMBURSEMENT_CONFIG.ratePerKm}/km
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Card elevation={0} sx={{ background: GRADIENTS.info, borderRadius: 3, height: "100%" }}>
+                      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                          <LocalHospital sx={{ color: "rgba(255,255,255,0.85)", fontSize: 20 }} />
+                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 500, letterSpacing: "0.5px", textTransform: "uppercase", fontSize: "0.65rem" }}>
+                            Clinics Visited
+                          </Typography>
+                        </Box>
+                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800, lineHeight: 1.2 }}>
+                          {totalClinicsVisited}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem" }}>
+                          Across {completedTrips.length} trips
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Card elevation={0} sx={{ background: GRADIENTS.purple, borderRadius: 3, height: "100%" }}>
+                      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                          <Navigation sx={{ color: "rgba(255,255,255,0.85)", fontSize: 20 }} />
+                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 500, letterSpacing: "0.5px", textTransform: "uppercase", fontSize: "0.65rem" }}>
+                            Google Maps
+                          </Typography>
+                        </Box>
+                        <Typography variant="h5" sx={{ color: "white", fontWeight: 800, lineHeight: 1.2 }}>
+                          {tripsWithRoad.length}<Typography component="span" variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 500 }}>/{completedTrips.length}</Typography>
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.65rem" }}>
+                          Trips with road data
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                {/* Enhanced Trips Table */}
+                <TableContainer sx={{ borderRadius: 2, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+                  <Table size="small">
                     <TableHead>
-                      <TableRow sx={{ bgcolor: "#10b981" }}>
-                        <TableCell sx={{ color: "white", fontWeight: 600 }}>Date</TableCell>
-                        <TableCell sx={{ color: "white", fontWeight: 600 }}>DC Name</TableCell>
-                        <TableCell sx={{ color: "white", fontWeight: 600 }}>Start Time</TableCell>
-                        <TableCell sx={{ color: "white", fontWeight: 600 }}>End Time</TableCell>
-                        <TableCell sx={{ color: "white", fontWeight: 600 }}>Distance</TableCell>
-                        <TableCell sx={{ color: "white", fontWeight: 600 }}>Duration</TableCell>
-                        <TableCell sx={{ color: "white", fontWeight: 600 }}>Status</TableCell>
+                      <TableRow sx={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)" }}>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", py: 1.5 }}>Date</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>DC Name</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Time</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Straight-line</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Road Dist.</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Reimbursement</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Clinics</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Duration</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Status</TableCell>
+                        <TableCell sx={{ color: "#94a3b8", fontWeight: 600, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px" }} align="center">Details</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {filteredTrips.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map(trip => (
-                        <TableRow key={trip.id} hover>
-                          <TableCell>{formatDate(trip.startTime)}</TableCell>
-                          <TableCell sx={{ fontWeight: 500 }}>{trip.userName}</TableCell>
-                          <TableCell>{formatTimestamp(trip.startTime)}</TableCell>
-                          <TableCell>{formatTimestamp(trip.endTime)}</TableCell>
-                          <TableCell>
-                            <Typography sx={{ fontWeight: 600, color: "#10b981" }}>
-                              {trip.totalDistance?.toFixed(2) || 0} km
+                      {filteredTrips.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((trip, idx) => {
+                        const roadKm = trip.distanceSummary?.roadTotalKm;
+                        const hasRoadData = roadKm != null;
+                        const reimbAmt = trip.reimbursement?.calculatedAmount;
+                        const clinicCount = trip.visitLocations?.length || 0;
+
+                        return (
+                        <TableRow
+                          key={trip.id}
+                          hover
+                          sx={{
+                            bgcolor: idx % 2 === 0 ? "#ffffff" : "#f8fafc",
+                            "&:hover": { bgcolor: "#f0fdf4 !important" },
+                            transition: "background-color 0.15s",
+                          }}
+                        >
+                          <TableCell sx={{ py: 1.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b", fontSize: "0.8rem" }}>
+                              {formatDate(trip.startTime)}
                             </Typography>
                           </TableCell>
-                          <TableCell>{formatDuration(trip.totalDuration)}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Avatar sx={{ width: 28, height: 28, bgcolor: "#10b981", fontSize: "0.7rem", fontWeight: 700 }}>
+                                {(trip.userName || "?").charAt(0)}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.8rem", color: "#1e293b", lineHeight: 1.2 }}>
+                                  {trip.userName || "N/A"}
+                                </Typography>
+                                {trip.userEmpId && (
+                                  <Typography variant="caption" sx={{ color: "#94a3b8", fontSize: "0.65rem" }}>
+                                    {trip.userEmpId}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption" sx={{ color: "#64748b", fontSize: "0.75rem" }}>
+                              {formatTimestamp(trip.startTime)}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", fontSize: "0.65rem" }}>
+                              to {formatTimestamp(trip.endTime)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: trip.status === "active" ? "#94a3b8" : "#64748b", fontSize: "0.8rem", fontStyle: trip.status === "active" ? "italic" : "normal" }}>
+                              {trip.status === "active" ? "In progress" : `${trip.totalDistance?.toFixed(2) || "0.00"} km`}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            {hasRoadData ? (
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: "#059669", fontSize: "0.85rem" }}>
+                                {roadKm.toFixed(2)} km
+                              </Typography>
+                            ) : (
+                              <Chip label={trip.status === "active" ? "In progress" : "N/A"} size="small" sx={{ bgcolor: trip.status === "active" ? "#dbeafe" : "#f1f5f9", color: trip.status === "active" ? "#2563eb" : "#94a3b8", fontSize: "0.65rem", height: 22 }} />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {reimbAmt != null ? (
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: "#d97706", fontSize: "0.85rem" }}>
+                                {REIMBURSEMENT_CONFIG.currencySymbol}{reimbAmt.toFixed(0)}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" sx={{ color: "#cbd5e1", fontSize: "0.75rem" }}>--</Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {clinicCount > 0 ? (
+                              <Chip
+                                label={clinicCount}
+                                size="small"
+                                sx={{ bgcolor: "#dbeafe", color: "#1d4ed8", fontWeight: 700, fontSize: "0.75rem", height: 24, minWidth: 32 }}
+                              />
+                            ) : (
+                              <Typography variant="body2" sx={{ color: "#cbd5e1", fontSize: "0.75rem", textAlign: "center" }}>0</Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: "#475569", fontSize: "0.8rem" }}>
+                              {formatDuration(trip.totalDuration)}
+                            </Typography>
+                          </TableCell>
                           <TableCell>
                             <Chip
-                              label={trip.status || "N/A"}
+                              label={trip.autoEnded ? "auto-ended" : (trip.status || "N/A")}
                               size="small"
-                              sx={{ bgcolor: trip.status === "completed" ? "#dcfce7" : "#fef3c7", color: trip.status === "completed" ? "#16a34a" : "#d97706" }}
+                              sx={{
+                                bgcolor: trip.autoEnded ? "#fef3c7" : trip.status === "completed" ? "#dcfce7" : trip.status === "active" ? "#dbeafe" : "#fef3c7",
+                                color: trip.autoEnded ? "#d97706" : trip.status === "completed" ? "#16a34a" : trip.status === "active" ? "#2563eb" : "#d97706",
+                                fontWeight: 600,
+                                fontSize: "0.65rem",
+                                height: 24,
+                              }}
                             />
                           </TableCell>
+                          <TableCell align="center">
+                            {(hasRoadData || clinicCount > 0) && (
+                              <Tooltip title="View route details">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setSelectedTripDetail(trip)}
+                                  sx={{ color: "#10b981", "&:hover": { bgcolor: "#f0fdf4" } }}
+                                >
+                                  <Visibility sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
+                      {filteredTrips.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                            <Typography color="text.secondary">No trips recorded yet</Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -2184,7 +2384,8 @@ function OfflineVisitsManagerDashboardEnhanced({ currentUser }) {
                   rowsPerPageOptions={[10, 25, 50]}
                 />
               </Box>
-            )}
+              );
+            })()}
 
             {/* Tab 3: Clinics */}
             {activeTab === 3 && (
@@ -2524,6 +2725,162 @@ function OfflineVisitsManagerDashboardEnhanced({ currentUser }) {
         visit={selectedVisit}
         formatTimestamp={formatTimestamp}
       />
+
+      {/* Trip Detail Dialog */}
+      <Dialog
+        open={!!selectedTripDetail}
+        onClose={() => setSelectedTripDetail(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+      >
+        {selectedTripDetail && (() => {
+          const trip = selectedTripDetail;
+          const roadKm = trip.distanceSummary?.roadTotalKm;
+          const straightKm = trip.totalDistance;
+          const segments = trip.routeSegments || [];
+          const clinics = trip.visitLocations || [];
+          const reimb = trip.reimbursement;
+
+          return (
+          <>
+            {/* Header */}
+            <Box sx={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)", px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Box>
+                <Typography variant="h6" sx={{ color: "white", fontWeight: 700, fontSize: "1.1rem", mb: 0.5 }}>
+                  Trip Route Details
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                  <Chip label={trip.userName || "N/A"} size="small" sx={{ bgcolor: "rgba(16,185,129,0.2)", color: "#34d399", fontWeight: 600, fontSize: "0.7rem" }} />
+                  <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                    {formatDate(trip.startTime)} &bull; {formatTimestamp(trip.startTime)} - {formatTimestamp(trip.endTime)}
+                  </Typography>
+                </Box>
+              </Box>
+              <IconButton onClick={() => setSelectedTripDetail(null)} sx={{ color: "#94a3b8" }}>
+                <Close />
+              </IconButton>
+            </Box>
+
+            <DialogContent sx={{ p: 0 }}>
+              {/* Stats Row */}
+              <Box sx={{ display: "flex", borderBottom: "1px solid #e2e8f0" }}>
+                <Box sx={{ flex: 1, p: 2, textAlign: "center", borderRight: "1px solid #e2e8f0" }}>
+                  <Typography variant="caption" sx={{ color: "#94a3b8", textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px", fontWeight: 600 }}>Straight-line</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#64748b", fontSize: "1.1rem" }}>{straightKm?.toFixed(2) || "0.00"} km</Typography>
+                </Box>
+                <Box sx={{ flex: 1, p: 2, textAlign: "center", borderRight: "1px solid #e2e8f0", bgcolor: "#f0fdf4" }}>
+                  <Typography variant="caption" sx={{ color: "#059669", textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px", fontWeight: 600 }}>Road Distance</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: "#059669", fontSize: "1.1rem" }}>{roadKm != null ? `${roadKm.toFixed(2)} km` : "N/A"}</Typography>
+                </Box>
+                <Box sx={{ flex: 1, p: 2, textAlign: "center", borderRight: "1px solid #e2e8f0", bgcolor: "#fffbeb" }}>
+                  <Typography variant="caption" sx={{ color: "#d97706", textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px", fontWeight: 600 }}>Reimbursement</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: "#d97706", fontSize: "1.1rem" }}>{reimb?.calculatedAmount != null ? `${REIMBURSEMENT_CONFIG.currencySymbol}${reimb.calculatedAmount.toFixed(2)}` : "--"}</Typography>
+                </Box>
+                <Box sx={{ flex: 1, p: 2, textAlign: "center" }}>
+                  <Typography variant="caption" sx={{ color: "#94a3b8", textTransform: "uppercase", fontSize: "0.6rem", letterSpacing: "0.5px", fontWeight: 600 }}>Duration</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#475569", fontSize: "1.1rem" }}>{formatDuration(trip.totalDuration)}</Typography>
+                </Box>
+              </Box>
+
+              {/* Route Segments Timeline */}
+              {segments.length > 0 && (
+                <Box sx={{ p: 3 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#1e293b", mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
+                    <Route sx={{ fontSize: 18, color: "#10b981" }} />
+                    Route Segments ({segments.length})
+                  </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                    {segments.map((seg, i) => (
+                      <Box key={i} sx={{ display: "flex", alignItems: "stretch", gap: 2 }}>
+                        {/* Timeline line */}
+                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: 24 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: i === 0 ? "#10b981" : "#0ea5e9", border: "2px solid white", boxShadow: `0 0 0 2px ${i === 0 ? "#10b981" : "#0ea5e9"}`, zIndex: 1 }} />
+                          {i < segments.length - 1 && <Box sx={{ width: 2, flex: 1, bgcolor: "#e2e8f0" }} />}
+                        </Box>
+                        {/* Segment details */}
+                        <Box sx={{ flex: 1, pb: 2, minWidth: 0 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b", fontSize: "0.8rem" }}>
+                              {seg.from?.label || `Point ${i + 1}`}
+                            </Typography>
+                            <ArrowForward sx={{ fontSize: 14, color: "#94a3b8" }} />
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b", fontSize: "0.8rem" }}>
+                              {seg.to?.label || `Point ${i + 2}`}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                            {seg.roadDistanceKm != null && (
+                              <Chip label={`${seg.roadDistanceKm} km road`} size="small" sx={{ bgcolor: "#dcfce7", color: "#16a34a", fontWeight: 600, fontSize: "0.65rem", height: 22 }} />
+                            )}
+                            <Chip label={`${seg.haversineDistanceKm} km straight`} size="small" sx={{ bgcolor: "#f1f5f9", color: "#64748b", fontSize: "0.65rem", height: 22 }} />
+                            {seg.roadDurationMinutes != null && (
+                              <Chip label={`${seg.roadDurationMinutes} min`} size="small" sx={{ bgcolor: "#e0f2fe", color: "#0284c7", fontSize: "0.65rem", height: 22 }} />
+                            )}
+                            {seg.error && (
+                              <Chip label={`Error: ${seg.error}`} size="small" sx={{ bgcolor: "#fef2f2", color: "#dc2626", fontSize: "0.65rem", height: 22 }} />
+                            )}
+                          </Box>
+                        </Box>
+                      </Box>
+                    ))}
+                    {/* End point */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: 24 }}>
+                        <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: "#ef4444", border: "2px solid white", boxShadow: "0 0 0 2px #ef4444" }} />
+                      </Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b", fontSize: "0.8rem" }}>
+                        {segments[segments.length - 1]?.to?.label || "Trip End"}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              )}
+
+              {/* Clinics Visited */}
+              {clinics.length > 0 && (
+                <Box sx={{ px: 3, pb: 3 }}>
+                  <Divider sx={{ mb: 2 }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#1e293b", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                    <LocalHospital sx={{ fontSize: 18, color: "#0ea5e9" }} />
+                    Clinics Visited ({clinics.length})
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {clinics.map((clinic, i) => (
+                      <Chip
+                        key={i}
+                        icon={<LocationOn sx={{ fontSize: 14 }} />}
+                        label={clinic.clinicCode || "Visit"}
+                        size="small"
+                        sx={{ bgcolor: "#dbeafe", color: "#1d4ed8", fontWeight: 600, fontSize: "0.7rem", "& .MuiChip-icon": { color: "#3b82f6" } }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* No enhanced data message */}
+              {segments.length === 0 && clinics.length === 0 && (
+                <Box sx={{ p: 4, textAlign: "center" }}>
+                  <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+                    No road distance or clinic visit data available for this trip.
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#cbd5e1" }}>
+                    Road data is available for trips completed after the Google Maps integration.
+                  </Typography>
+                </Box>
+              )}
+            </DialogContent>
+
+            <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e2e8f0", bgcolor: "#f8fafc" }}>
+              <Button onClick={() => setSelectedTripDetail(null)} variant="outlined" sx={{ borderColor: "#e2e8f0", color: "#64748b", textTransform: "none", fontWeight: 600 }}>
+                Close
+              </Button>
+            </DialogActions>
+          </>
+          );
+        })()}
+      </Dialog>
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

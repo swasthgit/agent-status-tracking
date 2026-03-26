@@ -25,6 +25,16 @@ export const AGENT_STATUS = {
 const BREAK_MAX_DURATION = 60 * 60 * 1000;    // 1 hour max break
 const AUTO_LOGOUT_HOUR = 18;                   // 6 PM auto logout
 const CHECK_INTERVAL = 60 * 1000;             // Check every 1 minute
+const BREAK_GUARD_PERIOD = 5 * 1000;          // 5 second guard after starting break
+const INIT_RETRY_DELAY = 2000;                // 2 second retry delay
+const MAX_INIT_RETRIES = 3;                   // Max retry attempts for initial fetch
+
+// localStorage keys for session fallback
+const LS_PREFIX = 'mswasth_agent_';
+const LS_STATUS_KEY = (id) => `${LS_PREFIX}${id}_status`;
+const LS_LOGIN_TIME_KEY = (id) => `${LS_PREFIX}${id}_loginTime`;
+const LS_LOGIN_DATE_KEY = (id) => `${LS_PREFIX}${id}_loginDate`;
+const LS_BREAK_START_KEY = (id) => `${LS_PREFIX}${id}_breakStart`;
 
 /**
  * Helper to check if a timestamp is from today
@@ -34,6 +44,69 @@ const isToday = (timestamp) => {
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   const today = new Date();
   return date.toDateString() === today.toDateString();
+};
+
+/**
+ * Save session state to localStorage as a fallback for network failures.
+ * Only used when Firestore is unreachable on page refresh.
+ */
+const saveSessionToLocal = (agentId, data) => {
+  try {
+    if (data.status) localStorage.setItem(LS_STATUS_KEY(agentId), data.status);
+    if (data.loginTime) localStorage.setItem(LS_LOGIN_TIME_KEY(agentId), data.loginTime.toISOString());
+    localStorage.setItem(LS_LOGIN_DATE_KEY(agentId), new Date().toDateString());
+    if (data.breakStartTime) {
+      localStorage.setItem(LS_BREAK_START_KEY(agentId), data.breakStartTime.toISOString());
+    } else {
+      localStorage.removeItem(LS_BREAK_START_KEY(agentId));
+    }
+  } catch (e) {
+    // localStorage not available - ignore
+  }
+};
+
+/**
+ * Load session state from localStorage fallback.
+ * Returns null if no valid session found or session is from a different day.
+ */
+const loadSessionFromLocal = (agentId) => {
+  try {
+    const savedDate = localStorage.getItem(LS_LOGIN_DATE_KEY(agentId));
+    const today = new Date().toDateString();
+
+    if (savedDate !== today) {
+      clearLocalSession(agentId);
+      return null;
+    }
+
+    const status = localStorage.getItem(LS_STATUS_KEY(agentId));
+    const loginTimeStr = localStorage.getItem(LS_LOGIN_TIME_KEY(agentId));
+    const breakStartStr = localStorage.getItem(LS_BREAK_START_KEY(agentId));
+
+    if (!status || !loginTimeStr) return null;
+
+    return {
+      status,
+      loginTime: new Date(loginTimeStr),
+      breakStartTime: breakStartStr ? new Date(breakStartStr) : null,
+    };
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * Clear localStorage session data
+ */
+const clearLocalSession = (agentId) => {
+  try {
+    localStorage.removeItem(LS_STATUS_KEY(agentId));
+    localStorage.removeItem(LS_LOGIN_TIME_KEY(agentId));
+    localStorage.removeItem(LS_LOGIN_DATE_KEY(agentId));
+    localStorage.removeItem(LS_BREAK_START_KEY(agentId));
+  } catch (e) {
+    // ignore
+  }
 };
 
 /**
@@ -64,6 +137,8 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
   const breakTimerRef = useRef(null);
   const unsubscribeRef = useRef(null);
   const isInitializedRef = useRef(false);
+  const breakGuardRef = useRef(false); // Guard to prevent immediate break cancellation from stale data
+  const breakStartTimeRef = useRef(null); // Stable ref for break start during guard period
 
   // Update status in Firestore
   const updateStatusInFirestore = useCallback(async (newStatus, additionalFields = {}) => {
@@ -113,9 +188,17 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
         breakStartTime: null,
       });
 
+      const now = new Date();
       setIsLoggedInToday(true);
-      setTodayLoginTime(new Date());
-      setLastActivity(new Date());
+      setTodayLoginTime(now);
+      setLastActivity(now);
+
+      // Save to localStorage as fallback for network issues on refresh
+      saveSessionToLocal(agentId, {
+        status: AGENT_STATUS.LOGIN,
+        loginTime: now,
+        breakStartTime: null,
+      });
     } catch (error) {
       console.error('[useAgentStatus] Error starting day:', error);
     }
@@ -135,6 +218,12 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
 
       setBreakTimeRemaining(0);
       setBreakStartTime(null);
+      setIsLoggedInToday(false);
+      breakGuardRef.current = false;
+      breakStartTimeRef.current = null;
+
+      // Clear local session so refresh won't restore it
+      clearLocalSession(agentId);
 
       // Clear timers
       if (breakTimerRef.current) {
@@ -157,23 +246,44 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
 
     console.log('[useAgentStatus] Starting break');
 
+    // Activate break guard to prevent stale listener data from cancelling the break
+    breakGuardRef.current = true;
+    const breakStart = new Date();
+    breakStartTimeRef.current = breakStart;
+
     try {
       await updateStatusInFirestore(AGENT_STATUS.BREAK, {
         breakStartTime: serverTimestamp(),
       });
 
-      setBreakStartTime(new Date());
+      setBreakStartTime(breakStart);
       setBreakTimeRemaining(BREAK_MAX_DURATION / 1000); // Convert to seconds
+
+      // Save to localStorage
+      saveSessionToLocal(agentId, {
+        status: AGENT_STATUS.BREAK,
+        loginTime: todayLoginTime || breakStart,
+        breakStartTime: breakStart,
+      });
+
+      // Release guard after the guard period
+      setTimeout(() => {
+        breakGuardRef.current = false;
+      }, BREAK_GUARD_PERIOD);
     } catch (error) {
       console.error('[useAgentStatus] Error starting break:', error);
+      breakGuardRef.current = false;
+      breakStartTimeRef.current = null;
     }
-  }, [agentId, collectionName, status, updateStatusInFirestore]);
+  }, [agentId, collectionName, status, todayLoginTime, updateStatusInFirestore]);
 
   // End break
   const endBreak = useCallback(async () => {
     if (!agentId || !collectionName) return;
 
     console.log('[useAgentStatus] Ending break');
+    breakGuardRef.current = false;
+    breakStartTimeRef.current = null;
 
     try {
       await updateStatusInFirestore(AGENT_STATUS.LOGIN, {
@@ -184,6 +294,13 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
       setBreakTimeRemaining(0);
       await recordActivity();
 
+      // Update localStorage
+      saveSessionToLocal(agentId, {
+        status: AGENT_STATUS.LOGIN,
+        loginTime: todayLoginTime || new Date(),
+        breakStartTime: null,
+      });
+
       // Clear break timer
       if (breakTimerRef.current) {
         clearInterval(breakTimerRef.current);
@@ -192,7 +309,7 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
     } catch (error) {
       console.error('[useAgentStatus] Error ending break:', error);
     }
-  }, [agentId, collectionName, updateStatusInFirestore, recordActivity]);
+  }, [agentId, collectionName, todayLoginTime, updateStatusInFirestore, recordActivity]);
 
   // Set status to On Call
   const setOnCall = useCallback(async () => {
@@ -200,7 +317,16 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
     if (status === AGENT_STATUS.LOGOUT || status === "Logout" || status === "Logged Out") return;
 
     await updateStatusInFirestore(AGENT_STATUS.ON_CALL);
-  }, [status, updateStatusInFirestore]);
+
+    // Keep localStorage in sync
+    if (agentId) {
+      saveSessionToLocal(agentId, {
+        status: AGENT_STATUS.ON_CALL,
+        loginTime: todayLoginTime || new Date(),
+        breakStartTime: null,
+      });
+    }
+  }, [agentId, status, todayLoginTime, updateStatusInFirestore]);
 
   // Set status back to Login after call ends
   const setAvailableAfterCall = useCallback(async () => {
@@ -209,7 +335,16 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
 
     await updateStatusInFirestore(AGENT_STATUS.LOGIN);
     await recordActivity();
-  }, [status, updateStatusInFirestore, recordActivity]);
+
+    // Keep localStorage in sync
+    if (agentId) {
+      saveSessionToLocal(agentId, {
+        status: AGENT_STATUS.LOGIN,
+        loginTime: todayLoginTime || new Date(),
+        breakStartTime: null,
+      });
+    }
+  }, [agentId, status, todayLoginTime, updateStatusInFirestore, recordActivity]);
 
   // Check for 6 PM auto-logout
   const check6PMLogout = useCallback(() => {
@@ -281,14 +416,17 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
     // Update break countdown every second
     const updateBreakCountdown = () => {
       const now = new Date();
-      const startTime = breakStartTime instanceof Date ? breakStartTime : new Date(breakStartTime);
+      // Use the ref value during guard period to prevent stale timestamps from cancelling break
+      const startTime = breakGuardRef.current && breakStartTimeRef.current
+        ? breakStartTimeRef.current
+        : (breakStartTime instanceof Date ? breakStartTime : new Date(breakStartTime));
       const elapsed = now - startTime;
       const remaining = Math.max(0, Math.floor((BREAK_MAX_DURATION - elapsed) / 1000));
 
       setBreakTimeRemaining(remaining);
 
-      // Auto-end break when time is up
-      if (remaining <= 0) {
+      // Auto-end break when time is up (but not during guard period)
+      if (remaining <= 0 && !breakGuardRef.current) {
         console.log('[useAgentStatus] Break time exceeded, auto-ending break');
         endBreak();
       }
@@ -311,8 +449,8 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
 
     const agentDocRef = doc(db, collectionName, agentId);
 
-    // Initial fetch to check today's login status
-    const initializeState = async () => {
+    // Initial fetch to check today's login status (with retry on failure)
+    const initializeState = async (retryCount = 0) => {
       setIsStatusLoading(true); // Start loading
       try {
         const docSnap = await getDoc(agentDocRef);
@@ -328,14 +466,25 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
             if (data.status !== AGENT_STATUS.LOGOUT) {
               setIsLoggedInToday(true);
               setStatus(data.status || AGENT_STATUS.LOGIN);
+
+              // Save to localStorage for future fallback
+              saveSessionToLocal(agentId, {
+                status: data.status || AGENT_STATUS.LOGIN,
+                loginTime,
+                breakStartTime: data.breakStartTime && data.status === AGENT_STATUS.BREAK
+                  ? (data.breakStartTime.toDate ? data.breakStartTime.toDate() : new Date(data.breakStartTime))
+                  : null,
+              });
             } else {
               setIsLoggedInToday(false);
               setStatus(AGENT_STATUS.LOGOUT);
+              clearLocalSession(agentId);
             }
           } else {
             // Not logged in today
             setIsLoggedInToday(false);
             setStatus(AGENT_STATUS.LOGOUT);
+            clearLocalSession(agentId);
           }
 
           // Set last activity
@@ -352,19 +501,45 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
               data.breakStartTime.toDate() :
               new Date(data.breakStartTime);
             setBreakStartTime(breakStart);
+            breakStartTimeRef.current = breakStart;
           }
         } else {
           // Document doesn't exist - agent hasn't logged in today
           setIsLoggedInToday(false);
           setStatus(AGENT_STATUS.LOGOUT);
+          clearLocalSession(agentId);
         }
         isInitializedRef.current = true;
       } catch (error) {
         console.error('[useAgentStatus] Error initializing state:', error);
-        // On error, default to not logged in so modal shows
-        setIsLoggedInToday(false);
+
+        // On network error, use localStorage fallback to preserve session
+        const cachedSession = loadSessionFromLocal(agentId);
+        if (cachedSession && cachedSession.status !== AGENT_STATUS.LOGOUT) {
+          console.log('[useAgentStatus] Using localStorage fallback for session state');
+          setStatus(cachedSession.status);
+          setIsLoggedInToday(true);
+          setTodayLoginTime(cachedSession.loginTime);
+          if (cachedSession.breakStartTime && cachedSession.status === AGENT_STATUS.BREAK) {
+            setBreakStartTime(cachedSession.breakStartTime);
+            breakStartTimeRef.current = cachedSession.breakStartTime;
+          }
+          isInitializedRef.current = true;
+        } else if (retryCount < MAX_INIT_RETRIES) {
+          // Retry the fetch after a delay
+          console.log(`[useAgentStatus] Retrying initialization (attempt ${retryCount + 1}/${MAX_INIT_RETRIES})...`);
+          setTimeout(() => initializeState(retryCount + 1), INIT_RETRY_DELAY);
+          return; // Don't set loading to false yet - retry in progress
+        } else {
+          // All retries exhausted, no localStorage fallback
+          console.error('[useAgentStatus] All retries exhausted, defaulting to not logged in');
+          setIsLoggedInToday(false);
+          isInitializedRef.current = true;
+        }
       } finally {
-        setIsStatusLoading(false); // Done loading - NOW show modal if needed
+        if (isInitializedRef.current) {
+          setIsStatusLoading(false); // Done loading - NOW show modal if needed
+        }
       }
     };
 
@@ -374,6 +549,13 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
     unsubscribeRef.current = onSnapshot(agentDocRef, (docSnap) => {
       if (docSnap.exists() && isInitializedRef.current) {
         const data = docSnap.data();
+
+        // During break guard period, ignore status changes that would cancel the break
+        // This prevents stale Firestore listener data from immediately ending a break
+        if (breakGuardRef.current && data.status !== AGENT_STATUS.BREAK) {
+          console.log('[useAgentStatus] Ignoring stale status during break guard period');
+          return;
+        }
 
         // Update status
         if (data.status) {
@@ -397,6 +579,15 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
 
           if (data.status !== AGENT_STATUS.LOGOUT) {
             setIsLoggedInToday(true);
+
+            // Keep localStorage in sync with Firestore
+            saveSessionToLocal(agentId, {
+              status: data.status,
+              loginTime,
+              breakStartTime: data.breakStartTime && data.status === AGENT_STATUS.BREAK
+                ? (data.breakStartTime.toDate ? data.breakStartTime.toDate() : new Date(data.breakStartTime))
+                : null,
+            });
           }
         }
 
@@ -405,9 +596,20 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
           const breakStart = data.breakStartTime.toDate ?
             data.breakStartTime.toDate() :
             new Date(data.breakStartTime);
-          setBreakStartTime(breakStart);
+
+          // Validate break start time is within max duration to prevent stale data issues
+          const breakAge = Date.now() - breakStart.getTime();
+          if (breakAge < BREAK_MAX_DURATION) {
+            setBreakStartTime(breakStart);
+            breakStartTimeRef.current = breakStart;
+          } else {
+            // Break has expired based on the stored timestamp - auto end it
+            console.log('[useAgentStatus] Stale breakStartTime detected, auto-ending expired break');
+            endBreak();
+          }
         } else if (data.status !== AGENT_STATUS.BREAK) {
           setBreakStartTime(null);
+          breakStartTimeRef.current = null;
         }
       }
     }, (error) => {
@@ -419,7 +621,7 @@ export const useAgentStatus = (agentId, collectionName, isLoggedIn = true) => {
         unsubscribeRef.current();
       }
     };
-  }, [agentId, collectionName]);
+  }, [agentId, collectionName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup on unmount
   useEffect(() => {
